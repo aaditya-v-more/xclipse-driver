@@ -16,6 +16,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import shutil
 import struct
@@ -119,9 +120,12 @@ def wait_for_phone(limit_s: float = 600) -> bool:
 
 def build_driver() -> None:
     log = ROOT / "driver" / "build-log.txt"
+    head = run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"]).stdout.strip()
+    dirty = run(["git", "-C", str(ROOT), "status", "--porcelain", "--", "driver"]).stdout.strip()
+    env = dict(os.environ, PACKAGE_TAG=f"xd-{head}{'-dirty' if dirty else ''}")
     with log.open("w", encoding="utf-8") as out:
         r = subprocess.run(["cmd.exe", "/c", f"call {TOOLS / 'env.cmd'} && {ROOT / 'driver' / 'build.cmd'}"],
-                           stdout=out, stderr=subprocess.STDOUT)
+                           stdout=out, stderr=subprocess.STDOUT, env=env)
     if r.returncode:
         sys.exit(f"driver build failed; see {log}")
 

@@ -62,7 +62,10 @@ def main():
 
     commit = git('rev-parse', '--short', 'HEAD')
     count = git('rev-list', '--count', 'HEAD') or '1'
-    suffix = '-' + commit if commit else ''
+    # PACKAGE_TAG names builds made outside this repository's own history (for example from a
+    # tree that vendors it), so they stay distinguishable in an app's driver list.
+    tag = os.environ.get('PACKAGE_TAG', '') or commit
+    suffix = '-' + tag if tag else ''
 
     meta = {
         'schemaVersion': 1,
