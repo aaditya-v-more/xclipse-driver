@@ -67,6 +67,16 @@ tools/python/bin/python3 pipeline/game.py --runs 3
 - Put test binaries in `/data/local/tmp`. **Keep the user's files on the phone.** Don't delete benchmark folders, installers, or the driver zip; document them instead (user instruction, 2026-10-10).
 - **When driving the phone's UI, nobody else may touch it.** Keep the screen on with `adb shell svc power stayon usb`, and restore it afterwards with `adb shell settings put global stay_on_while_plugged_in 0` (the original value). Don't use key presses as a keep-alive; GameNative treats them as input.
 - Never enter credentials. GameNative's Steam sign-in is skipped with "Skip login".
+- **Hand phone UI navigation to Sonnet subagents** (standing instruction from the user, 2026-10-11).
+  - This covers work like editing GameNative containers, importing a driver in Driver Manager, toggling app settings, and reading values off screens.
+  - It's slow and mechanical, so launch it as a background subagent with the Sonnet model, and keep the main session on analysis and code.
+  - Give the subagent:
+    - the exact values;
+    - the rules in this section;
+    - `pipeline/phone_ui.py` (`dump`, `tap`, `type`, `clear`, `shot`).
+  - Ask it to read every change back after saving.
+  - Tell it to tap tabs by coordinates or exact names, not substrings, and never to tap Reset container, Uninstall, Delete variable or Import config.
+  - Only one agent drives the phone at a time. Don't run `game.py` while a subagent is driving.
 - Don't make system changes, such as installing WSL, enabling Windows features, or changing macOS security settings. Give the user the command to run instead.
 
 ## Conventions

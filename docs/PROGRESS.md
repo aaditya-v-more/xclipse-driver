@@ -115,6 +115,18 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - **Fixed** by forcing Wine's built-in runtime, which keeps its imports in a separate section. Both Heaven containers now set `WINEDLLOVERRIDES=msvcr100,msvcp100=b`, and Heaven-stock is back on FEXCore 2603 like the other three.
   - The next launch got as far as Unigine's own error box: it couldn't open `A:/bin/A:/data/heaven_4.0.cfg`. Heaven resolves `-data_path` and `-engine_config` against its `bin` folder even when they start with a drive letter. The Exec Arguments now use `../` and `../data/heaven_4.0.cfg`, as Heaven's own launcher does.
   - `game.py` now saves a phone screenshot when a run ends without frames, since that usually means a message box.
+- [ ] **Heaven gets further on both drivers, and fails differently on each (2026-10-11, `results/2026-10-11_013033-game`).**
+  - **Stock: Samsung's driver can't create Heaven's textures.**
+    - Unigine's error box lists DXVK refusing DXT1/DXT5 (BC1/BC3) textures and a 2048x2048 D24 depth texture, all with "Direct3D11 error: invalid arg". DXVK returns that when the driver reports the image as unsupported.
+    - In `auto` BCn mode GameNative's wrapper passes BC1–BC3 straight to Samsung's driver and emulates only BC4–BC7 (the `VK_DRIVER_ID_SAMSUNG_PROPRIETARY && format <= 138` case in `wrapper_physical_device.c`). `WRAPPER_NATIVE_BCN` changes nothing here, because Samsung's driver doesn't report `textureCompressionBC`.
+    - To try next: BCn Emulation `full` on Heaven-stock, which emulates BC1–BC3 too. The D24 failure may need something else.
+  - **Radv: our driver hangs Heaven on an allocation the kernel refuses.**
+    - Textures are created, then the screen stays black. Wine's log shows `radv/amdgpu: Failed to allocate a buffer: size 256 bytes, alignment 4 bytes, domains 8`. Domain 8 is GDS.
+    - The Xclipse 940 runs as GFX10_3, and on GFX10–10.3 RADV counts some query results from NGG shaders with GDS atomics. That covers geometry-shader primitives in pipeline statistics, primitives-generated queries, and mesh-shader queries.
+    - D3D11 pipeline-statistics queries through DXVK trigger it, and the queue then allocates the GDS buffer (`radv_queue.c`). Samsung's `sgpu` kernel driver has no GDS, so the allocation and the submission fail.
+    - Fix (next step, written up in `docs/HANDOFF.md`): don't use the GDS-based query emulation on Xclipse. Every D3D11 game that uses pipeline statistics would hit this.
+  - **`game.py` called the stock run "ran" at 8.8 FPS over 15 s.** Those frames were Wine drawing the error box. A run needs a minimum stretch of steady frames before it counts.
+  - **Open question:** on radv, RADV's image log showed `R8G8B8A8_UNORM` images with BC1 view formats (`fmt 37 ... list [133,134]`). That looks like the wrapper still emulating BC1 despite `WRAPPER_NATIVE_BCN=1`. GameNative 0.9.2's wrapper may predate that variable; check the launch settings in the next run's `results.json`.
 - [x] **GameNative's Vulkan wrapper emulated BC textures for RADV too (2026-10-11).**
   - In `auto` mode (`WRAPPER_EMULATE_BCN=3`), GameNative's wrapper (`src/vulkan/wrapper/wrapper_physical_device.c` in GameNative/mesa) uses native BC textures only for Qualcomm, Turnip, and NVIDIA. Every other driver gets emulation even when it reports `textureCompressionBC`, unless `WRAPPER_NATIVE_BCN=1` is set.
   - So the radv runs so far decompressed BC textures that our driver supports. Samsung's driver has no BC support, so it needs emulation regardless.
