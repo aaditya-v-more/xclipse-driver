@@ -71,6 +71,12 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - To profile again: push `driver/build-android/src/amd/vulkan/libvulkan_radeon.so`, then run `simpleperf record -e cpu-clock:u -f 4000 ./xdtest --driver <that .so> --test draws`.
 - [x] From the kernel source: `SGPU_INSTANCE_DATA` and `SGPU_MEM_PROFILE_ADD` only feed memory profiling to debugfs. `AMDGPU_WGP_GATING` sets device-wide WGP clock-on and always-on counts. It's global power state, so we leave it alone.
 
+- [x] **Game-level test prepared** (see `docs/game-setup.md`):
+  - GameNative 0.9.2 on the phone already has everything needed: Driver Manager zip import, the `CustomGames` scan folder, the `LAUNCH_GAME` intent, Exec Arguments, and per-container environment variables. There's no need to update it.
+  - GravityMark 1.89 and Unigine Heaven 4.0 were unpacked on the PC without running their installers and pushed as four custom games (stock and radv each).
+  - `pipeline/game.py` launches them over adb, counts presented frames from SurfaceFlinger, and pulls GravityMark's frame-time file and screenshot.
+  - **Waiting on:** the one-time GameNative setup (import the driver zip, set Exec Arguments and driver per container).
+
 ## Optimization targets (from the speed tests)
 
 1. **GPU per-draw overhead (5×).**
