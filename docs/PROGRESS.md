@@ -29,10 +29,29 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
 - [x] Private GitHub repo `aaditya-v-more/xclipse-driver`.
 - [x] **First driver build (2026-10-10).** `driver\dist\radv-xclipse-26.3.0-devel.zip`: Vulkan 1.4.358, 4.2 MB, SHA-256 `EB53754F…0847`. It contains `meta.json`, `vulkan.radeon.so`, and `NOTICE.txt`. A clean build takes about 1.5 minutes. The Windows build needed the NDK's `llvm-nm` added to `build.cmd` and PyYAML.
 
+- [x] **Automated on-device pipeline (2026-10-10).**
+  - `tests/xdtest.c` loads either driver: the stock one through `libvulkan.so`, ours through its Android HAL entry point.
+  - `pipeline/run.py` builds, deploys, runs each test on both drivers, survives phone reboots, and writes `results/<time>/`.
+  - The user approved automated GPU testing on the phone.
+- [x] **Probe passes on the 940** (`results/2026-10-10_181408` and `results/2026-10-10_181508`):
+  - `info`, `device`, `submit`, `compute` (65,536 elements), and `render` (an offscreen triangle, every pixel correct) all pass on both drivers, with no hangs.
+  - RADV exposes Vulkan 1.4.358 and 224 extensions; stock exposes 1.3.279 and 154.
+  - RADV compiles the compute pipeline in 2.7 ms against 54.6 ms, and the graphics pipeline in 5.0 ms against 8.1 ms.
+
+## Notes for unattended runs
+
+This PC's internet usually comes from the phone's hotspot. If a GPU hang reboots the phone, the hotspot stays off, and adb can't turn it back on without root. The runner keeps going locally, but the Claude session is offline until someone taps the hotspot on. For fully unattended runs, put the PC on other internet, such as home Wi-Fi or Ethernet.
+
 ## Next steps
 
-1. **On-device smoke test** (needs the user's go-ahead, because a GPU hang can force a phone reboot): load `vulkan.radeon.so` from `/data/local/tmp` in a small probe and confirm instance and device creation and a trivial submit on the 940. `third_party/Xclipse940-RADV` has probe sources to reuse.
-2. **Test app:** GameNative (`app.gamenative`, already installed; latest is v1.3.0-prerelease, 2026-10-04). It's a Winlator-based Steam launcher with Winlator's `AdrenotoolsManager`, so it should accept custom driver zips. Bannerlator 3.1.6 (525 MB) is the fallback: it documents a hand-picked custom driver install and a "Wrapper + bcn_layer" Xclipse baseline.
-3. **Baseline:** Samsung's driver with Wrapper + BCn (GameNative's wrapper has BCn built in), run through the benchmark suite. The benchmark downloads (GravityMark 211 MB, Heaven 247 MB) need the user's approval.
-4. Load our driver zip and run the same suite.
-5. Fix what breaks, mining `third_party/Xclipse940-RADV`. Report the Winlator-style test results upstream on JimVulkan/radv-xclipse PR #6; the maintainer asked for exactly that.
+1. **Driver-level performance tests** in `xdtest`, fully automatic:
+   - compute ALU throughput
+   - memory bandwidth
+   - fill rate
+   - draw-call CPU overhead
+   - pipeline compile time over many shaders
+
+   Results get tracked per run.
+2. **Game-level A/B in GameNative** (`app.gamenative`, already installed; v1.3.0-prerelease is the latest). It's a Winlator-based Steam launcher with Winlator's `AdrenotoolsManager`, so it should accept our driver zip. The user does a one-time setup: install the zip, then make one container with our driver and one with the stock wrapper. After that, automation launches the benchmark over adb and collects FPS logs (`DXVK_HUD`). The fallback app is Bannerlator 3.1.6 (525 MB), which documents a hand-picked driver install.
+3. **Benchmarks** need the user's approval to download: GravityMark (211 MB) and Unigine Heaven 4.0 (247 MB). Use DXVK 2.7.1 for both drivers, at least 3 runs each, and report the median and 1% lows.
+4. Fix what breaks, mining `third_party/Xclipse940-RADV`. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6; the maintainer asked for exactly that.

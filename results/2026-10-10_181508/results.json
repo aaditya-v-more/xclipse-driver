@@ -1,0 +1,212 @@
+{
+  "meta": {
+    "started": "2026-10-10T18:15:08",
+    "driver": {
+      "commit": "ce9f8ac",
+      "so_sha256": "b44e72f04892d60e95e42a5d216f3e8311daedc4a29557e00305f30505273473"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "36.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 339 Capacity level: -1 10-10 17:14:15.595 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1989, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4284, temperature:345, online:4, charging_status:0, cycle_count:0, current_avg:573437, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2206375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:32.580 Sending ACTION_BATTERY_CHANGED: level:93, status:3, health:2, remain:0, ac:false, usb:false, wireless:false, pogo:false, misc:0x10000, charge_type:0, charger_type:0, voltage:4263, temperature:341, online:1, charging_status:0, cycle_count:0, current_avg:373437, ps:false, hvc:false, current_event:0x40000000, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:34.358 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:2360, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4234, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:230468, ps:false, hvc:false, current_event:0x40000004, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:44.343 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1866, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4288, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:368750, ps:false, hvc:false, current_event:0x20000004, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:54.355 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1866, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4269, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:355468, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:17:04.374 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1866, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4285, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:324218, ps:false, hvc:false, current_event:0x20000004, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:17:24.422 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1838, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4275, temperature:339, online:4, charging_status:0, cycle_count:0, current_avg:434375, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2220625, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:19:37.241 Sending ACTION_BATTERY_CHANGED: level:94, status:2, health:2, remain:1686, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4292, temperature:334, online:4, charging_status:0, cycle_count:0, current_avg:553125, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2230125, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:24:02.889 Sending ACTION_BATTERY_CHANGED: level:95, status:2, health:2, remain:1384, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4316, temperature:333, online:4, charging_status:0, cycle_count:0, current_avg:588281, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2251500, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:29:09.317 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:1085, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4327, temperature:338, online:4, charging_status:0, cycle_count:0, current_avg:412500, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2277625, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:33:44.656 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:902, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4334, temperature:350, online:4, charging_status:0, cycle_count:0, current_avg:207031, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2294250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:35:36.794 Sending ACTION_BATTERY_CHANGED: level:97, status:2, health:2, remain:783, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4320, temperature:348, online:4, charging_status:0, cycle_count:0, current_avg:477343, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2301375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:35:46.967 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:783, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4278, temperature:350, online:4, charging_status:0, cycle_count:0, current_avg:-39062, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2303750, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:36:37.791 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:812, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4295, temperature:362, online:4, charging_status:0, cycle_count:0, current_avg:-429687, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2301375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:37:28.739 Sending ACTION_BATTERY_CHANGED: level:97, status:2, health:2, remain:783, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4327, temperature:362, online:4, charging_status:0, cycle_count:0, current_avg:382031, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2301375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:43:15.403 Sending ACTION_BATTERY_CHANGED: level:98, status:2, health:2, remain:390, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4347, temperature:357, online:4, charging_status:0, cycle_count:0, current_avg:514062, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2322750, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:44:37.186 Sending ACTION_BATTERY_CHANGED: level:99, status:2, health:2, remain:182, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4351, temperature:355, online:4, charging_status:0, cycle_count:0, current_avg:548437, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2339375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:47:00.251 Sending ACTION_BATTERY_CHANGED: level:100, status:5, health:2, remain:0, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4357, temperature:352, online:4, charging_status:0, cycle_count:0, current_avg:533593, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2370250, present:true, scale:100, technology:Li-ion, protection:1 10-10 17:55:55.211 Sending ACTION_BATTERY_CHANGED: level:100, status:5, health:2, remain:0, ac:false, usb:true, wireless:false, pogo:false, misc:0x10010000, charge_type:1, charger_type:0, voltage:4382, temperature:347, online:4, charging_status:0, cycle_count:0, current_avg:613281, ps:false, hvc:false, current_event:0x20008000, mcc:0, mcv:0, cc:2375000, present:true, scale:100, technology:Li-ion, protection:1 10-10 18:09:53.567 Sending ACTION_BATTERY_CHANGED: level:100, status:5, health:2, remain:0, ac:false, usb:true, wireless:false, pogo:false, misc:0x10010000, charge_type:1, charger_type:0, voltage:4385, temperature:335, online:4, charging_status:0, cycle_count:0, current_avg:347656, ps:false, hvc:false, current_event:0x20008000, mcc:0, mcv:0, cc:2375000, present:true, scale:100, technology:Li-ion, protection:1"
+    },
+    "tests": [
+      "submit",
+      "compute",
+      "render"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "37.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 339 Capacity level: -1 10-10 17:14:15.595 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1989, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4284, temperature:345, online:4, charging_status:0, cycle_count:0, current_avg:573437, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2206375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:32.580 Sending ACTION_BATTERY_CHANGED: level:93, status:3, health:2, remain:0, ac:false, usb:false, wireless:false, pogo:false, misc:0x10000, charge_type:0, charger_type:0, voltage:4263, temperature:341, online:1, charging_status:0, cycle_count:0, current_avg:373437, ps:false, hvc:false, current_event:0x40000000, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:34.358 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:2360, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4234, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:230468, ps:false, hvc:false, current_event:0x40000004, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:44.343 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1866, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4288, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:368750, ps:false, hvc:false, current_event:0x20000004, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:16:54.355 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1866, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4269, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:355468, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:17:04.374 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1866, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4285, temperature:340, online:4, charging_status:0, cycle_count:0, current_avg:324218, ps:false, hvc:false, current_event:0x20000004, mcc:0, mcv:0, cc:2218250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:17:24.422 Sending ACTION_BATTERY_CHANGED: level:93, status:2, health:2, remain:1838, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4275, temperature:339, online:4, charging_status:0, cycle_count:0, current_avg:434375, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2220625, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:19:37.241 Sending ACTION_BATTERY_CHANGED: level:94, status:2, health:2, remain:1686, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4292, temperature:334, online:4, charging_status:0, cycle_count:0, current_avg:553125, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2230125, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:24:02.889 Sending ACTION_BATTERY_CHANGED: level:95, status:2, health:2, remain:1384, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4316, temperature:333, online:4, charging_status:0, cycle_count:0, current_avg:588281, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2251500, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:29:09.317 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:1085, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4327, temperature:338, online:4, charging_status:0, cycle_count:0, current_avg:412500, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2277625, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:33:44.656 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:902, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4334, temperature:350, online:4, charging_status:0, cycle_count:0, current_avg:207031, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2294250, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:35:36.794 Sending ACTION_BATTERY_CHANGED: level:97, status:2, health:2, remain:783, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4320, temperature:348, online:4, charging_status:0, cycle_count:0, current_avg:477343, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2301375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:35:46.967 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:783, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4278, temperature:350, online:4, charging_status:0, cycle_count:0, current_avg:-39062, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2303750, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:36:37.791 Sending ACTION_BATTERY_CHANGED: level:96, status:2, health:2, remain:812, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4295, temperature:362, online:4, charging_status:0, cycle_count:0, current_avg:-429687, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2301375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:37:28.739 Sending ACTION_BATTERY_CHANGED: level:97, status:2, health:2, remain:783, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4327, temperature:362, online:4, charging_status:0, cycle_count:0, current_avg:382031, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2301375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:43:15.403 Sending ACTION_BATTERY_CHANGED: level:98, status:2, health:2, remain:390, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4347, temperature:357, online:4, charging_status:0, cycle_count:0, current_avg:514062, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2322750, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:44:37.186 Sending ACTION_BATTERY_CHANGED: level:99, status:2, health:2, remain:182, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4351, temperature:355, online:4, charging_status:0, cycle_count:0, current_avg:548437, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2339375, present:true, scale:100, technology:Li-ion, protection:0 10-10 17:47:00.251 Sending ACTION_BATTERY_CHANGED: level:100, status:5, health:2, remain:0, ac:false, usb:true, wireless:false, pogo:false, misc:0x10000, charge_type:1, charger_type:0, voltage:4357, temperature:352, online:4, charging_status:0, cycle_count:0, current_avg:533593, ps:false, hvc:false, current_event:0x20000000, mcc:0, mcv:0, cc:2370250, present:true, scale:100, technology:Li-ion, protection:1 10-10 17:55:55.211 Sending ACTION_BATTERY_CHANGED: level:100, status:5, health:2, remain:0, ac:false, usb:true, wireless:false, pogo:false, misc:0x10010000, charge_type:1, charger_type:0, voltage:4382, temperature:347, online:4, charging_status:0, cycle_count:0, current_avg:613281, ps:false, hvc:false, current_event:0x20008000, mcc:0, mcv:0, cc:2375000, present:true, scale:100, technology:Li-ion, protection:1 10-10 18:09:53.567 Sending ACTION_BATTERY_CHANGED: level:100, status:5, health:2, remain:0, ac:false, usb:true, wireless:false, pogo:false, misc:0x10010000, charge_type:1, charger_type:0, voltage:4385, temperature:335, online:4, charging_status:0, cycle_count:0, current_avg:347656, ps:false, hvc:false, current_event:0x20008000, mcc:0, mcv:0, cc:2375000, present:true, scale:100, technology:Li-ion, protection:1"
+    }
+  },
+  "results": [
+    {
+      "test": "submit",
+      "driver": "stock",
+      "ms_load": 25.365,
+      "ms_instance": 39.433,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.398,
+      "ms_fence_only": 0.633,
+      "ms_empty_cmdbuf": 0.784,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] fence-only submit",
+        "[xdtest] empty command buffer submit",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "compute",
+      "driver": "stock",
+      "ms_load": 27.281,
+      "ms_instance": 37.823,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.279,
+      "ms_pipeline": 54.647,
+      "ms_gpu": 1.214,
+      "elements": 65536,
+      "mismatches": 0,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating compute pipeline",
+        "[xdtest] compute dispatch",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "render",
+      "driver": "stock",
+      "ms_load": 25.108,
+      "ms_instance": 37.822,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.412,
+      "ms_pipeline": 8.112,
+      "ms_gpu": 0.846,
+      "image": "/data/local/tmp/xd/out/render_stock.ppm",
+      "pixels_triangle": 5202,
+      "pixels_clear": 11182,
+      "pixels_other": 0,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating graphics pipeline",
+        "[xdtest] triangle draw",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "submit",
+      "driver": "radv",
+      "ms_load": 17.432,
+      "ms_instance": 3.773,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.806,
+      "ms_fence_only": 0.153,
+      "ms_empty_cmdbuf": 0.803,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] fence-only submit",
+        "[xdtest] empty command buffer submit",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "compute",
+      "driver": "radv",
+      "ms_load": 19.729,
+      "ms_instance": 3.385,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.575,
+      "ms_pipeline": 2.652,
+      "ms_gpu": 0.742,
+      "elements": 65536,
+      "mismatches": 0,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating compute pipeline",
+        "[xdtest] compute dispatch",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "render",
+      "driver": "radv",
+      "ms_load": 17.311,
+      "ms_instance": 3.12,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.505,
+      "ms_pipeline": 5.007,
+      "ms_gpu": 1.769,
+      "image": "/data/local/tmp/xd/out/render_radv.ppm",
+      "pixels_triangle": 5202,
+      "pixels_clear": 11182,
+      "pixels_other": 0,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating graphics pipeline",
+        "[xdtest] triangle draw",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}
