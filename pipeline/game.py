@@ -53,6 +53,10 @@ MEMORY_EVERY_S = 5
 # own; RADV logs [BUILD] only with debug.radv_xclipse_log >= 1 (--radv-log).
 DRIVER_MARKERS = {"samsung": "Samsung::Vulkan::OpenDevice", "radv": "RADV_BUILD"}
 LOW_MEMORY_KILL = f"Reclaim '{APP}'|Kill '{APP}'"
+# GameNative logs the settings it launches a container with; kept per run to show that the stock
+# and radv containers differ only in the driver.
+LAUNCH_SETTINGS = ("Graphics Driver:|DX Wrapper:|Box64 Version:|Box64 Preset:|FEXCore Preset:|"
+                   "WoW64 Mode:|Screen Size:|Env Vars \\(Container Base\\):|Env Vars \\(Final Guest\\):")
 
 
 def game_layers() -> list[str]:
@@ -248,6 +252,8 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
         result["status"] = "killed-low-memory"
         result["low_memory_kill"] = killed[0].strip()
     result["vulkan_drivers_seen"] = drivers_seen(since, processes)
+    result["launch_settings"] = [line.split(": I: ", 1)[-1] for line in
+                                 logcat_since(since, LAUNCH_SETTINGS)]
     result["processes"] = sorted(set(processes.values()))
 
     if "times" in cfg:
