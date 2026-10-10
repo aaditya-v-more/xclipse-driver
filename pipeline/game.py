@@ -54,7 +54,8 @@ LOW_MEMORY_KILL = f"Reclaim '{APP}'|Kill '{APP}'"
 
 
 def game_layers() -> list[str]:
-    """Names of GameNative's SurfaceView layers, which carry the game's frames."""
+    """Names of GameNative's SurfaceView layers. The frames land on one of them (on Android 16, a
+    child layer of the SurfaceView); `present_times` is empty for the others."""
     names = []
     for line in shell("dumpsys SurfaceFlinger --list", 30).splitlines():
         name = line.strip()
@@ -108,12 +109,13 @@ def app_user() -> str:
 def memory_sample(user: str, processes: dict[str, str] | None = None) -> dict:
     """System memory, and the resident and swapped memory of every GameNative process (its Wine
     processes included), in MB. Adds those processes to `processes` (pid -> name)."""
-    out = shell("cat /proc/meminfo /proc/pressure/memory; "
+    out = shell("cat /proc/meminfo /proc/pressure/memory /sys/kernel/gpu/mem_info; "
                 f"ps -A -u {user} -o PID=,NAME=; "
                 f"for p in $(ps -A -u {user} -o PID=); do grep -h -E '^Vm(RSS|Swap):' /proc/$p/status; "
                 "done", 30)
-    kb = {"MemAvailable:": 0, "SwapFree:": 0, "VmRSS:": 0, "VmSwap:": 0}
+    kb = {"MemAvailable:": 0, "SwapFree:": 0, "GpuTotal:": 0, "VmRSS:": 0, "VmSwap:": 0}
     psi_full = None
+    gpu_bytes, pids = {}, set()
     for line in out.splitlines():
         parts = line.split(None, 1)
         if not parts:
@@ -122,10 +124,17 @@ def memory_sample(user: str, processes: dict[str, str] | None = None) -> dict:
             kb[parts[0]] += int(parts[1].split()[0])
         elif parts[0] == "full":
             psi_full = float(parts[1].split()[0].split("=")[1])
-        elif parts[0].isdigit() and len(parts) == 2 and processes is not None:
-            processes[parts[0]] = parts[1].strip()
+        elif parts[0] == "pid:":  # /sys/kernel/gpu/mem_info: "pid: <pid> <bytes>"
+            pid, size = parts[1].split()
+            gpu_bytes[pid] = int(size)
+        elif parts[0].isdigit() and len(parts) == 2:
+            pids.add(parts[0])
+            if processes is not None:
+                processes[parts[0]] = parts[1].strip()
     return {"available_mb": kb["MemAvailable:"] // 1024, "swap_free_mb": kb["SwapFree:"] // 1024,
             "app_rss_mb": kb["VmRSS:"] // 1024, "app_swap_mb": kb["VmSwap:"] // 1024,
+            "gpu_total_mb": kb["GpuTotal:"] // 1024,
+            "app_gpu_mb": sum(gpu_bytes.get(pid, 0) for pid in pids) // (1 << 20),
             "pressure_full_avg10": psi_full}
 
 
@@ -204,9 +213,13 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
                 break
             continue
         gone_for = 0
-        if layer not in layers:
-            layer = layers[0]
-        new = present_times(layer)
+        new = present_times(layer) if layer in layers else []
+        if not new:
+            for name in layers:
+                new = present_times(name)
+                if new:
+                    layer = name
+                    break
         if new and seen_at is None:
             seen_at = time.monotonic() - started
         frames.update(new)
@@ -243,18 +256,20 @@ def summarize(meta: dict, results: list[dict]) -> str:
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
            f"first {WARMUP_S} s after the first frame.", "",
            "| Benchmark | Driver | Run | Status | Avg FPS | 1% low FPS | Median frame time (ms) "
-           "| Driver seen | Least free memory (MB) | GameNative peak (MB) |",
-           "|---|---|---|---|---|---|---|---|---|---|"]
+           "| Driver seen | Least free memory (MB) | GameNative peak (MB) | Its GPU memory peak (MB) |",
+           "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         s = r.get("surfaceflinger", {})
         fmt = lambda v: f"{v:.1f}" if isinstance(v, (int, float)) else ""  # noqa: E731
         mem = r.get("memory") or [{}]
         least = min((m.get("available_mb", 0) for m in mem), default=0)
         peak = max((m.get("app_rss_mb", 0) + m.get("app_swap_mb", 0) for m in mem), default=0)
+        gpu_peak = max((m.get("app_gpu_mb", 0) for m in mem), default=0)
         out.append(f"| {r['bench']} | {r['driver']} | {r['run']} | {r['status']} | "
                    f"{fmt(s.get('fps_avg'))} | {fmt(s.get('fps_1pct_low'))} | "
                    f"{fmt(s.get('frametime_median_ms'))} | "
-                   f"{', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} |")
+                   f"{', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} | "
+                   f"{gpu_peak} |")
     out += ["", "## Medians", ""]
     for bench in dict.fromkeys(r["bench"] for r in results):
         line = []

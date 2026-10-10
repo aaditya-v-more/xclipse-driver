@@ -1,0 +1,584 @@
+{
+  "meta": {
+    "started": "2026-10-11T00:21:43",
+    "benches": [
+      "gravitymark"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "runs": 1,
+    "gpu_temp_c_start": 45.0
+  },
+  "results": [
+    {
+      "bench": "gravitymark",
+      "driver": "stock",
+      "app_id": 2000940101,
+      "gpu_temp_c_before": 44.0,
+      "available_mb_before": 3126,
+      "seconds_to_first_frame": null,
+      "layer": "301f532 SurfaceView[app.gamenative/app.gamenative.MainActivity]@0#170060",
+      "surfaceflinger": {
+        "frames": 0
+      },
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 3133,
+          "swap_free_mb": 10506,
+          "app_rss_mb": 205,
+          "app_swap_mb": 36,
+          "pressure_full_avg10": 0.42
+        },
+        {
+          "t": 7,
+          "available_mb": 1987,
+          "swap_free_mb": 10467,
+          "app_rss_mb": 1033,
+          "app_swap_mb": 33,
+          "pressure_full_avg10": 2.19
+        },
+        {
+          "t": 12,
+          "available_mb": 885,
+          "swap_free_mb": 9525,
+          "app_rss_mb": 1027,
+          "app_swap_mb": 124,
+          "pressure_full_avg10": 5.77
+        },
+        {
+          "t": 18,
+          "available_mb": 798,
+          "swap_free_mb": 9572,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 15.72
+        },
+        {
+          "t": 23,
+          "available_mb": 2751,
+          "swap_free_mb": 10700,
+          "app_rss_mb": 92,
+          "app_swap_mb": 41,
+          "pressure_full_avg10": 11.3
+        },
+        {
+          "t": 29,
+          "available_mb": 2429,
+          "swap_free_mb": 10664,
+          "app_rss_mb": 80,
+          "app_swap_mb": 41,
+          "pressure_full_avg10": 10.32
+        },
+        {
+          "t": 35,
+          "available_mb": 2475,
+          "swap_free_mb": 10640,
+          "app_rss_mb": 81,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 5.81
+        },
+        {
+          "t": 41,
+          "available_mb": 2577,
+          "swap_free_mb": 10407,
+          "app_rss_mb": 80,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 3.89
+        },
+        {
+          "t": 46,
+          "available_mb": 2746,
+          "swap_free_mb": 10081,
+          "app_rss_mb": 80,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 4.17
+        },
+        {
+          "t": 52,
+          "available_mb": 2926,
+          "swap_free_mb": 10213,
+          "app_rss_mb": 80,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 2.56
+        },
+        {
+          "t": 58,
+          "available_mb": 2897,
+          "swap_free_mb": 10255,
+          "app_rss_mb": 80,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 1.4
+        },
+        {
+          "t": 64,
+          "available_mb": 2983,
+          "swap_free_mb": 10204,
+          "app_rss_mb": 81,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 0.77
+        },
+        {
+          "t": 69,
+          "available_mb": 2962,
+          "swap_free_mb": 10193,
+          "app_rss_mb": 81,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 0.42
+        },
+        {
+          "t": 75,
+          "available_mb": 2966,
+          "swap_free_mb": 10142,
+          "app_rss_mb": 81,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 0.23
+        },
+        {
+          "t": 81,
+          "available_mb": 2971,
+          "swap_free_mb": 10155,
+          "app_rss_mb": 81,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 0.33
+        },
+        {
+          "t": 86,
+          "available_mb": 3030,
+          "swap_free_mb": 10159,
+          "app_rss_mb": 81,
+          "app_swap_mb": 38,
+          "pressure_full_avg10": 0.18
+        },
+        {
+          "t": 92,
+          "available_mb": 3000,
+          "swap_free_mb": 10137,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.1
+        },
+        {
+          "t": 98,
+          "available_mb": 2987,
+          "swap_free_mb": 10147,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.05
+        },
+        {
+          "t": 104,
+          "available_mb": 3000,
+          "swap_free_mb": 10147,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.02
+        },
+        {
+          "t": 110,
+          "available_mb": 2996,
+          "swap_free_mb": 10143,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 115,
+          "available_mb": 3042,
+          "swap_free_mb": 10084,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 121,
+          "available_mb": 3070,
+          "swap_free_mb": 10051,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 127,
+          "available_mb": 3082,
+          "swap_free_mb": 10056,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 133,
+          "available_mb": 3064,
+          "swap_free_mb": 10062,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 139,
+          "available_mb": 3082,
+          "swap_free_mb": 10075,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 144,
+          "available_mb": 3049,
+          "swap_free_mb": 10104,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 150,
+          "available_mb": 3061,
+          "swap_free_mb": 10103,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 156,
+          "available_mb": 3065,
+          "swap_free_mb": 10092,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 162,
+          "available_mb": 3090,
+          "swap_free_mb": 10064,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 168,
+          "available_mb": 3086,
+          "swap_free_mb": 10066,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 173,
+          "available_mb": 2893,
+          "swap_free_mb": 10150,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 179,
+          "available_mb": 2574,
+          "swap_free_mb": 10177,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.59
+        },
+        {
+          "t": 185,
+          "available_mb": 2825,
+          "swap_free_mb": 10137,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.32
+        },
+        {
+          "t": 190,
+          "available_mb": 2859,
+          "swap_free_mb": 10134,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.17
+        },
+        {
+          "t": 196,
+          "available_mb": 2934,
+          "swap_free_mb": 10099,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.09
+        },
+        {
+          "t": 202,
+          "available_mb": 2986,
+          "swap_free_mb": 10023,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.05
+        },
+        {
+          "t": 207,
+          "available_mb": 3003,
+          "swap_free_mb": 10069,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.02
+        },
+        {
+          "t": 213,
+          "available_mb": 3021,
+          "swap_free_mb": 10070,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 219,
+          "available_mb": 3053,
+          "swap_free_mb": 10140,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 225,
+          "available_mb": 2754,
+          "swap_free_mb": 10148,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.36
+        },
+        {
+          "t": 230,
+          "available_mb": 2803,
+          "swap_free_mb": 10237,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.2
+        },
+        {
+          "t": 236,
+          "available_mb": 2876,
+          "swap_free_mb": 10149,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.1
+        },
+        {
+          "t": 242,
+          "available_mb": 2865,
+          "swap_free_mb": 10161,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.05
+        },
+        {
+          "t": 248,
+          "available_mb": 2892,
+          "swap_free_mb": 10212,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.03
+        },
+        {
+          "t": 253,
+          "available_mb": 2942,
+          "swap_free_mb": 10223,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 259,
+          "available_mb": 2923,
+          "swap_free_mb": 10246,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 265,
+          "available_mb": 2914,
+          "swap_free_mb": 10249,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 271,
+          "available_mb": 2908,
+          "swap_free_mb": 10249,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 276,
+          "available_mb": 2858,
+          "swap_free_mb": 10250,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 282,
+          "available_mb": 2851,
+          "swap_free_mb": 10250,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 288,
+          "available_mb": 2890,
+          "swap_free_mb": 10224,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 294,
+          "available_mb": 2926,
+          "swap_free_mb": 10180,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 299,
+          "available_mb": 2931,
+          "swap_free_mb": 10172,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 0.0
+        }
+      ],
+      "status": "killed-low-memory",
+      "low_memory_kill": "10-11 00:22:10.923   589   589 I lmkd    : Reclaim 'app.gamenative' (17764), uid 10402, oom_score_adj 0, state 2 to free 62532kB rss, 98128kB swap; reason: min2x watermark is breached even after kill; level: 1",
+      "vulkan_drivers_seen": [
+        "samsung"
+      ],
+      "processes": [
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "[GravityMark.exe]",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe"
+      ],
+      "gpu_temp_c_after": 45.0,
+      "run": 1
+    },
+    {
+      "bench": "gravitymark",
+      "driver": "radv",
+      "app_id": 2000940102,
+      "gpu_temp_c_before": 44.0,
+      "available_mb_before": 3437,
+      "seconds_to_first_frame": 30.013814375037327,
+      "layer": "c19d7e8 SurfaceView[app.gamenative/app.gamenative.MainActivity]@0(BLAST)#170192",
+      "surfaceflinger": {
+        "frames": 7
+      },
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 3157,
+          "swap_free_mb": 10923,
+          "app_rss_mb": 201,
+          "app_swap_mb": 36,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 7,
+          "available_mb": 3339,
+          "swap_free_mb": 10594,
+          "app_rss_mb": 269,
+          "app_swap_mb": 33,
+          "pressure_full_avg10": 1.99
+        },
+        {
+          "t": 13,
+          "available_mb": 3418,
+          "swap_free_mb": 10529,
+          "app_rss_mb": 317,
+          "app_swap_mb": 33,
+          "pressure_full_avg10": 1.09
+        },
+        {
+          "t": 19,
+          "available_mb": 3397,
+          "swap_free_mb": 10530,
+          "app_rss_mb": 341,
+          "app_swap_mb": 33,
+          "pressure_full_avg10": 0.6
+        },
+        {
+          "t": 24,
+          "available_mb": 3439,
+          "swap_free_mb": 10524,
+          "app_rss_mb": 281,
+          "app_swap_mb": 33,
+          "pressure_full_avg10": 0.4
+        },
+        {
+          "t": 29,
+          "available_mb": 2886,
+          "swap_free_mb": 10524,
+          "app_rss_mb": 567,
+          "app_swap_mb": 32,
+          "pressure_full_avg10": 0.58
+        },
+        {
+          "t": 35,
+          "available_mb": 793,
+          "swap_free_mb": 10065,
+          "app_rss_mb": 457,
+          "app_swap_mb": 121,
+          "pressure_full_avg10": 3.38
+        },
+        {
+          "t": 40,
+          "available_mb": 4479,
+          "swap_free_mb": 10606,
+          "app_rss_mb": 0,
+          "app_swap_mb": 0,
+          "pressure_full_avg10": 16.52
+        },
+        {
+          "t": 45,
+          "available_mb": 2593,
+          "swap_free_mb": 10869,
+          "app_rss_mb": 91,
+          "app_swap_mb": 41,
+          "pressure_full_avg10": 11.08
+        }
+      ],
+      "status": "killed-low-memory",
+      "low_memory_kill": "10-11 00:27:41.883   589   589 I lmkd    : Reclaim 'app.gamenative' (29985), uid 10402, oom_score_adj 0, state 2 to free 22420kB rss, 114020kB swap; reason: min2x watermark is breached even after kill; level: 2",
+      "vulkan_drivers_seen": [
+        "radv"
+      ],
+      "processes": [
+        "A:\\bin\\GravityMark.exe",
+        "C:\\windows\\system32\\cmd.exe",
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\msiexec.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\wineboot.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe",
+        "z:\\Steamless\\Steamless.CLI.exe"
+      ],
+      "gpu_temp_c_after": 61.0,
+      "run": 1
+    }
+  ]
+}

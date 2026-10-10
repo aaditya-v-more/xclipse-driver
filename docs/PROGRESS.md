@@ -95,6 +95,13 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - The phone has 7.4 GB of RAM plus 8 GB of RAM Plus (zram). About 3 GB was available, with many of the user's apps open. The user was also using the phone during the launch.
   - Next: rerun with background apps closed and the phone left alone, logging free memory every few seconds. If it still runs out, cut GravityMark's load or find what in the Wine stack uses the memory.
   - `game.py` caveat: GameNative's SurfaceView exists from the "Booting..." screen on, so "first frame" includes loading. Count from the game's own first frames (GravityMark's `-times` file) before trusting averages.
+- [x] **GravityMark doesn't fit in this phone's memory under Wine, on either driver (2026-10-11, result `2026-10-11_002143-game`).**
+  - Both runs were killed by lmkd. After `am kill-all`, 3.1–3.4 GB was available. During loading, available memory fell by about 2.3 GB more than GameNative's processes grew (their RSS peaked at about 1 GB). That's GPU allocations, which RSS doesn't count.
+  - Stock: GravityMark rendered (at about 25 FPS while initializing). The kill came 0.6 s after the user rotated the phone, which made GameNative recreate its surface on top of the load.
+  - Radv: **our driver loaded in GameNative.** GravityMark's process logged `[BUILD] Mesa 26.3.0-devel` 28 s after launch. lmkd killed it 10 s later, with no rotation involved.
+  - GravityMark's manual recommends "a dedicated GPU with 4+ GB of video memory". 50k asteroids is its smallest preset, and the Earth textures are a fixed cost. Moving to Heaven at low quality.
+  - The phone reports GPU memory per process in `/sys/kernel/gpu/mem_info` and in total as `GpuTotal` in `/proc/meminfo`. `game.py` now samples both.
+  - Fixed in `game.py`: on Android 16 the frames land on a child layer of GameNative's SurfaceView, so the script now reads whichever layer has frames. Before, a run could only end by timing out, and its FPS came out empty.
 
 ## Optimization targets (from the speed tests)
 
