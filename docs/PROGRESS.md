@@ -57,12 +57,10 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
 
 ## Optimization targets (from the speed tests)
 
-1. **GPU per-draw overhead (5×).** Suspects:
-   - the 940 branch turning prefetches off
-   - extra packets per draw in the Xclipse context-init or "titan" register paths
-   - how push constants are emitted
-
-   Compare against `third_party/Xclipse940-RADV` and capture a command stream with `RADV_DEBUG`.
+1. **GPU per-draw overhead (5×).**
+   - **NGG culling is most of it.** With `RADV_DEBUG=nonggc`, GPU cost per draw drops from 0.298 to 0.122 µs (Samsung: 0.055 µs; result `2026-10-10_184237`).
+   - Next: decide when NGG culling is worth it on this GPU, for example only above a vertex-count threshold, as desktop RADV does on some chips. Then find the remaining 2×.
+   - **Don't use `RADV_DEBUG=nongg`** (the legacy geometry path). It hung the 940's GPU on the first draw batch (result `2026-10-10_184254`). The kernel recovered, `gpu_info` showed hang +1 and timeout +1, and Samsung's driver passed right after. The runner now detects hangs from those counters, stops testing our driver for that run, and health-checks the GPU with the stock driver.
 2. **CPU cost per draw and per pipeline bind (2–3×).** These matter for DXVK games that issue thousands of draws per frame.
 3. **Opaque fill (−14%).** Check DCC and render-backend settings (`RADV_XCLIPSE_DCC*`).
 

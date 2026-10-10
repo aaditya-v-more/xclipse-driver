@@ -16,6 +16,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import re
 import shutil
 import struct
 import subprocess
@@ -77,7 +78,10 @@ KEY_FEATURES = [
     "pipelineStatisticsQuery", "shaderCullDistance", "fillModeNonSolid",
 ]
 STATUS_TEXT = {"pass": "pass", "fail": "**FAIL**", "crash": "**crash**", "timeout": "**timeout**",
-               "phone-reboot": "**phone rebooted**"}
+               "gpu-hang": "**GPU hang**", "phone-reboot": "**phone rebooted**"}
+# Samsung's GPU driver counts hangs, timeouts and page faults in /sys/kernel/gpu/gpu_info.
+GPU_EVENT_COUNTERS = {"GHG_S": "hang", "GTO_S": "timeout", "GPF_S": "page fault",
+                      "GRH_S": "GRH", "GRF_S": "GRF", "GCF_S": "GCF"}
 
 
 def run(cmd: list[str], timeout: float | None = None) -> subprocess.CompletedProcess:
@@ -168,6 +172,11 @@ def phone_context() -> dict:
     return {key: " ".join(shell(cmd, 20).split()) for key, cmd in queries.items()}
 
 
+def gpu_event_counters() -> dict[str, int]:
+    raw = shell("cat /sys/kernel/gpu/gpu_info", 15)
+    return {k: int(v) for k, v in re.findall(r'"(\w+)":"(\d+)"', raw)}
+
+
 def list_crash_records() -> list[str]:
     return shell("ls /data/log 2>/dev/null | grep -i lastkmsg", 30).split()
 
@@ -186,14 +195,16 @@ def driver_log(since: str) -> list[str]:
     return [line for line in lines if any(k in line.lower() for k in keep)][-80:]
 
 
-def run_test(driver: str, test: str, run_dir: Path, known_records: set[str]) -> dict:
+def run_test(driver: str, test: str, run_dir: Path, known_records: set[str],
+             extra_env: list[str]) -> dict:
     spec = "stock" if driver == "stock" else f"{PHONE_DIR}/vulkan.radeon.so"
-    env = "" if driver == "stock" else "MESA_SHADER_CACHE_DISABLE=true "
+    env = "" if driver == "stock" else " ".join(["MESA_SHADER_CACHE_DISABLE=true", *extra_env]) + " "
     command = (f"cd {PHONE_DIR} && {env}timeout 30 ./xdtest --driver {spec} --test {test} "
                f"--out {PHONE_DIR}/out --tag {driver}")
     since = shell("date '+%m-%d %H:%M:%S.000'", 15)
     result = {"test": test, "driver": driver,
               "gpu_temp_c_before": shell("cat /sys/kernel/gpu/gpu_tmu", 15)}
+    counters_before = gpu_event_counters()
     try:
         p = adb("shell", command, timeout=90)
         stdout, stderr, code = p.stdout, p.stderr, p.returncode
@@ -217,8 +228,16 @@ def run_test(driver: str, test: str, run_dir: Path, known_records: set[str]) -> 
         if result["phone_back"]:
             new = sorted(set(list_crash_records()) - known_records)
             result["crash_records"] = pull_crash_records(new, run_dir)
-    elif result["status"] != "pass" and driver != "stock":
-        result["driver_log"] = driver_log(since)
+    else:
+        counters_after = gpu_event_counters()
+        events = {GPU_EVENT_COUNTERS.get(k, k): counters_after[k] - counters_before.get(k, 0)
+                  for k in counters_after if counters_after[k] != counters_before.get(k, 0)}
+        if events:
+            result["gpu_events"] = events
+            if result["status"] != "pass" and ("hang" in events or "timeout" in events):
+                result["status"] = "gpu-hang"
+        if result["status"] != "pass" and driver != "stock":
+            result["driver_log"] = driver_log(since)
     return result
 
 
@@ -270,7 +289,10 @@ def summarize(meta: dict, results: list[dict]) -> str:
            f"- Driver: `driver/` at `{meta['driver']['commit']}`, "
            f"`vulkan.radeon.so` SHA-256 `{meta['driver']['so_sha256'][:16]}`",
            f"- Phone: {phone.get('model')} `{phone.get('build')}`, Android {phone.get('android')}, "
-           f"GPU {phone.get('gpu_temp_c')} °C at the start", "",
+           f"GPU {phone.get('gpu_temp_c')} °C at the start"]
+    if meta.get("env"):
+        out.append(f"- Extra environment for our driver: `{' '.join(meta['env'])}`")
+    out += ["",
            "| Test | " + " | ".join(drivers) + " |", "|---|" + "---|" * len(drivers)]
     for t in tests:
         cells = []
@@ -332,6 +354,9 @@ def summarize(meta: dict, results: list[dict]) -> str:
                        + (f" - {r['error']}" if r.get("error") else ""))
             for line in r.get("progress", []):
                 out.append(f"  - `{line}`")
+            if r.get("gpu_events"):
+                out.append("  - kernel GPU events: " + ", ".join(
+                    f"{name} +{n}" for name, n in r["gpu_events"].items()))
             if r.get("crash_records"):
                 out.append(f"  - crash records saved: {', '.join(r['crash_records'])}")
     return "\n".join(out) + "\n"
@@ -345,6 +370,8 @@ def main() -> None:
     ap.add_argument("--drivers", default="stock,radv")
     ap.add_argument("--keep-going", action="store_true",
                     help="keep testing our driver after it made the phone reboot")
+    ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
+                    help="environment variable for our driver's runs (repeatable), e.g. RADV_DEBUG=nongg")
     args = ap.parse_args()
     tests, drivers = args.tests.split(","), args.drivers.split(",")
 
@@ -363,7 +390,7 @@ def main() -> None:
     deploy("radv" in drivers)
     known = set(list_crash_records())
     meta = {"started": started.isoformat(timespec="seconds"), "driver": driver_identity(),
-            "phone": phone_context(), "tests": tests, "drivers": drivers}
+            "phone": phone_context(), "tests": tests, "drivers": drivers, "env": args.env}
 
     # Test by test, alternating drivers, so phone heat builds up evenly for both.
     results, stopped = [], set()
@@ -372,12 +399,21 @@ def main() -> None:
             if driver in stopped:
                 continue
             print(f"{driver:>6} {test:<9}", end=" ", flush=True)
-            r = run_test(driver, test, run_dir, known)
+            r = run_test(driver, test, run_dir, known, args.env)
             print(r["status"] + (f" - {r['error']}" if r.get("error") else ""), flush=True)
             results.append(r)
-            if r["status"] == "phone-reboot" and driver != "stock" and not args.keep_going:
-                print(f"no more {driver} tests this run after a phone reboot (--keep-going continues)")
-                stopped.add(driver)
+            if r["status"] in ("phone-reboot", "gpu-hang") and driver != "stock":
+                if not args.keep_going:
+                    print(f"no more {driver} tests this run after a {r['status']} (--keep-going continues)")
+                    stopped.add(driver)
+                if r["status"] == "gpu-hang":
+                    health = run_test("stock", "submit", run_dir, known, [])
+                    health["test"] = "health-check"
+                    results.append(health)
+                    print(f"  health check on the stock driver: {health['status']}", flush=True)
+                    if health["status"] != "pass":
+                        print("the GPU didn't recover; stopping. Reboot the phone before more tests.")
+                        stopped.update(drivers)
 
     if phone_state() == "device":
         pull_images(run_dir)
