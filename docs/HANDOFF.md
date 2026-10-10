@@ -32,7 +32,7 @@ The work moves between the user's Windows PC and Mac. Everything (toolchain, dri
 - It also offers an update to 1.2.1. Tap **Later**.
 - All four games are in the library, added with **Add Game**. 0.9.2 does *not* auto-scan `GameNative/CustomGames`; after adding, refresh the library.
 - The driver is imported as **"RADV Xclipse (Mesa 26.3.0-devel-xd-c8fed77)"**.
-- The containers are **not configured yet**.
+- All four containers are configured (2026-10-11), as in the table below. Exec Arguments were read back from the phone and match exactly.
 
 **Phone settings:** "Stay awake while charging" (`stay_on_while_plugged_in`) was temporarily set to 2 and is restored to its original 0. No other phone setting was changed.
 
@@ -56,7 +56,7 @@ Before leaving one computer, commit and push. On the other one:
 
 In the commands below, `python` means the toolchain's Python for the computer you're on, and paths work with either slash direction on Windows.
 
-## Next: configure the four containers (one time, in GameNative)
+## Container settings (done 2026-10-11, kept for reference)
 
 For each game: open it, then the menu → **Edit container**. Set:
 
@@ -90,7 +90,10 @@ Don't try these shortcuts; we checked them in the v0.9.2 source:
 
 `pipeline/game.py` therefore launches with the plain intent (`app_id` and `game_source` only) and relies on each container's saved settings.
 
-## Then: first game runs
+## Next: first game runs
+
+**Memory first.** The first GravityMark launch got killed by Android's low-memory killer about 18 s into the benchmark (details in `docs/PROGRESS.md`). Before each run, close the background apps (Recents → Close all) and don't use the phone until the run ends.
+
 
 1. **Smoke test** each benchmark once:
 

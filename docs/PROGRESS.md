@@ -87,6 +87,14 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - Added `tools/setup.sh` and `tools/env.sh`, the macOS/Linux twins of `setup.ps1` and `env.cmd`. They install the same NDK r29, Python 3.13.16 (python-build-standalone), and glslang 16.6.0, with pinned checksums, into the same `tools/` layout.
   - `pipeline/run.py` picks the NDK host folder, `.exe` suffixes, and `build.cmd` or `build.sh` from the OS. `driver/build.sh` now names the NDK's `llvm-nm`, like `build.cmd`. Reports are written with LF on every OS, and `.gitattributes` pins script line endings.
   - First Mac build: a clean driver build plus three tests took 1 min 42 s. `run.py --build-driver --tests info,device,render` passes on both drivers (result `2026-10-10_234847`).
+- [x] **GameNative containers configured (2026-10-11).** All four are `bionic`, with the same Wrapper. The stock containers use System; the radv containers use RADV Xclipse (Mesa 26.3.0-devel-xd-c8fed77). Exec Arguments were typed over adb and read back to confirm an exact match.
+- [ ] **First GravityMark launch (stock): killed for lack of memory.**
+  - The plain `LAUNCH_GAME` intent works. There's no sign-in screen in the way.
+  - The first launch installs GameNative's Bionic components (about 30 s), then boots Wine, installs Mono, and runs the DRM step. GravityMark started 62 s after the intent and opened Samsung's Vulkan device 4 s later.
+  - 18 s after GravityMark started, lmkd killed GameNative itself (`oom_score_adj 0`). The reason given: "device is low on swap ... and thrashing (300%)". By then it had already killed every background app, the launcher included.
+  - The phone has 7.4 GB of RAM plus 8 GB of RAM Plus (zram). About 3 GB was available, with many of the user's apps open. The user was also using the phone during the launch.
+  - Next: rerun with background apps closed and the phone left alone, logging free memory every few seconds. If it still runs out, cut GravityMark's load or find what in the Wine stack uses the memory.
+  - `game.py` caveat: GameNative's SurfaceView exists from the "Booting..." screen on, so "first frame" includes loading. Count from the game's own first frames (GravityMark's `-times` file) before trusting averages.
 
 ## Optimization targets (from the speed tests)
 
