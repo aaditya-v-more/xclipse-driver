@@ -7,7 +7,7 @@ game over adb, records the frames GameNative presents on screen (SurfaceFlinger 
 the benchmark's own frame-time file when it writes one, and stops the app. Drivers alternate run
 by run and the phone cools down in between, so heat affects both alike.
 
-usage: tools\\python\\python.exe pipeline\\game.py [--bench gravitymark,heaven] [--runs 3]
+usage: python pipeline/game.py [--bench gravitymark,heaven] [--runs 3]
 """
 
 from __future__ import annotations
@@ -223,8 +223,8 @@ def main() -> None:
                 cool_down(target=baseline + 3)
 
     (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
-                                          encoding="utf-8")
-    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8")
+                                          encoding="utf-8", newline="\n")
+    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
     print(f"report: {run_dir / 'summary.md'}")
 
 

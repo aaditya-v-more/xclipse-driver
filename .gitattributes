@@ -1,0 +1,6 @@
+# Scripts that run in a POSIX shell or on the phone need LF on every checkout, Windows included.
+*.sh text eol=lf
+*.py text eol=lf
+# cmd.exe needs CRLF in batch files.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

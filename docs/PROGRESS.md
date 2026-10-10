@@ -13,7 +13,7 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - It reportedly runs Eden without GPU hangs.
   - It hasn't been tested in Winlator; that's the test the maintainer asked for.
 - **Second reference:** `third_party/Xclipse940-RADV`. Its 940 bring-up is deeper (Mesa 24.3.4) but only compute works so far. Mine it for fixes.
-- **Build:** natively on Windows with the portable `tools/` folder and `driver\build.cmd`. No WSL is needed.
+- **Build:** natively on Windows, macOS, or Linux with the portable `tools/` folder (`driver\build.cmd` or `driver/build.sh`). No WSL is needed.
 - **Why RADV should win:** Samsung's driver lacks BCn, maintenance5/6, mutable descriptors, and float64. That keeps it on DXVK 2.x and forces BCn emulation layers. Details are in `docs/research.md`.
 - **Delivery:** a zip with `meta.json` and `vulkan.radeon.so`, loaded through adrenotools-style custom-driver support. That loader is vendor-agnostic.
 - **Benchmarks:** GravityMark (Vulkan and DX11 modes) and Unigine Heaven 4.0 in Winlator, one fixed game scene with the DXVK HUD, and 3DMark Wild Life Extreme natively as a drift control. Use DXVK 2.7.1 for both drivers, at least 3 runs each, and report the median and 1% lows.
@@ -82,6 +82,11 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - The v0.9.2 source showed that the `LAUNCH_GAME` intent's `container_config` override can't carry the driver choice, because it resets `graphicsDriverConfig`. That per-container setup is therefore a one-time UI step.
   - Full state and the next steps are in `docs/HANDOFF.md`.
   - Added `tools/setup.ps1`, which recreates the verified toolchain on a new PC with one command.
+- [x] **Works from Windows or Mac (2026-10-10):**
+  - The session moved to a MacBook Air (Apple Silicon, macOS 27) with the same phone on USB.
+  - Added `tools/setup.sh` and `tools/env.sh`, the macOS/Linux twins of `setup.ps1` and `env.cmd`. They install the same NDK r29, Python 3.13.16 (python-build-standalone), and glslang 16.6.0, with pinned checksums, into the same `tools/` layout.
+  - `pipeline/run.py` picks the NDK host folder, `.exe` suffixes, and `build.cmd` or `build.sh` from the OS. `driver/build.sh` now names the NDK's `llvm-nm`, like `build.cmd`. Reports are written with LF on every OS, and `.gitattributes` pins script line endings.
+  - First Mac build: a clean driver build plus three tests took 1 min 42 s. `run.py --build-driver --tests info,device,render` passes on both drivers (result `2026-10-10_234847`).
 
 ## Optimization targets (from the speed tests)
 

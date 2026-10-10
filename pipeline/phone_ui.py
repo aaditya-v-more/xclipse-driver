@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Small adb helpers for driving an app's UI on the phone: list on-screen elements, tap, type.
 
-usage: tools\\python\\python.exe pipeline\\phone_ui.py dump [filter]
-       tools\\python\\python.exe pipeline\\phone_ui.py tap X Y | tap-text TEXT
-       tools\\python\\python.exe pipeline\\phone_ui.py type TEXT | key KEYCODE | shot PATH
+usage: python pipeline/phone_ui.py dump [filter]
+       python pipeline/phone_ui.py tap X Y | tap-text TEXT
+       python pipeline/phone_ui.py type TEXT | key KEYCODE | shot PATH
 """
 
 from __future__ import annotations

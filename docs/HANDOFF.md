@@ -1,10 +1,10 @@
-# Handoff: continue on another PC (written 2026-10-10)
+# Handoff: continue on any computer (written 2026-10-10, updated the same day)
 
-The work moves to the user's home PC. The phone stays the same: Galaxy S24 FE, SM-S721B, serial `RZCY90ZYQXZ`. Read this first, then `docs/PROGRESS.md` for the full history and numbers.
+The work moves between the user's Windows PC and Mac. Everything (toolchain, driver build, phone tests, game runs) works on both; the commands below give both forms. The phone stays the same: Galaxy S24 FE, SM-S721B, serial `RZCY90ZYQXZ`. Read this first, then `docs/PROGRESS.md` for the full history and numbers.
 
 ## Where things stand
 
-- **The driver works on the phone.** `driver/` (radv-xclipse `xclipse940`, Mesa 26.3.0-devel) builds on Windows. Every on-device test passes on the Xclipse 940: info, device, submit, compute, render, and the five speed tests.
+- **The driver works on the phone.** `driver/` (radv-xclipse `xclipse940`, Mesa 26.3.0-devel) builds on Windows and macOS. Every on-device test passes on the Xclipse 940: info, device, submit, compute, render, and the five speed tests.
 - **Speed tests, RADV against Samsung's driver:**
   - FP32 throughput, fill rate, and bandwidth are equal.
   - RADV compiles pipelines 2.6–3× faster.
@@ -38,24 +38,23 @@ The work moves to the user's home PC. The phone stays the same: Galaxy S24 FE, S
 
 **Removed:** only scratch files: `/sdcard/xd_ui.xml`, an unstripped driver copy, and simpleperf data. The profiling recipe in `docs/PROGRESS.md` regenerates them.
 
-## On the home PC
+## Switching computers
 
-1. **Clone the repo:** `gh repo clone aaditya-v-more/xclipse-driver`. It's a private repo under the user's GitHub account. Set the local git identity as in `CLAUDE.md`.
-2. **Toolchain** (about 830 MB, every download verified):
+Before leaving one computer, commit and push. On the other one:
 
-   ```bat
-   powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1
-   ```
-
-3. **Phone:** plug it in over USB and accept the "Allow USB debugging" prompt for the new PC. Tick "Always allow".
+1. **Get the repo.** First time: `gh repo clone aaditya-v-more/xclipse-driver` (private, under the user's GitHub account), then set the local git identity as in `CLAUDE.md`. After that: `git pull`.
+2. **Toolchain, once per computer** (every download verified; about 3 GB unpacked):
+   - Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1`
+   - macOS/Linux: `sh tools/setup.sh`
+3. **Phone:** plug it in over USB and accept the "Allow USB debugging" prompt for that computer. Tick "Always allow". `adb devices` should list `RZCY90ZYQXZ`.
 4. **Check everything works:**
+   - Windows: `tools\python\python.exe pipeline\run.py --build-driver --tests info,device,render`
+   - macOS/Linux: `tools/python/bin/python3 pipeline/run.py --build-driver --tests info,device,render`
 
-   ```bat
-   tools\python\python.exe pipeline\run.py --build-driver --tests info,device,render
-   ```
-
-   It should pass on both drivers.
+   It should pass on both drivers. Both computers have done this (the Mac: result `2026-10-10_234847`).
 5. **Optional:** re-clone the reference repos with the commands in `third_party/MANIFEST.md`.
+
+In the commands below, `python` means the toolchain's Python for the computer you're on, and paths work with either slash direction on Windows.
 
 ## Next: configure the four containers (one time, in GameNative)
 
@@ -73,7 +72,7 @@ Leave DX Wrapper at its default (DXVK `2.6.1-gplasync`) on all four, so both dri
 Typing the long arguments on the phone is tedious. `pipeline/phone_ui.py` can type them over adb:
 
 1. Tap into the Exec Arguments field.
-2. Run `tools\python\python.exe pipeline\phone_ui.py type "<args>"`.
+2. Run `python pipeline/phone_ui.py type "<args>"`.
 
 The same helper can drive the whole UI:
 
@@ -95,8 +94,8 @@ Don't try these shortcuts; we checked them in the v0.9.2 source:
 
 1. **Smoke test** each benchmark once:
 
-   ```bat
-   tools\python\python.exe pipeline\game.py --bench gravitymark --runs 1
+   ```sh
+   python pipeline/game.py --bench gravitymark --runs 1
    ```
 
    Watch the phone and check these:
@@ -106,11 +105,11 @@ Don't try these shortcuts; we checked them in the v0.9.2 source:
    - **Is our driver really loaded in the radv runs?** Run `adb shell setprop debug.radv_xclipse_log 1`, then check that logcat shows `[BUILD] Mesa 26.3.0-devel` during radv runs. Turn it off with `setprop debug.radv_xclipse_log 0`.
 2. **The real A/B:**
 
-   ```bat
-   tools\python\python.exe pipeline\game.py --runs 3
+   ```sh
+   python pipeline/game.py --runs 3
    ```
 
-   Results go to `results\<time>-game\summary.md`.
+   Results go to `results/<time>-game/summary.md`.
    - FPS comes from SurfaceFlinger (GameNative's `SurfaceView` layer). GameNative's compositor uses vsync (fifo), so FPS caps at the display rate.
    - GravityMark also writes its own frame-time file and a screenshot into `out\`.
 3. **Commit and push results** as usual. If RADV works in GameNative, report it on JimVulkan/radv-xclipse PR #6; the maintainer asked for exactly this test.
@@ -121,4 +120,4 @@ Don't try these shortcuts; we checked them in the v0.9.2 source:
   - NGG culling: compare in games with `adb shell setprop debug.radv_debug nonggc`.
   - Port-specific CPU overhead: about 4% from cache-flush emission, 2% from logging checks on the hot path, and 2% from register remapping. See `docs/PROGRESS.md`.
 - **New driver builds.** Each one has to be imported through Driver Manager, since its private folder can't be reached over adb. Then set it as the radv containers' Graphics Driver Version. The package name includes our commit (`xd-<sha>`).
-- **Unattended runs.** A GPU hang can reboot the phone. If the PC's internet is the phone's hotspot, the session goes offline until the hotspot is turned back on; on home Wi-Fi that doesn't apply.
+- **Unattended runs.** A GPU hang can reboot the phone. If the computer's internet is the phone's hotspot, the session goes offline until the hotspot is turned back on; on home Wi-Fi that doesn't apply.

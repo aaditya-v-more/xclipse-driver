@@ -4,28 +4,44 @@ Open-source Vulkan driver work for the Samsung Xclipse 940 GPU (Galaxy S24 FE, E
 
 ## Status (2026-10-10)
 
-- The driver builds on Windows and runs on the S24 FE. The instance, device, submit, compute, and offscreen render tests all pass.
+- The driver builds on Windows, macOS, and Linux, and runs on the S24 FE. The instance, device, submit, compute, and offscreen render tests all pass.
 - It exposes Vulkan 1.4 with 224 extensions, against Samsung's driver at 1.3 with 154. That includes BC texture compression, maintenance5/6, and mutable descriptors, which DXVK 3.x and vkd3d-proton use.
 - Shader pipelines compile much faster than with Samsung's driver: 2.7 ms against 54.6 ms for the compute test.
 - Next: game-level benchmarks in GameNative/Winlator. `docs/PROGRESS.md` has the plan.
 
 ## Quick start
 
-Build the driver in a cmd window:
+Every step works on Windows, macOS, and Linux. Set up the toolchain once (it goes into `tools/`, see `tools/README.md`):
+
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1
+```
+
+```sh
+sh tools/setup.sh
+```
+
+Build the driver. On Windows, in a cmd window:
 
 ```bat
 call tools\env.cmd && driver\build.cmd
 ```
 
-The output is `driver\dist\radv-xclipse-*.zip`. Install it through an emulator's custom GPU driver setting.
+On macOS or Linux:
 
-Run the phone tests (USB debugging on, this PC authorized):
-
-```bat
-tools\python\python.exe pipeline\run.py
+```sh
+. tools/env.sh && driver/build.sh
 ```
 
-Each test runs on both Samsung's driver and ours. The report goes to `results\<time>\summary.md`. Options:
+The output is `driver/dist/radv-xclipse-*.zip`. Install it through an emulator's custom GPU driver setting.
+
+Run the phone tests (USB debugging on, this computer authorized). The Python is `tools\python\python.exe` on Windows and `tools/python/bin/python3` on macOS and Linux (or `python3` after `. tools/env.sh`):
+
+```sh
+tools/python/bin/python3 pipeline/run.py
+```
+
+Each test runs on both Samsung's driver and ours. The report goes to `results/<time>/summary.md`. Options:
 
 - `--build-driver` rebuilds the driver first.
 - `--tests info,device,submit,compute,render` picks tests.

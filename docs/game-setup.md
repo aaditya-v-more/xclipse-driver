@@ -30,7 +30,7 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
 3. **Library:** the four games appear by folder name. For each one, open the game menu and choose **Edit container**:
    - **General:**
      - Container Variant: `bionic`.
-     - Exec Arguments: the line for that game from `EXEC-ARGS.txt`. Print them with `tools\python\python.exe pipeline\game.py --print-args`.
+     - Exec Arguments: the line for that game from `EXEC-ARGS.txt`. Print them with `python pipeline/game.py --print-args` (the toolchain's Python, see `README.md`).
    - **Graphics:**
      - Graphics Driver: the same Wrapper on all four (Wrapper-gamenative if offered).
      - Graphics Driver Version: `System` for `*-stock`, and `RADV Xclipse (Mesa 26.3.0-devel-xd-c8fed77)` for `*-radv`.
@@ -39,9 +39,11 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
 
 ## Running
 
-```bat
-tools\python\python.exe pipeline\game.py --runs 3
+```sh
+tools/python/bin/python3 pipeline/game.py --runs 3
 ```
+
+On Windows: `tools\python\python.exe pipeline\game.py --runs 3`.
 
 For each run, the script:
 

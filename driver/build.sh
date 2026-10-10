@@ -51,6 +51,7 @@ c = '$BIN/aarch64-linux-android34-clang$WRAP'
 cpp = '$BIN/aarch64-linux-android34-clang++$WRAP'
 ar = '$BIN/llvm-ar$EXE'
 strip = '$BIN/llvm-strip$EXE'
+nm = '$BIN/llvm-nm$EXE'
 
 [properties]
 cpp_link_args = ['-static-libstdc++']

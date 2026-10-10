@@ -30,9 +30,13 @@ Goal: an open-source Vulkan driver for the Samsung Xclipse 940 GPU (Galaxy S24 F
 - `docs/` holds the handoff, progress, findings, research, and game setup.
 - `recon/` holds the read-only device survey scripts and their raw output (summarized in `docs/findings.md`).
 - `third_party/` holds reference clones, kept out of git; re-clone them with `third_party/MANIFEST.md`.
-- `tools/` holds the portable toolchain, kept out of git. Recreate it with `tools\setup.ps1`, described in `tools/README.md`.
+- `tools/` holds the portable toolchain, kept out of git. Recreate it with `tools\setup.ps1` (Windows) or `tools/setup.sh` (macOS, Linux), described in `tools/README.md`.
 
 ## Build and test
+
+The work moves between a Windows PC and a Mac; everything runs on both. Check which one you're on before giving commands.
+
+Windows (cmd):
 
 ```bat
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1
@@ -41,19 +45,29 @@ tools\python\python.exe pipeline\run.py --build-driver
 tools\python\python.exe pipeline\game.py --runs 3
 ```
 
-- `setup.ps1` is a one-time toolchain setup.
+macOS or Linux:
+
+```sh
+sh tools/setup.sh
+. tools/env.sh && driver/build.sh
+tools/python/bin/python3 pipeline/run.py --build-driver
+tools/python/bin/python3 pipeline/game.py --runs 3
+```
+
+- `setup.ps1` / `setup.sh` is a one-time toolchain setup per computer. Both produce the same `tools/` layout from pinned, checksummed downloads.
+- `.gitattributes` keeps `*.sh` and `*.py` LF and `*.cmd` / `*.ps1` CRLF on every checkout.
 - The build produces `driver\dist\*.zip` (`meta.json` plus `vulkan.radeon.so`).
 - `run.py --build-driver` runs every on-device test on both drivers.
 - `game.py` needs the four GameNative containers configured first; see `docs/HANDOFF.md`.
 
 ## Device access
 
-- The phone (serial `RZCY90ZYQXZ`) connects over USB ADB. `pipeline/run.py` finds adb on PATH or at `%USERPROFILE%\platform-tools\adb.exe`.
+- The phone (serial `RZCY90ZYQXZ`) connects over USB ADB. `pipeline/run.py` finds adb on PATH or in `~/platform-tools` (`%USERPROFILE%\platform-tools` on Windows).
 - The user approved automated GPU testing on the phone. A GPU hang can reboot it; the runner detects hangs and reboots and stops testing our driver for that run.
 - Put test binaries in `/data/local/tmp`. **Keep the user's files on the phone.** Don't delete benchmark folders, installers, or the driver zip; document them instead (user instruction, 2026-10-10).
 - **When driving the phone's UI, nobody else may touch it.** Keep the screen on with `adb shell svc power stayon usb`, and restore it afterwards with `adb shell settings put global stay_on_while_plugged_in 0` (the original value). Don't use key presses as a keep-alive; GameNative treats them as input.
 - Never enter credentials. GameNative's Steam sign-in is skipped with "Skip login".
-- Don't make Windows system changes, such as installing WSL or enabling Windows features. Give the user the command to run instead.
+- Don't make system changes, such as installing WSL, enabling Windows features, or changing macOS security settings. Give the user the command to run instead.
 
 ## Conventions
 

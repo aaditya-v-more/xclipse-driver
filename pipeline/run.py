@@ -6,8 +6,10 @@ A/B pair. A GPU hang can make the phone reboot: when the phone drops off USB, th
 it to come back, saves the kernel's crash record, and stops testing our driver for this run
 (--keep-going continues anyway).
 
-usage: tools\\python\\python.exe pipeline\\run.py [--build-driver] [--tests info,device,...]
-                                                 [--drivers stock,radv] [--keep-going]
+usage: python pipeline/run.py [--build-driver] [--tests info,device,...] [--drivers stock,radv]
+                              [--keep-going]
+       Use the toolchain's Python: tools\\python\\python.exe on Windows, tools/python/bin/python3
+       on macOS and Linux (or plain python3 after ". tools/env.sh").
 """
 
 from __future__ import annotations
@@ -28,13 +30,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TOOLS = ROOT / "tools"
-NDK_BIN = TOOLS / "android-ndk-r29" / "toolchains" / "llvm" / "prebuilt" / "windows-x86_64" / "bin"
-GLSLANG = TOOLS / "glslang" / "bin" / "glslangValidator.exe"
+WINDOWS = sys.platform == "win32"
+EXE = ".exe" if WINDOWS else ""
+# The NDK ships x86_64 host binaries for every OS; on Apple Silicon they're universal.
+NDK_HOST = {"win32": "windows-x86_64", "darwin": "darwin-x86_64"}.get(sys.platform, "linux-x86_64")
+NDK_BIN = TOOLS / "android-ndk-r29" / "toolchains" / "llvm" / "prebuilt" / NDK_HOST / "bin"
+GLSLANG = TOOLS / "glslang" / "bin" / f"glslangValidator{EXE}"
 TEST_SRC = ROOT / "tests"
 TEST_BUILD = TEST_SRC / "build"
 DRIVER_SO = ROOT / "driver" / "build-android" / "vulkan.radeon.so"
 RESULTS = ROOT / "results"
-ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / "adb.exe")
+ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / f"adb{EXE}")
 PHONE_DIR = "/data/local/tmp/xd"
 CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render"]
 PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
@@ -123,9 +129,15 @@ def build_driver() -> None:
     head = run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"]).stdout.strip()
     dirty = run(["git", "-C", str(ROOT), "status", "--porcelain", "--", "driver"]).stdout.strip()
     env = dict(os.environ, PACKAGE_TAG=f"xd-{head}{'-dirty' if dirty else ''}")
+    if WINDOWS:
+        cmd = ["cmd.exe", "/c", f"call {TOOLS / 'env.cmd'} && {ROOT / 'driver' / 'build.cmd'}"]
+    else:
+        env["ANDROID_NDK_HOME"] = str(TOOLS / "android-ndk-r29")
+        env["PATH"] = os.pathsep.join([str(TOOLS / "python" / "bin"), str(TOOLS / "glslang" / "bin"),
+                                       env.get("PATH", "")])
+        cmd = ["sh", str(ROOT / "driver" / "build.sh")]
     with log.open("w", encoding="utf-8") as out:
-        r = subprocess.run(["cmd.exe", "/c", f"call {TOOLS / 'env.cmd'} && {ROOT / 'driver' / 'build.cmd'}"],
-                           stdout=out, stderr=subprocess.STDOUT, env=env)
+        r = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, env=env)
     if r.returncode:
         sys.exit(f"driver build failed; see {log}")
 
@@ -137,7 +149,7 @@ def build_tests() -> None:
                  "-o", str(TEST_BUILD / f"{name}.h"), str(TEST_SRC / "shaders" / source)])
         if r.returncode:
             sys.exit(f"glslang failed on {source}:\n{r.stdout}{r.stderr}")
-    r = run([str(NDK_BIN / "clang.exe"), "--target=aarch64-linux-android34", "-std=c11", "-O2",
+    r = run([str(NDK_BIN / f"clang{EXE}"), "--target=aarch64-linux-android34", "-std=c11", "-O2",
              "-Wall", "-Wextra", "-Wno-unused-parameter",
              "-I", str(ROOT / "driver" / "include"),
              "-I", str(ROOT / "driver" / "include" / "android_stub"),
@@ -423,8 +435,8 @@ def main() -> None:
         pull_images(run_dir)
         meta["phone_after"] = phone_context()
     (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
-                                          encoding="utf-8")
-    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8")
+                                          encoding="utf-8", newline="\n")
+    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
     print(f"report: {run_dir / 'summary.md'}")
 
 

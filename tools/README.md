@@ -1,14 +1,17 @@
 # Build tools
 
-These are portable tools: no installers, no admin rights, no system PATH changes. Only this README, `env.cmd`, and `setup.ps1` are in git. To use them, run `call tools\env.cmd` in a cmd window.
+These are portable tools: no installers, no admin rights, no system PATH changes. Only this README, the `env` scripts, and the `setup` scripts are in git. Both setups produce the same layout, so the rest of the project doesn't care which computer it's on.
 
-To recreate this folder on a new PC, run:
+| | Windows | macOS, Linux |
+|---|---|---|
+| Set up once | `powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1` | `sh tools/setup.sh` |
+| Use in a shell | `call tools\env.cmd` | `. tools/env.sh` |
+| Python | `tools\python\python.exe` | `tools/python/bin/python3` |
+| Build the driver | `driver\build.cmd` | `driver/build.sh` |
 
-```bat
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1
-```
+Each setup script downloads and verifies everything below, and installs ADB to `~/platform-tools` if adb isn't on PATH. Anything already present is skipped, so it's safe to run again. The toolchain takes about 3 GB unpacked.
 
-It downloads and verifies everything in the table below, and installs ADB if adb isn't on PATH. Anything already present is skipped.
+## Windows (`setup.ps1`)
 
 | Folder | What | Source | Verified |
 |---|---|---|---|
@@ -18,6 +21,21 @@ It downloads and verifies everything in the table below, and installs ADB if adb
 | `glslang` | glslang 16.6.0; `bin\glslangValidator.exe` is a copy of `glslang.exe` | `https://github.com/KhronosGroup/glslang/releases/download/16.6.0/glslang-16.6.0-windows-x86_64-release.zip` (13 MB) | SHA-256 `82bf434e69b9bb4829de7e2b4bc2c5e7a7861e53d66cf75e5cc70f5f694a8d9b`, matching GitHub's asset digest |
 
 The NDK is covered by the Android SDK License Agreement, which the user accepted on 2026-10-10.
+
+## macOS and Linux (`setup.sh`)
+
+The same versions, from each project's own release for the host. Checksums are pinned in the script.
+
+| Folder | What | Source | Verified |
+|---|---|---|---|
+| `android-ndk-r29` | Android NDK r29 | `https://dl.google.com/android/repository/android-ndk-r29-darwin.zip` (1.0 GB; `-linux.zip` on Linux) | SHA-1 from Google's `repository2-3.xml`: darwin `03d29fbb57e3c05a7d53597dd011d856c1456a4f`, linux `87e2bb7e9be5d6a1c6cdf5ec40dd4e0c6d07c30b` |
+| `python` | Python 3.13.16, a relocatable build from python-build-standalone `20261009` | `https://github.com/astral-sh/python-build-standalone/releases` (25 MB on macOS) | SHA-256 per host, matching GitHub's asset digest |
+| `python/bin` | meson, ninja, mako, packaging, PyYAML, pymsi | PyPI, the same pip command as on Windows | — |
+| `glslang` | glslang 16.6.0; `bin/glslangValidator` is a copy of `glslang` | `glslang-16.6.0-macos-universal-release.zip` (14 MB) or `-linux-x86_64-release.zip` | SHA-256 matching GitHub's asset digest |
+
+The NDK's macOS binaries are universal, so Apple Silicon needs no Rosetta. On macOS, `setup.sh` checks a downloaded adb is signed by Google LLC; Homebrew's `android-platform-tools` works too.
+
+## Rebuilding by hand on Windows
 
 To rebuild this folder, download the three archives and unpack them:
 
