@@ -102,6 +102,22 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - GravityMark's manual recommends "a dedicated GPU with 4+ GB of video memory". 50k asteroids is its smallest preset, and the Earth textures are a fixed cost. Moving to Heaven at low quality.
   - The phone reports GPU memory per process in `/sys/kernel/gpu/mem_info` and in total as `GpuTotal` in `/proc/meminfo`. `game.py` now samples both.
   - Fixed in `game.py`: on Android 16 the frames land on a child layer of GameNative's SurfaceView, so the script now reads whichever layer has frames. Before, a run could only end by timing out, and its FPS came out empty.
+- [ ] **Heaven 4.0 crashes at startup under GameNative, on both drivers (2026-10-11).**
+  - Heaven is 32-bit only (`Unigine_x86.dll`). GameNative runs it in Proton's WoW64 mode with FEXCore. The crash comes before any window or Vulkan device, so neither driver is involved.
+  - GameNative's Wine log (Settings → Debug → Enable Wine Debug Logs, written to `/sdcard/Android/data/app.gamenative/files/wine_logs/wine_debug.log`) shows "page fault on execute access" at `msvcr100+0x1e80`, called from `unigine_x86+0x2d754`.
+  - `msvcr100.dll` has its import table at RVA 0x1000, inside `.text`, and the crashing function is on that same 4 KB page. The loader writes that page, and afterwards the 32-bit emulation treats it as non-executable.
+  - Didn't help:
+    - Adding a 1280x720 size to Heaven's config file.
+    - Renaming Heaven's bundled VC++ runtime. The prefix has the same native DLL.
+    - FEXCore's "Denuvo" preset, which adds `FEX_SMCCHECKS=full`.
+    - FEXCore 2609-0.
+    - Box64 as the 32-bit emulator. Proton's WoW64 loader can't find its module (`c0000135`).
+  - Next: force Wine's built-in runtime, which keeps its imports in a separate section. Both Heaven containers now set `WINEDLLOVERRIDES=msvcr100,msvcp100=b`, and Heaven-stock is back on FEXCore 2603 like the other three.
+- [x] **GameNative's Vulkan wrapper emulated BC textures for RADV too (2026-10-11).**
+  - In `auto` mode (`WRAPPER_EMULATE_BCN=3`), GameNative's wrapper (`src/vulkan/wrapper/wrapper_physical_device.c` in GameNative/mesa) uses native BC textures only for Qualcomm, Turnip, and NVIDIA. Every other driver gets emulation even when it reports `textureCompressionBC`, unless `WRAPPER_NATIVE_BCN=1` is set.
+  - So the radv runs so far decompressed BC textures that our driver supports. Samsung's driver has no BC support, so it needs emulation regardless.
+  - All four containers now set `WRAPPER_NATIVE_BCN=1`. It doesn't change the stock runs, so the containers stay identical apart from the driver.
+  - Native BC is one of the main reasons RADV should be faster in DXVK games. It may also bring GravityMark's memory use on radv under the limit.
 
 ## Optimization targets (from the speed tests)
 
