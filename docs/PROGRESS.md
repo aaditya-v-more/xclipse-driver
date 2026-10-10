@@ -55,6 +55,17 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - The first FP32 shader let AMD's compiler (in Samsung's driver) merge identical chains and lanes, so it showed an impossible 6.9 TFLOPS. Now every lane is distinct.
   - Both drivers hit about 2.42 TFLOPS. The GPU's max clock read 800 MHz throughout.
 
+- [x] **Steadier speed tests** (result `2026-10-10_184607`): at least 250 ms of warm-up, median of 7, 50,000 draws, GPU clock recorded.
+  - FP32 throughput is equal (2,423 vs 2,420 GFLOPS).
+  - Fill is **equal** (opaque 25.5 vs 25.5 Gpx/s, blended 12.8 vs 12.8). The earlier −14% was clock noise.
+  - Bandwidth varies between about 36 and 49 GB/s for both drivers from run to run, because of memory clock scaling.
+  - GPU per draw: Samsung 0.140 µs; RADV 0.237 µs, or 0.191 µs with `RADV_XCLIPSE_NGGC=0`.
+  - CPU per draw: Samsung 0.152 µs; RADV 0.253 µs.
+  - Compile: Samsung 13.1 ms; RADV 5.0 ms (median).
+  - In the draws test the GPU clock ended at **500 MHz under RADV against 800 MHz under Samsung**. The sgpu governor (`sgpu_governor.c`) scales with busy time. RADV records commands more slowly, so the GPU idles longer between runs in this serial test and gets clocked down. This is partly a test artifact; game benchmarks will show whether it matters.
+- [x] New driver switch: `RADV_XCLIPSE_NGGC=0` or `setprop debug.radv_xclipse_nggc 0` turns off NGG culling, so games can compare (`driver/src/amd/vulkan/radv_physical_device.c`, documented in `driver/README.md`).
+- [x] From the kernel source: `SGPU_INSTANCE_DATA` and `SGPU_MEM_PROFILE_ADD` only feed memory profiling to debugfs. `AMDGPU_WGP_GATING` sets device-wide WGP clock-on and always-on counts. It's global power state, so we leave it alone.
+
 ## Optimization targets (from the speed tests)
 
 1. **GPU per-draw overhead (5×).**

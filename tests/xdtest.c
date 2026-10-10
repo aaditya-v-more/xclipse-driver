@@ -36,8 +36,10 @@
 
 /* A fence that hasn't signaled after this long means the GPU stopped responding. */
 #define GPU_TIMEOUT_NS 5000000000ull
-/* Performance tests: one warm-up run, then this many measured runs; the median is reported. */
-#define RUNS 5
+/* Performance tests: warm up for at least WARMUP_MS (the GPU clock governor ramps up with load),
+ * then RUNS measured runs; the median is reported. */
+#define WARMUP_MS 250.0
+#define RUNS 7
 
 /* ---- JSON output: one object, streamed as the test runs ---- */
 
@@ -566,13 +568,36 @@ static double gpu_time(record_fn record, void *arg, const char *what)
    return ts_read_ms();
 }
 
-/* One warm-up run, then RUNS measured runs into runs[]; returns their median. */
+/* Repeats `record` for at least WARMUP_MS of wall time, so the GPU clock has ramped up. */
+static void warm_up(record_fn record, void *arg, const char *what)
+{
+   double start = now_ms();
+   int n = 0;
+   while (n < 2 || now_ms() - start < WARMUP_MS) {
+      gpu_time(record, arg, what);
+      n++;
+   }
+}
+
+/* Warm-up, then RUNS measured runs into runs[]; returns their median. */
 static double measure(record_fn record, void *arg, const char *what, double *runs)
 {
-   gpu_time(record, arg, what);
+   warm_up(record, arg, what);
    for (int i = 0; i < RUNS; i++)
       runs[i] = gpu_time(record, arg, what);
    return median(runs, RUNS);
+}
+
+/* The GPU clock right after measuring, for reading results across runs. */
+static void record_gpu_clock(void)
+{
+   char buf[32] = {0};
+   FILE *f = fopen("/sys/kernel/gpu/gpu_clock", "r");
+   if (f) {
+      if (fgets(buf, sizeof(buf), f))
+         jint("gpu_clock_khz_after", atoll(buf));
+      fclose(f);
+   }
 }
 
 static int find_memory(uint32_t type_bits, VkMemoryPropertyFlags want)
@@ -1151,6 +1176,7 @@ static void run_alu(void)
    jruns("ms_runs", runs, RUNS);
    jnum("ms_gpu", gpu_ms);
    jnum("gflops", gflop / (gpu_ms / 1e3));
+   record_gpu_clock();
    free_compute(&c);
    free_buffer(&out);
 }
@@ -1203,6 +1229,7 @@ static void run_bandwidth(void)
    double cmd_ms = measure(record_copy, &a, "vkCmdCopyBuffer", runs);
    jruns("ms_runs_copy_command", runs, RUNS);
    jnum("gbps_copy_command", gb / (cmd_ms / 1e3));
+   record_gpu_clock();
 
    free_compute(&c);
    free_buffer(&src);
@@ -1245,6 +1272,7 @@ static void run_fill(void)
    double blend_ms = measure(record_fill, &a, "blended fill", runs);
    jruns("ms_runs_blend", runs, RUNS);
    jnum("gpix_s_blend", gpix / (blend_ms / 1e3));
+   record_gpu_clock();
 
    free_graphics(&opaque);
    free_graphics(&blended);
@@ -1288,12 +1316,12 @@ static void run_draws(void)
                                           sizeof(flat_frag), VK_FORMAT_R8G8B8A8_UNORM, false, 16, &ms);
    struct graphics blended = make_graphics(tiny_vert, sizeof(tiny_vert), flat_frag,
                                            sizeof(flat_frag), VK_FORMAT_R8G8B8A8_UNORM, true, 16, &ms);
-   struct draw_args a = {{&opaque, &blended}, &t, 20000, false, 0.0};
+   struct draw_args a = {{&opaque, &blended}, &t, 50000, false, 0.0};
 
    for (int variant = 0; variant < 2; variant++) {
       a.switch_pipelines = variant == 1;
       double gpu[RUNS], cpu[RUNS];
-      gpu_time(record_draws, &a, "draws (warm-up)");
+      warm_up(record_draws, &a, "draws (warm-up)");
       for (int i = 0; i < RUNS; i++) {
          gpu[i] = gpu_time(record_draws, &a, a.switch_pipelines ? "draws with pipeline switches"
                                                                 : "draws");
@@ -1305,6 +1333,7 @@ static void run_draws(void)
       jnum(k_gpu, median(gpu, RUNS) * 1e3 / a.count);
    }
    jint("draws_per_run", a.count);
+   record_gpu_clock();
 
    free_graphics(&opaque);
    free_graphics(&blended);

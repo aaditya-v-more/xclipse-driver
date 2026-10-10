@@ -336,7 +336,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
             perf_rows.append(row + " |")
     if perf_rows:
         out += ["", "## Performance", "",
-                "Median of 5 runs after a warm-up, timed with GPU timestamps.", "",
+                "Median of 7 runs after at least 250 ms of warm-up, timed with GPU timestamps.", "",
                 "| Metric | " + " | ".join(drivers) + (" | " + drivers[-1] + " vs " + drivers[0]
                                                    if len(drivers) == 2 else "") + " |",
                 "|---|" + "---|" * (len(drivers) + (1 if len(drivers) == 2 else 0))]

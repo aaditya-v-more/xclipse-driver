@@ -3084,10 +3084,14 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                    pdev->info.gfx_level >= GFX11;
 
    /* TODO: Investigate if NGG culling helps on GFX11. */
+   /* Xclipse: on the 940, NGG culling adds about 0.18 us of GPU time to every draw (0.30 vs
+    * 0.12 us for a tiny draw). RADV_XCLIPSE_NGGC=0 or `setprop debug.radv_xclipse_nggc 0` turns
+    * it off, to compare in games where geometry-heavy scenes may still gain from it. */
    pdev->use_ngg_culling = pdev->use_ngg && pdev->info.max_render_backends > 1 &&
                            (pdev->info.gfx_level == GFX10_3 || pdev->info.gfx_level == GFX10 ||
                             (instance->perftest_flags & RADV_PERFTEST_NGGC)) &&
-                           !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
+                           !(instance->debug_flags & RADV_DEBUG_NO_NGGC) &&
+                           !radv_xclipse_flag_off("RADV_XCLIPSE_NGGC", "radv_xclipse_nggc");
 
    pdev->emulate_ngg_gs_query_pipeline_stat = pdev->use_ngg && pdev->info.gfx_level < GFX11;
 
