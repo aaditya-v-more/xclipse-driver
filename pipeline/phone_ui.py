@@ -3,7 +3,7 @@
 
 usage: python pipeline/phone_ui.py dump [filter]
        python pipeline/phone_ui.py tap X Y | tap-text TEXT
-       python pipeline/phone_ui.py type TEXT | key KEYCODE | shot PATH
+       python pipeline/phone_ui.py type TEXT | clear | key KEYCODE | shot PATH
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -56,10 +57,57 @@ def tap(x: int, y: int) -> None:
     shell(f"input tap {x} {y}")
 
 
-def type_text(text: str) -> None:
-    """Types into the focused field. `input text` needs %s for spaces; the rest is shell-quoted."""
+def focused_text() -> str | None:
+    return next((n["text"] for n in dump() if n["cls"] == "EditText" and n["focused"]), None)
+
+
+def key(code: str) -> None:
+    """One key press, then a pause. Gboard follows the cursor asynchronously: in a burst of arrow
+    keys it loses moves, and a delete that follows lands in the wrong place."""
+    shell(f"input keyevent {code}")
+    time.sleep(0.4)
+
+
+def input_text(text: str) -> None:
+    """`input text` needs %s for spaces; the rest is shell-quoted."""
     escaped = text.replace("%", "\\%").replace(" ", "%s").replace("'", "'\\''")
     shell(f"input text '{escaped}'", 60)
+
+
+def clear() -> str | None:
+    """Empties the focused field. Returns what's left in it."""
+    for _ in range(3):
+        n = len(focused_text() or "")
+        if not n:
+            break
+        shell("input keyevent KEYCODE_MOVE_END " + "KEYCODE_DEL " * (n + 5), 120)
+    return focused_text()
+
+
+def type_text(text: str) -> str | None:
+    """Types at the end of the focused field and returns the field's final text.
+
+    Gboard inserts a space when a letter follows '.' or ',' (as in "unigine.cpp" or "A,B"), even
+    in typed key events. So the text goes in pieces split after such punctuation; the first
+    character after it is typed alone, and if Gboard put a space before it, that space is deleted
+    before typing on.
+    """
+    done = focused_text() or ""
+    for i, piece in enumerate(re.split(r"(?<=[.,:;!?])(?=[A-Za-z0-9])", text)):
+        if i:
+            input_text(piece[0])
+            if focused_text() == done + " " + piece[0]:
+                key("KEYCODE_DPAD_LEFT")
+                key("KEYCODE_DEL")
+                key("KEYCODE_MOVE_END")
+            done += piece[0]
+            if focused_text() != done:
+                return focused_text()
+            piece = piece[1:]
+        if piece:
+            input_text(piece)
+            done += piece
+    return focused_text()
 
 
 def screenshot(path: str) -> None:
@@ -87,7 +135,16 @@ def main() -> None:
         tap(n["x"], n["y"])
         print(f"tapped {n['text'] or n['desc']!r} at {n['x']},{n['y']}")
     elif cmd == "type":
-        type_text(" ".join(rest))
+        want = " ".join(rest)
+        got = type_text(want)
+        if got != want:
+            sys.exit(f"the field reads {got!r}, not {want!r}")
+        print("typed and checked")
+    elif cmd == "clear":
+        left = clear()
+        if left:
+            sys.exit(f"the field still reads {left!r}")
+        print("cleared")
     elif cmd == "key":
         shell(f"input keyevent {rest[0]}")
     elif cmd == "shot":

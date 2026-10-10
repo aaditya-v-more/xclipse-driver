@@ -72,7 +72,7 @@ Leave DX Wrapper at its default (DXVK `2.6.1-gplasync`) on all four, so both dri
 Typing the long arguments on the phone is tedious. `pipeline/phone_ui.py` can type them over adb:
 
 1. Tap into the Exec Arguments field.
-2. Run `python pipeline/phone_ui.py type "<args>"`.
+2. Run `python pipeline/phone_ui.py type "<args>"`. It reads the field back and prints "typed and checked" only when it matches. The phone's keyboard, Gboard, inserts a space when a letter follows `.` or `,` (it broke `unigine.cpp` and `PHORONIX,RELEASE,QUALITY_LOW`), so the helper types around that. `phone_ui.py clear` empties the focused field.
 
 The same helper can drive the whole UI:
 
