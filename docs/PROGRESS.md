@@ -27,11 +27,12 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
 - [x] Reference repos cloned into `third_party/` (see `third_party/MANIFEST.md`).
 - [x] Portable toolchain in `tools/`, all downloads verified: NDK r29, Python 3.13.16 with meson 1.12.1, ninja, mako, and packaging, and glslang 16.6.0.
 - [x] Private GitHub repo `aaditya-v-more/xclipse-driver`.
+- [x] **First driver build (2026-10-10).** `driver\dist\radv-xclipse-26.3.0-devel.zip`: Vulkan 1.4.358, 4.2 MB, SHA-256 `EB53754F…0847`. It contains `meta.json`, `vulkan.radeon.so`, and `NOTICE.txt`. A clean build takes about 1.5 minutes. The Windows build needed the NDK's `llvm-nm` added to `build.cmd` and PyYAML.
 
 ## Next steps
 
-1. Build `driver/` with `call tools\env.cmd && driver\build.cmd` to get `driver\dist\*.zip`.
-2. Pick and install the test app: a bionic Winlator fork that loads custom Vulkan driver zips on non-Adreno phones (WinXclipse, Cmod, or Bannerlator). Downloading the APK needs the user's approval.
-3. Baseline: Samsung's driver with Wrapper + BCn layer or ExynosTools, run through the benchmark suite. Benchmark downloads (about 460 MB) need the user's approval.
+1. **On-device smoke test** (needs the user's go-ahead, because a GPU hang can force a phone reboot): load `vulkan.radeon.so` from `/data/local/tmp` in a small probe and confirm instance and device creation and a trivial submit on the 940. `third_party/Xclipse940-RADV` has probe sources to reuse.
+2. **Test app:** GameNative (`app.gamenative`, already installed; latest is v1.3.0-prerelease, 2026-10-04). It's a Winlator-based Steam launcher with Winlator's `AdrenotoolsManager`, so it should accept custom driver zips. Bannerlator 3.1.6 (525 MB) is the fallback: it documents a hand-picked custom driver install and a "Wrapper + bcn_layer" Xclipse baseline.
+3. **Baseline:** Samsung's driver with Wrapper + BCn (GameNative's wrapper has BCn built in), run through the benchmark suite. The benchmark downloads (GravityMark 211 MB, Heaven 247 MB) need the user's approval.
 4. Load our driver zip and run the same suite.
-5. Fix what breaks, mining `third_party/Xclipse940-RADV`. Report results upstream on JimVulkan/radv-xclipse PR #6.
+5. Fix what breaks, mining `third_party/Xclipse940-RADV`. Report the Winlator-style test results upstream on JimVulkan/radv-xclipse PR #6; the maintainer asked for exactly that.
