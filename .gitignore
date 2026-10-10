@@ -1,0 +1,9 @@
+# Big or re-creatable things stay out of git.
+# third_party/MANIFEST.md lists how to re-clone the reference repos; tools/README.md lists the toolchain.
+/third_party/*
+!/third_party/MANIFEST.md
+/tools/*
+!/tools/env.cmd
+!/tools/README.md
+*.zip
+*.nupkg
