@@ -1,4 +1,26 @@
 {
   "model": "opus[1m]",
-  "autoCompactWindow": 300000
+  "autoCompactWindow": 300000,
+  "enabledPlugins": {
+    "data@synced": false
+  },
+  "deniedMcpServers": [
+    { "serverName": "chrome-devtools" },
+    { "serverName": "claude-in-chrome" },
+    { "serverName": "computer-use" }
+  ],
+  "permissions": {
+    "deny": [
+      "mcp__chrome-devtools__*",
+      "mcp__claude-in-chrome__*",
+      "mcp__Control_Chrome__*",
+      "mcp__computer-use__*",
+      "mcp__Claude_Code_iOS_Simulator__*",
+      "mcp__scheduled-tasks__*",
+      "mcp__mcp-registry__*",
+      "mcp__fcd8d03c-d582-4bc2-b72a-8a9476aaeebb__*",
+      "mcp__1a59c906-04da-521d-bda7-7f71b9f9e01c__*",
+      "mcp__6f616b42-0ed8-571e-823f-ee4aca6b7ce9__*"
+    ]
+  }
 }
