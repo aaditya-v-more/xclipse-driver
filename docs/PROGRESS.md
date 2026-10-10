@@ -76,6 +76,12 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - GravityMark 1.89 and Unigine Heaven 4.0 were unpacked on the PC without running their installers and pushed as four custom games (stock and radv each).
   - `pipeline/game.py` launches them over adb, counts presented frames from SurfaceFlinger, and pulls GravityMark's frame-time file and screenshot.
   - **Waiting on:** the one-time GameNative setup (import the driver zip, set Exec Arguments and driver per container).
+- [x] **Phone prepared, then paused for a PC move (2026-10-10):**
+  - The user added all four games with **Add Game** and imported the driver zip with Driver Manager.
+  - The four containers still need their variant, driver, and Exec Arguments set.
+  - The v0.9.2 source showed that the `LAUNCH_GAME` intent's `container_config` override can't carry the driver choice, because it resets `graphicsDriverConfig`. That per-container setup is therefore a one-time UI step.
+  - Full state and the next steps are in `docs/HANDOFF.md`.
+  - Added `tools/setup.ps1`, which recreates the verified toolchain on a new PC with one command.
 
 ## Optimization targets (from the speed tests)
 

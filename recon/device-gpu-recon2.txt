@@ -1,0 +1,148 @@
+
+=== ioctl allowlists (allowx) on the GPU device ===
+vendor_sepolicy.cil: allowx total=180, allowx mentioning gpu_device=0
+plat_sepolicy.cil: allowx total=697, allowx mentioning gpu_device=0
+system_ext_sepolicy.cil: allowx total=46, allowx mentioning gpu_device=0
+product_sepolicy.cil: allowx total=0, allowx mentioning gpu_device=0
+
+=== Domains behind the generic GPU allow rules ===
+(typeattributeset base_typeattr_265 (and (appdomain ) (not (isolated_app_all ))))
+
+(typeattributeset base_typeattr_586_34_0 (and (appdomain) (not (isolated_app_all))))
+
+
+=== sgpu module ===
+version=cat: /sys/module/sgpu/version: No such file or directory
+srcversion=cat: /sys/module/sgpu/srcversion: No such file or directory
+initstate=cat: /sys/module/sgpu/initstate: Permission denied
+taint=cat: /sys/module/sgpu/taint: Permission denied
+coresize=cat: /sys/module/sgpu/coresize: Permission denied
+/vendor_dlkm/lib/modules: 7 entries; gpu-related: 
+/vendor/lib/modules: 7 entries; gpu-related: 
+
+=== sgpu module parameter values ===
+aspm=cat: /sys/module/sgpu/parameters/aspm: Permission denied
+async_gfx_ring=cat: /sys/module/sgpu/parameters/async_gfx_ring: Permission denied
+audio=cat: /sys/module/sgpu/parameters/audio: Permission denied
+bapm=cat: /sys/module/sgpu/parameters/bapm: Permission denied
+benchmark=cat: /sys/module/sgpu/parameters/benchmark: Permission denied
+bpmdpath=cat: /sys/module/sgpu/parameters/bpmdpath: Permission denied
+cg_mask=cat: /sys/module/sgpu/parameters/cg_mask: Permission denied
+compute_multipipe=cat: /sys/module/sgpu/parameters/compute_multipipe: Permission denied
+cwsr_enable=cat: /sys/module/sgpu/parameters/cwsr_enable: Permission denied
+deep_color=cat: /sys/module/sgpu/parameters/deep_color: Permission denied
+devfreq_polling_ms=cat: /sys/module/sgpu/parameters/devfreq_polling_ms: Permission denied
+disable_cu=cat: /sys/module/sgpu/parameters/disable_cu: Permission denied
+discovery=cat: /sys/module/sgpu/parameters/discovery: Permission denied
+disp_priority=cat: /sys/module/sgpu/parameters/disp_priority: Permission denied
+dpm=cat: /sys/module/sgpu/parameters/dpm: Permission denied
+emu_mode=cat: /sys/module/sgpu/parameters/emu_mode: Permission denied
+eval_mode=cat: /sys/module/sgpu/parameters/eval_mode: Permission denied
+exp_hw_support=cat: /sys/module/sgpu/parameters/exp_hw_support: Permission denied
+fault_detect=cat: /sys/module/sgpu/parameters/fault_detect: Permission denied
+force_asic_type=cat: /sys/module/sgpu/parameters/force_asic_type: Permission denied
+force_chip_rev=cat: /sys/module/sgpu/parameters/force_chip_rev: Permission denied
+force_gtt=cat: /sys/module/sgpu/parameters/force_gtt: Permission denied
+force_ifh=cat: /sys/module/sgpu/parameters/force_ifh: Permission denied
+forcelongtraining=cat: /sys/module/sgpu/parameters/forcelongtraining: Permission denied
+fw_load_type=cat: /sys/module/sgpu/parameters/fw_load_type: Permission denied
+gartsize=cat: /sys/module/sgpu/parameters/gartsize: Permission denied
+gpu_recovery=cat: /sys/module/sgpu/parameters/gpu_recovery: Permission denied
+gttsize=cat: /sys/module/sgpu/parameters/gttsize: Permission denied
+hw_i2c=cat: /sys/module/sgpu/parameters/hw_i2c: Permission denied
+ip_block_mask=cat: /sys/module/sgpu/parameters/ip_block_mask: Permission denied
+job_hang_limit=cat: /sys/module/sgpu/parameters/job_hang_limit: Permission denied
+jobtimeout_to_panic=cat: /sys/module/sgpu/parameters/jobtimeout_to_panic: Permission denied
+lbpw=cat: /sys/module/sgpu/parameters/lbpw: Permission denied
+lockup_timeout=cat: /sys/module/sgpu/parameters/lockup_timeout: Permission denied
+mcbp=cat: /sys/module/sgpu/parameters/mcbp: Permission denied
+moverate=cat: /sys/module/sgpu/parameters/moverate: Permission denied
+msi=cat: /sys/module/sgpu/parameters/msi: Permission denied
+no_hw_access=cat: /sys/module/sgpu/parameters/no_hw_access: Permission denied
+no_timeout=cat: /sys/module/sgpu/parameters/no_timeout: Permission denied
+noretry=cat: /sys/module/sgpu/parameters/noretry: Permission denied
+num_kcq=cat: /sys/module/sgpu/parameters/num_kcq: Permission denied
+pcie_gen2=cat: /sys/module/sgpu/parameters/pcie_gen2: Permission denied
+pcie_gen_cap=cat: /sys/module/sgpu/parameters/pcie_gen_cap: Permission denied
+pcie_lane_cap=cat: /sys/module/sgpu/parameters/pcie_lane_cap: Permission denied
+pg_mask=cat: /sys/module/sgpu/parameters/pg_mask: Permission denied
+poll_eop=cat: /sys/module/sgpu/parameters/poll_eop: Permission denied
+ppfeaturemask=cat: /sys/module/sgpu/parameters/ppfeaturemask: Permission denied
+reset_method=cat: /sys/module/sgpu/parameters/reset_method: Permission denied
+runpm=cat: /sys/module/sgpu/parameters/runpm: Permission denied
+sched_hw_submission=cat: /sys/module/sgpu/parameters/sched_hw_submission: Permission denied
+sched_jobs=cat: /sys/module/sgpu/parameters/sched_jobs: Permission denied
+sdma_phase_quantum=cat: /sys/module/sgpu/parameters/sdma_phase_quantum: Permission denied
+smu_memory_pool_size=cat: /sys/module/sgpu/parameters/smu_memory_pool_size: Permission denied
+sws_quantum=cat: /sys/module/sgpu/parameters/sws_quantum: Permission denied
+test=cat: /sys/module/sgpu/parameters/test: Permission denied
+tmz=cat: /sys/module/sgpu/parameters/tmz: Permission denied
+unscheduled_job_debug=cat: /sys/module/sgpu/parameters/unscheduled_job_debug: Permission denied
+virtual_display=cat: /sys/module/sgpu/parameters/virtual_display: Permission denied
+vis_vramlimit=cat: /sys/module/sgpu/parameters/vis_vramlimit: Permission denied
+vm_block_size=cat: /sys/module/sgpu/parameters/vm_block_size: Permission denied
+vm_debug=cat: /sys/module/sgpu/parameters/vm_debug: Permission denied
+vm_fault_stop=cat: /sys/module/sgpu/parameters/vm_fault_stop: Permission denied
+vm_fragment_size=cat: /sys/module/sgpu/parameters/vm_fragment_size: Permission denied
+vm_size=cat: /sys/module/sgpu/parameters/vm_size: Permission denied
+vm_update_mode=cat: /sys/module/sgpu/parameters/vm_update_mode: Permission denied
+vramlimit=cat: /sys/module/sgpu/parameters/vramlimit: Permission denied
+
+=== sgpu sysfs device attributes ===
+devfreq driver driver_override drm fw_version modalias of_node pcie_replay_count power product_name product_number serial_number subsystem supplier:platform:12861e40.pd_g3dcore uevent 
+product_name=
+product_number=
+serial_number=
+no ip_discovery directory
+
+=== libdrm_sgpu.so API (exported names) ===
+amdgpu_bo_alloc amdgpu_bo_cpu_map amdgpu_bo_cpu_unmap amdgpu_bo_export amdgpu_bo_free amdgpu_bo_import amdgpu_bo_inc_ref amdgpu_bo_list_create amdgpu_bo_list_create_raw amdgpu_bo_list_destroy amdgpu_bo_list_destroy_raw amdgpu_bo_list_update amdgpu_bo_query_info amdgpu_bo_set_metadata amdgpu_bo_va_op amdgpu_bo_va_op_raw amdgpu_bo_wait_for_idle amdgpu_create_bo_from_user_mem amdgpu_cs_chunk_fence_info_to_data amdgpu_cs_chunk_fence_to_dep amdgpu_cs_create_semaphore amdgpu_cs_create_syncobj amdgpu_cs_create_syncobj2 amdgpu_cs_ctx_create amdgpu_cs_ctx_create2 amdgpu_cs_ctx_create3 amdgpu_cs_ctx_free amdgpu_cs_ctx_override_priority amdgpu_cs_destroy_semaphore amdgpu_cs_destroy_syncobj amdgpu_cs_export_syncobj amdgpu_cs_fence_to_handle amdgpu_cs_import_syncobj amdgpu_cs_query_fence_status amdgpu_cs_query_reset_state amdgpu_cs_query_reset_state2 amdgpu_cs_signal_semaphore amdgpu_cs_submit amdgpu_cs_submit_raw amdgpu_cs_submit_raw2 amdgpu_cs_syncobj_export_sync_file amdgpu_cs_syncobj_export_sync_file2 amdgpu_cs_syncobj_import_sync_file amdgpu_cs_syncobj_import_sync_file2 amdgpu_cs_syncobj_query amdgpu_cs_syncobj_query2 amdgpu_cs_syncobj_reset amdgpu_cs_syncobj_signal amdgpu_cs_syncobj_timeline_signal amdgpu_cs_syncobj_timeline_wait amdgpu_cs_syncobj_transfer amdgpu_cs_syncobj_wait amdgpu_cs_wait_fences amdgpu_cs_wait_semaphore amdgpu_device_deinitialize amdgpu_device_get_fd amdgpu_device_initialize amdgpu_find_bo_by_cpu_mapping amdgpu_get_marketing_name amdgpu_query_buffer_size_alignment amdgpu_query_crtc_from_id amdgpu_query_firmware_version amdgpu_query_gds_info amdgpu_query_gpu_info amdgpu_query_heap_info amdgpu_query_hw_ip_count amdgpu_query_hw_ip_info amdgpu_query_info amdgpu_query_sensor_info amdgpu_query_sw_info amdgpu_query_video_caps_info amdgpu_read_mm_registers amdgpu_va_range_alloc amdgpu_va_range_free amdgpu_va_range_query amdgpu_vm_reserve_vmid amdgpu_vm_unreserve_vmid amdgpu_wgp_gating_wgp_aon amdgpu_wgp_gating_wgp_clock_on amdgpu_wgp_gating_wgp_status sgpu_bo_alloc sgpu_bo_export sgpu_bo_import sgpu_bo_list_create sgpu_bo_list_update sgpu_bo_va_op sgpu_create_bo_from_user_mem sgpu_cs_ctx_create sgpu_cs_ctx_override_priority sgpu_cs_query_reset_state sgpu_cs_signal_semaphore sgpu_cs_submit sgpu_cs_submit_raw sgpu_cs_syncobj_export_sync_file sgpu_cs_syncobj_import_sync_file sgpu_cs_syncobj_query sgpu_cs_syncobj_timeline_signal sgpu_cs_syncobj_timeline_wait sgpu_cs_syncobj_transfer sgpu_cs_syncobj_wait sgpu_cs_wait_fences sgpu_cs_wait_semaphore sgpu_find_bo_by_cpu_mapping sgpu_instance_data_create sgpu_instance_data_destroy sgpu_mem_profile_update sgpu_query_dump_bpmd sgpu_query_dump_bpmd_to_fd sgpu_query_gpu_page_faults sgpu_query_sw_info sgpu_va_range_alloc 
+--- ids/data file references:
+
+=== GFX IP and toolchain hints in vulkan.samsung.so ===
+     37 Gfx10Cb
+     15 Gfx10C
+     14 Gfx10F
+     12 Gfx10A
+      8 Gfx10B
+      4 GFX103
+      2 gfx1040
+      2 NAVI14
+      2 Gfx10D
+      2 Gfx103
+      2 Gfx102
+      2 GFX104
+      1 navi14
+      1 gfx103D
+      1 gfx1034
+      1 gfx1033
+      1 gfx1032
+      1 gfx1031
+      1 gfx1030
+      1 gfx101F
+      1 gfx1012
+      1 gfx1011
+      1 gfx1010
+      1 Xclipse GPU Fault 
+      1 Xclipse GPU Fault
+      1 VANGOGHLITE_EVT
+      1 VANGOGHLITE
+      1 VANGOGH
+      1 Navi2
+      1 Navi14
+      1 NAVI24
+      1 NAVI23
+      1 NAVI22
+      1 NAVI21
+      1 NAVI12
+      1 NAVI10
+      1 Gfx10E
+      1 Gfx10C0
+      1 Gfx103E
+      1 Gfx103D
+
+=== gpu service commands ===
+GPU Service commands:
+  vkjson      dump Vulkan properties as JSON
+  vkprofiles  print support for select Vulkan profiles
+  featureOverrides  update and output gpuservice's feature overrides

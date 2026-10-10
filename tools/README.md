@@ -1,6 +1,14 @@
 # Build tools
 
-These are portable tools: no installers, no admin rights, no system PATH changes. Only this README and `env.cmd` are in git. To use them, run `call tools\env.cmd` in a cmd window.
+These are portable tools: no installers, no admin rights, no system PATH changes. Only this README, `env.cmd`, and `setup.ps1` are in git. To use them, run `call tools\env.cmd` in a cmd window.
+
+To recreate this folder on a new PC, run:
+
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup.ps1
+```
+
+It downloads and verifies everything in the table below, and installs ADB if adb isn't on PATH. Anything already present is skipped.
 
 | Folder | What | Source | Verified |
 |---|---|---|---|

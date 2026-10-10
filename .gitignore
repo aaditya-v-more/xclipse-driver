@@ -5,6 +5,7 @@
 /tools/*
 !/tools/env.cmd
 !/tools/README.md
+!/tools/setup.ps1
 *.zip
 *.nupkg
 /driver/build-log.txt
