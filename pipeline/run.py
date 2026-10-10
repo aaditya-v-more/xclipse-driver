@@ -34,8 +34,28 @@ DRIVER_SO = ROOT / "driver" / "build-android" / "vulkan.radeon.so"
 RESULTS = ROOT / "results"
 ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / "adb.exe")
 PHONE_DIR = "/data/local/tmp/xd"
-ALL_TESTS = ["info", "device", "submit", "compute", "render"]
-SHADERS = {"fill.comp": "fill_comp", "tri.vert": "tri_vert", "tri.frag": "tri_frag"}
+CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render"]
+PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
+ALL_TESTS = CORRECTNESS_TESTS + PERF_TESTS
+SHADERS = {
+    "fill.comp": "fill_comp", "tri.vert": "tri_vert", "tri.frag": "tri_frag",
+    "alu.comp": "alu_comp", "copy.comp": "copy_comp", "complex.comp": "complex_comp",
+    "screen.vert": "screen_vert", "flat.frag": "flat_frag", "tiny.vert": "tiny_vert",
+}
+# Performance metrics per test: (result key, label, higher is better).
+PERF_METRICS = {
+    "alu": [("gflops", "FP32 throughput, GFLOPS", True)],
+    "bandwidth": [("gbps_shader_copy", "Shader copy, GB/s", True),
+                  ("gbps_copy_command", "vkCmdCopyBuffer, GB/s", True)],
+    "fill": [("gpix_s_opaque", "Opaque fill at 1080p, Gpixel/s", True),
+             ("gpix_s_blend", "Blended fill at 1080p, Gpixel/s", True)],
+    "draws": [("us_record_per_draw", "CPU per draw, µs", False),
+              ("us_record_per_draw_switching", "CPU per draw with a pipeline switch, µs", False),
+              ("us_gpu_per_draw", "GPU per draw, µs", False),
+              ("us_gpu_per_draw_switching", "GPU per draw with a pipeline switch, µs", False)],
+    "compile": [("ms_median", "Shader pipeline compile, ms (median of 16)", False),
+                ("ms_first", "First pipeline compile, ms", False)],
+}
 
 # Extensions that decide what DXVK (Direct3D 9-11) and vkd3d-proton (Direct3D 12) can do.
 GAME_EXTENSIONS = [
@@ -172,7 +192,8 @@ def run_test(driver: str, test: str, run_dir: Path, known_records: set[str]) -> 
     command = (f"cd {PHONE_DIR} && {env}timeout 30 ./xdtest --driver {spec} --test {test} "
                f"--out {PHONE_DIR}/out --tag {driver}")
     since = shell("date '+%m-%d %H:%M:%S.000'", 15)
-    result = {"test": test, "driver": driver}
+    result = {"test": test, "driver": driver,
+              "gpu_temp_c_before": shell("cat /sys/kernel/gpu/gpu_tmu", 15)}
     try:
         p = adb("shell", command, timeout=90)
         stdout, stderr, code = p.stdout, p.stderr, p.returncode
@@ -279,6 +300,30 @@ def summarize(meta: dict, results: list[dict]) -> str:
             if "yes" in present:
                 out.append(f"| {ext} | " + " | ".join(present) + " |")
 
+    perf_rows = []
+    for test, metrics in PERF_METRICS.items():
+        for key, label, higher_better in metrics:
+            values = [by.get((test, d), {}).get(key) for d in drivers]
+            if all(v is None for v in values):
+                continue
+            row = f"| {label} | " + " | ".join("" if v is None else f"{v:.3g}" for v in values)
+            if len(drivers) == 2 and None not in values and min(values) > 0:
+                stock, ours = values
+                ratio = ours / stock if higher_better else stock / ours
+                row += f" | {ratio:.2f}x {'better' if ratio >= 1 else 'worse'}"
+            perf_rows.append(row + " |")
+    if perf_rows:
+        out += ["", "## Performance", "",
+                "Median of 5 runs after a warm-up, timed with GPU timestamps.", "",
+                "| Metric | " + " | ".join(drivers) + (" | " + drivers[-1] + " vs " + drivers[0]
+                                                   if len(drivers) == 2 else "") + " |",
+                "|---|" + "---|" * (len(drivers) + (1 if len(drivers) == 2 else 0))]
+        out += perf_rows
+        temps = [float(r["gpu_temp_c_before"]) for r in results
+                 if r.get("gpu_temp_c_before", "").replace(".", "", 1).isdigit()]
+        if temps:
+            out += ["", f"GPU temperature before each test: {min(temps):.0f}-{max(temps):.0f} °C."]
+
     problems = [r for r in results if r["status"] != "pass"]
     if problems:
         out += ["", "## Problems", ""]
@@ -320,16 +365,19 @@ def main() -> None:
     meta = {"started": started.isoformat(timespec="seconds"), "driver": driver_identity(),
             "phone": phone_context(), "tests": tests, "drivers": drivers}
 
-    results = []
-    for driver in drivers:
-        for test in tests:
-            print(f"{driver:>6} {test:<8}", end=" ", flush=True)
+    # Test by test, alternating drivers, so phone heat builds up evenly for both.
+    results, stopped = [], set()
+    for test in tests:
+        for driver in drivers:
+            if driver in stopped:
+                continue
+            print(f"{driver:>6} {test:<9}", end=" ", flush=True)
             r = run_test(driver, test, run_dir, known)
             print(r["status"] + (f" - {r['error']}" if r.get("error") else ""), flush=True)
             results.append(r)
             if r["status"] == "phone-reboot" and driver != "stock" and not args.keep_going:
-                print("stopping this driver's tests after a phone reboot (--keep-going continues)")
-                break
+                print(f"no more {driver} tests this run after a phone reboot (--keep-going continues)")
+                stopped.add(driver)
 
     if phone_state() == "device":
         pull_images(run_dir)

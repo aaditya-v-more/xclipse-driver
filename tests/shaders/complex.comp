@@ -1,0 +1,41 @@
+#version 450
+// Compile-time workload: loops, branches, transcendentals and shared memory, shaped by
+// specialization constants. SALT only makes each pipeline unique, so no driver can serve it from
+// a cache.
+layout(local_size_x = 64) in;
+layout(constant_id = 0) const uint VARIANT = 0u;
+layout(constant_id = 1) const uint SALT = 0u;
+layout(std430, binding = 0) buffer Buf { vec4 data[]; };
+shared vec4 tile[64];
+
+vec4 hash4(vec4 p)
+{
+   p = fract(p * vec4(0.1031, 0.1030, 0.0973, 0.1099));
+   p += dot(p, p.wzxy + 33.33);
+   return fract((p.xxyz + p.yzzw) * p.zywx);
+}
+
+void main()
+{
+   uint i = gl_GlobalInvocationID.x;
+   uint l = gl_LocalInvocationID.x;
+   vec4 v = data[i];
+   for (uint n = 0u; n < 8u + (VARIANT & 7u); n++) {
+      uint path = (n + VARIANT) & 3u;
+      if (path == 0u)
+         v = hash4(v + float(n));
+      else if (path == 1u)
+         v = sin(v) * cos(v.yzwx) + sqrt(abs(v.zwxy));
+      else if (path == 2u)
+         v = mix(v, v.wzyx, smoothstep(0.0, 1.0, fract(v)));
+      else
+         v = normalize(v + 1e-3) * exp2(-abs(v.x));
+      tile[l] = v;
+      barrier();
+      v += tile[(l + 1u + VARIANT) & 63u] * 0.5;
+      barrier();
+   }
+   if ((VARIANT & 1u) == 1u)
+      v = pow(abs(v), vec4(1.5));
+   data[i] = v + float(SALT) * 1e-9;
+}

@@ -38,6 +38,34 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - RADV exposes Vulkan 1.4.358 and 224 extensions; stock exposes 1.3.279 and 154.
   - RADV compiles the compute pipeline in 2.7 ms against 54.6 ms, and the graphics pipeline in 5.0 ms against 8.1 ms.
 
+- [x] **Driver-level speed tests** (`alu`, `bandwidth`, `fill`, `draws`, `compile`; results `2026-10-10_183930` and `2026-10-10_184117`). Each figure is the median of 5 runs, Samsung first, then RADV:
+
+  | Metric | Samsung | RADV | |
+  |---|---|---|---|
+  | FP32 throughput | 2,423 GFLOPS | 2,420 GFLOPS | equal |
+  | Shader-copy bandwidth | 48.4 GB/s | 47.2 GB/s | equal |
+  | `vkCmdCopyBuffer` | 36 GB/s | 48.8 GB/s | RADV 1.35× |
+  | Blended fill at 1080p | 12.8 Gpx/s | 12.8 Gpx/s | equal |
+  | Opaque fill at 1080p | 25.5 Gpx/s | 22.0 Gpx/s | RADV 14% slower |
+  | GPU cost per tiny draw | 0.055 µs | 0.298 µs | **RADV 5× slower** |
+  | CPU cost per draw | 0.058 µs | 0.114 µs | RADV 2× slower |
+  | CPU cost per draw with a pipeline switch | 0.29 µs | 0.80 µs | RADV 2.8× slower |
+  | Pipeline compile (median / first) | 12.7 / 26.7 ms | 4.8 / 6.9 ms | **RADV 2.7–3.8× faster** |
+
+  - The first FP32 shader let AMD's compiler (in Samsung's driver) merge identical chains and lanes, so it showed an impossible 6.9 TFLOPS. Now every lane is distinct.
+  - Both drivers hit about 2.42 TFLOPS. The GPU's max clock read 800 MHz throughout.
+
+## Optimization targets (from the speed tests)
+
+1. **GPU per-draw overhead (5×).** Suspects:
+   - the 940 branch turning prefetches off
+   - extra packets per draw in the Xclipse context-init or "titan" register paths
+   - how push constants are emitted
+
+   Compare against `third_party/Xclipse940-RADV` and capture a command stream with `RADV_DEBUG`.
+2. **CPU cost per draw and per pipeline bind (2–3×).** These matter for DXVK games that issue thousands of draws per frame.
+3. **Opaque fill (−14%).** Check DCC and render-backend settings (`RADV_XCLIPSE_DCC*`).
+
 ## Notes for unattended runs
 
 This PC's internet usually comes from the phone's hotspot. If a GPU hang reboots the phone, the hotspot stays off, and adb can't turn it back on without root. The runner keeps going locally, but the Claude session is offline until someone taps the hotspot on. For fully unattended runs, put the PC on other internet, such as home Wi-Fi or Ethernet.
