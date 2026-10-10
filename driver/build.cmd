@@ -38,6 +38,7 @@ if not exist "%BUILD%" mkdir "%BUILD%"
    echo cpp = '%BIN%/aarch64-linux-android34-clang++.cmd'
    echo ar = '%BIN%/llvm-ar.exe'
    echo strip = '%BIN%/llvm-strip.exe'
+   echo nm = '%BIN%/llvm-nm.exe'
    echo.
    echo [properties]
    echo cpp_link_args = ['-static-libstdc++']

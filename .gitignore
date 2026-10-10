@@ -7,3 +7,4 @@
 !/tools/README.md
 *.zip
 *.nupkg
+/driver/build-log.txt
