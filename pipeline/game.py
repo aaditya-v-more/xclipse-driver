@@ -21,12 +21,13 @@ import argparse
 import datetime as dt
 import json
 import statistics
+import subprocess
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run import RESULTS, adb, phone_state, shell  # noqa: E402
+from run import ADB, RESULTS, adb, phone_state, shell  # noqa: E402
 
 APP = "app.gamenative"
 OUT_DIR = "/sdcard/Download/xclipse/out"  # D:\xclipse\out inside the containers
@@ -42,7 +43,9 @@ EXEC_ARGS = {
     "gravitymark": ("-vk -fullscreen 1 -benchmark 1 -close 1 -count 1 -asteroids 50000 -fps 1 "
                     "-info 0 -sensors 0 -times D:\\xclipse\\out\\gravitymark-{driver}-times.txt "
                     "-image D:\\xclipse\\out\\gravitymark-{driver}.png"),
-    "heaven": ("-project_name Heaven -data_path A:/ -engine_config A:/data/heaven_4.0.cfg "
+    # Heaven resolves these paths against its bin folder even when they start with a drive letter
+    # ("A:/data/x" became "A:/bin/A:/data/x"), so they're relative, as in Heaven's own launcher.
+    "heaven": ("-project_name Heaven -data_path ../ -engine_config ../data/heaven_4.0.cfg "
                "-system_script heaven/unigine.cpp -sound_app null -video_app direct3d11 "
                "-video_multisample 0 -video_fullscreen 1 -video_mode -1 "
                "-extern_define PHORONIX,RELEASE,QUALITY_LOW"),
@@ -173,6 +176,15 @@ def drivers_seen(since: str, processes: dict[str, str]) -> list[str]:
     return seen
 
 
+def screenshot(path: Path) -> bool:
+    png = subprocess.run([ADB, "exec-out", "screencap", "-p"], capture_output=True,
+                         timeout=60).stdout
+    if not png.startswith(b"\x89PNG"):
+        return False
+    path.write_bytes(png)
+    return True
+
+
 def gpu_temp() -> float:
     try:
         return float(shell("cat /sys/kernel/gpu/gpu_tmu", 15))
@@ -246,6 +258,11 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
     result["layer"] = layer
     result["surfaceflinger"] = frame_stats(list(frames))
     result["memory"] = memory
+    # A run without frames has usually stopped at a message box, from the game or from Wine.
+    if result["surfaceflinger"].get("frames", 0) < 10 and "status" not in result:
+        shot = run_dir / f"{tag}-{bench}-{driver}-screen.png"
+        if screenshot(shot):
+            result["screenshot"] = shot.name
     shell(f"am force-stop {APP}")
     killed = logcat_since(since, LOW_MEMORY_KILL)
     if killed:

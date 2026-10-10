@@ -112,7 +112,9 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
     - FEXCore's "Denuvo" preset, which adds `FEX_SMCCHECKS=full`.
     - FEXCore 2609-0.
     - Box64 as the 32-bit emulator. Proton's WoW64 loader can't find its module (`c0000135`).
-  - Next: force Wine's built-in runtime, which keeps its imports in a separate section. Both Heaven containers now set `WINEDLLOVERRIDES=msvcr100,msvcp100=b`, and Heaven-stock is back on FEXCore 2603 like the other three.
+  - **Fixed** by forcing Wine's built-in runtime, which keeps its imports in a separate section. Both Heaven containers now set `WINEDLLOVERRIDES=msvcr100,msvcp100=b`, and Heaven-stock is back on FEXCore 2603 like the other three.
+  - The next launch got as far as Unigine's own error box: it couldn't open `A:/bin/A:/data/heaven_4.0.cfg`. Heaven resolves `-data_path` and `-engine_config` against its `bin` folder even when they start with a drive letter. The Exec Arguments now use `../` and `../data/heaven_4.0.cfg`, as Heaven's own launcher does.
+  - `game.py` now saves a phone screenshot when a run ends without frames, since that usually means a message box.
 - [x] **GameNative's Vulkan wrapper emulated BC textures for RADV too (2026-10-11).**
   - In `auto` mode (`WRAPPER_EMULATE_BCN=3`), GameNative's wrapper (`src/vulkan/wrapper/wrapper_physical_device.c` in GameNative/mesa) uses native BC textures only for Qualcomm, Turnip, and NVIDIA. Every other driver gets emulation even when it reports `textureCompressionBC`, unless `WRAPPER_NATIVE_BCN=1` is set.
   - So the radv runs so far decompressed BC textures that our driver supports. Samsung's driver has no BC support, so it needs emulation regardless.
