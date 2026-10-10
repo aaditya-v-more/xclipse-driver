@@ -32,8 +32,10 @@ APP = "app.gamenative"
 OUT_DIR = "/sdcard/Download/xclipse/out"  # D:\xclipse\out inside the containers
 BENCHES = {
     "gravitymark": {"ids": {"stock": 2000940101, "radv": 2000940102}, "seconds": 300,
+                    "exe": "GravityMark.exe",
                     "times": "gravitymark-{driver}-times.txt", "image": "gravitymark-{driver}.png"},
-    "heaven": {"ids": {"stock": 2000940201, "radv": 2000940202}, "seconds": 330},
+    "heaven": {"ids": {"stock": 2000940201, "radv": 2000940202}, "seconds": 330,
+               "exe": "Heaven.exe"},
 }
 # Exec Arguments to set once per container (GameNative: Edit container -> General).
 EXEC_ARGS = {
@@ -197,6 +199,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
           f"--es game_source CUSTOM_GAME")
 
     frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
+    exe_seen = exe_gone = 0
     while time.monotonic() - started < cfg["seconds"]:
         time.sleep(1)
         if phone_state() != "device":
@@ -204,8 +207,19 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
             break
         elapsed = time.monotonic() - started
         if elapsed - sampled >= MEMORY_EVERY_S:
-            memory.append({"t": round(elapsed), **memory_sample(user, processes)})
+            now = {}
+            memory.append({"t": round(elapsed), **memory_sample(user, now)})
+            processes.update(now)
             sampled = elapsed
+            # GameNative keeps showing Wine's desktop after the game exits, so the game's own
+            # process tells when it's over.
+            if any(cfg["exe"].lower() in name.lower() for name in now.values()):
+                exe_seen, exe_gone = exe_seen or round(elapsed), 0
+            elif exe_seen:
+                exe_gone += 1
+                if exe_gone >= 2:
+                    result["game_exited_s"] = round(elapsed)
+                    break
         layers = game_layers()
         if not layers:
             gone_for = gone_for + 1 if seen_at else 0
@@ -223,6 +237,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
         if new and seen_at is None:
             seen_at = time.monotonic() - started
         frames.update(new)
+    result["seconds_to_game_process"] = exe_seen or None
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
     result["surfaceflinger"] = frame_stats(list(frames))
