@@ -291,24 +291,24 @@ def main() -> None:
         return
     if phone_state() != "device":
         sys.exit("phone not ready on adb")
-    shell("input keyevent KEYCODE_WAKEUP")  # handled by the system, not passed to apps
-    if "isKeyguardShowing=true" in shell("dumpsys window | grep isKeyguardShowing"):
-        sys.exit("the phone is locked; unlock it, then run again")
 
-    started = dt.datetime.now()
-    run_dir = RESULTS / (started.strftime("%Y-%m-%d_%H%M%S") + "-game")
-    run_dir.mkdir(parents=True)
-    shell(f"mkdir -p {OUT_DIR}")
-    baseline = cool_down(target=45.0)
-    meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
-            "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline}
-
+    # The screen must stay on between runs (the timeout is 30 s), and a game can't start on a
+    # locked phone. The setting is restored at the end.
     stay_on = shell("settings get global stay_on_while_plugged_in")
-    shell("svc power stayon usb")  # the screen must stay on between runs (30 s timeout otherwise)
-    shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
-    user = app_user()
+    shell("svc power stayon usb")
     try:
-        results = run_all(args, benches, drivers, run_dir, user, baseline)
+        shell("input keyevent KEYCODE_WAKEUP")  # handled by the system, not passed to apps
+        if not wait_unlocked(600):
+            sys.exit("the phone stayed locked; unlock it, then run again")
+        started = dt.datetime.now()
+        run_dir = RESULTS / (started.strftime("%Y-%m-%d_%H%M%S") + "-game")
+        run_dir.mkdir(parents=True)
+        shell(f"mkdir -p {OUT_DIR}")
+        baseline = cool_down(target=45.0)
+        meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
+                "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline}
+        shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
+        results = run_all(args, benches, drivers, run_dir, app_user(), baseline)
     finally:
         shell(f"settings put global stay_on_while_plugged_in {stay_on}")
         shell("setprop debug.radv_xclipse_log 0")
@@ -317,6 +317,19 @@ def main() -> None:
                                           encoding="utf-8", newline="\n")
     (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
     print(f"report: {run_dir / 'summary.md'}")
+
+
+def wait_unlocked(limit_s: float) -> bool:
+    deadline = time.monotonic() + limit_s
+    asked = False
+    while "isKeyguardShowing=true" in shell("dumpsys window | grep isKeyguardShowing"):
+        if time.monotonic() > deadline:
+            return False
+        if not asked:
+            print("waiting for the phone to be unlocked", flush=True)
+            asked = True
+        time.sleep(3)
+    return True
 
 
 def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: str,
