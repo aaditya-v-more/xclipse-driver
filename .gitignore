@@ -8,3 +8,5 @@
 *.zip
 *.nupkg
 /driver/build-log.txt
+/tests/build/
+__pycache__/
