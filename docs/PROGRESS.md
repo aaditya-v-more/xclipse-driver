@@ -63,7 +63,12 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - CPU per draw: Samsung 0.152 µs; RADV 0.253 µs.
   - Compile: Samsung 13.1 ms; RADV 5.0 ms (median).
   - In the draws test the GPU clock ended at **500 MHz under RADV against 800 MHz under Samsung**. The sgpu governor (`sgpu_governor.c`) scales with busy time. RADV records commands more slowly, so the GPU idles longer between runs in this serial test and gets clocked down. This is partly a test artifact; game benchmarks will show whether it matters.
-- [x] New driver switch: `RADV_XCLIPSE_NGGC=0` or `setprop debug.radv_xclipse_nggc 0` turns off NGG culling, so games can compare (`driver/src/amd/vulkan/radv_physical_device.c`, documented in `driver/README.md`).
+- [x] To compare NGG culling in games, use `adb shell setprop debug.radv_debug nonggc`, and clear it with `setprop debug.radv_debug ""`. The port reads `RADV_DEBUG`, `RADV_PERFTEST`, and `RADV_EXPERIMENTAL` from the `debug.radv_debug`, `debug.radv_perftest`, and `debug.radv_experimental` properties when an app can't set environment variables (`radv_instance.c`). A separate switch briefly added in 445fcf4 was removed as redundant.
+- [x] **CPU profile of RADV's draw path** (simpleperf on the phone, `cpu-clock:u`, unstripped driver):
+  - `radv_emit_all_graphics_states` 21%, `radv_CmdDraw` 12%, `radv_CmdBindPipeline` 9%, `radv_emit_graphics_shaders` 7%, `radv_emit_hw_ngg` 5%, `memcmp` 4.5%.
+  - Push-constant path: about 12% in total.
+  - Port-specific: cache-flush emission about 4%, `radv_log_msg` plus `ac_xclipse_log_level` about 2% (logging checks in the hot path while logging is off), and `ac_titan_sh_dw` (the register remap) about 2%.
+  - To profile again: push `driver/build-android/src/amd/vulkan/libvulkan_radeon.so`, then run `simpleperf record -e cpu-clock:u -f 4000 ./xdtest --driver <that .so> --test draws`.
 - [x] From the kernel source: `SGPU_INSTANCE_DATA` and `SGPU_MEM_PROFILE_ADD` only feed memory profiling to debugfs. `AMDGPU_WGP_GATING` sets device-wide WGP clock-on and always-on counts. It's global power state, so we leave it alone.
 
 ## Optimization targets (from the speed tests)

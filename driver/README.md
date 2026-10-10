@@ -64,9 +64,7 @@ Each switch is an environment variable or, for apps that cannot set one, an Andr
 | `debug.radv_xclipse_mtype` | `RADV_XCLIPSE_MTYPE` | VA map MTYPE: `0` default, `3` upstream |
 | `debug.radv_xclipse_pal_heaps` | `RADV_XCLIPSE_PAL_HEAPS` | `0` restores the single memory heap |
 | `debug.radv_xclipse_dcc` | `RADV_XCLIPSE_DCC` | `0` turns off render target compression (DCC) |
-| `debug.radv_xclipse_dcc_small` | `RADV_XCLIPSE_DCC_SMALL` | `0` turns off DCC for render targets of 512x512 and smaller only |
-| `debug.radv_xclipse_nggc` | `RADV_XCLIPSE_NGGC` | `0` turns off NGG culling, which costs about 0.18 µs of GPU time per draw on the Xclipse 940 |
-| `debug.radv_xclipse_fillclear` | | `1` clears a whole render target that has no compression by filling its memory instead of drawing (experimental) |
+| `debug.radv_xclipse_dcc_small` | `RADV_XCLIPSE_DCC_SMALL` | `0` turns off DCC for render targets of 512x512 and smaller only || `debug.radv_xclipse_fillclear` | | `1` clears a whole render target that has no compression by filling its memory instead of drawing (experimental) |
 | `debug.radv_xclipse_bc5_alias` | `RADV_XCLIPSE_BC5_ALIAS` | `0` stores BC5 textures separately from their converted (EAC) copy again: twice the memory and a slower upload, but copying such a texture back out as BC5 returns the original data |
 | `debug.radv_xclipse_titan` | `RADV_XCLIPSE_TITAN` | Xclipse 530 and 940: `0` stops remapping registers to their layout; lower levels than the default `10` remap only part of it |
 | `debug.radv_xclipse_prefetch` | `RADV_XCLIPSE_PREFETCH` | Shader and vertex-descriptor prefetches into the GPU cache: `0` none (default on the 940, where they hang the GPU, and what the vendor driver does), `1` issued from the command fetcher, `2` issued from the main command engine (default elsewhere) |
