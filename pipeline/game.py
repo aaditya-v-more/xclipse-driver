@@ -7,7 +7,12 @@ game over adb, records the frames GameNative presents on screen (SurfaceFlinger 
 the benchmark's own frame-time file when it writes one, and stops the app. Drivers alternate run
 by run and the phone cools down in between, so heat affects both alike.
 
-usage: python pipeline/game.py [--bench gravitymark,heaven] [--runs 3]
+Before each run it closes background apps (`am kill-all`), because GravityMark under Wine needs
+most of the phone's memory: on the first try Android's low-memory killer stopped GameNative 18 s
+into the benchmark. Free memory, swap, and GameNative's own memory are sampled during the run, and
+a run that the low-memory killer ends is reported as such, not as a finished benchmark.
+
+usage: python pipeline/game.py [--bench gravitymark,heaven] [--runs 3] [--radv-log]
 """
 
 from __future__ import annotations
@@ -40,7 +45,12 @@ EXEC_ARGS = {
                "-video_multisample 0 -video_fullscreen 1 -video_mode -1 "
                "-extern_define PHORONIX,RELEASE,QUALITY_LOW"),
 }
-WARMUP_S = 10  # ignore frames from the first seconds after the first frame (loading, ramp-up)
+WARMUP_S = 10  # ignore frames from the first seconds after the game starts rendering (ramp-up)
+MEMORY_EVERY_S = 5
+# Log lines that show which Vulkan driver a run loaded. Samsung's driver logs OpenDevice on its
+# own; RADV logs [BUILD] only with debug.radv_xclipse_log >= 1 (--radv-log).
+DRIVER_MARKERS = {"samsung": "Samsung::Vulkan::OpenDevice", "radv": "RADV_BUILD"}
+LOW_MEMORY_KILL = f"Reclaim '{APP}'|Kill '{APP}'"
 
 
 def game_layers() -> list[str]:
@@ -69,11 +79,13 @@ def present_times(layer: str) -> list[int]:
 
 
 def frame_stats(times_ns: list[int]) -> dict:
-    if len(times_ns) < 10:
-        return {"frames": len(times_ns)}
     ts = sorted(set(times_ns))
-    start = ts[0] + WARMUP_S * 1_000_000_000
-    ts = [t for t in ts if t >= start]
+    # GameNative's SurfaceView exists from its "Booting..." screen on and presents a frame now and
+    # then while Wine starts. The game is rendering once 10 frames land within 2 s.
+    rendering = next((t for i, t in enumerate(ts[:-10]) if ts[i + 10] - t < 2_000_000_000), None)
+    if rendering is None:
+        return {"frames": len(ts)}
+    ts = [t for t in ts if t >= rendering + WARMUP_S * 1_000_000_000]
     if len(ts) < 10:
         return {"frames": len(ts)}
     intervals = [(b - a) / 1e6 for a, b in zip(ts, ts[1:])]
@@ -85,6 +97,65 @@ def frame_stats(times_ns: list[int]) -> dict:
         "frametime_median_ms": statistics.median(intervals),
         "fps_1pct_low": 1000.0 / statistics.mean(worst) if worst else None,
     }
+
+
+def app_user() -> str:
+    """GameNative's Linux user name (u0_aNNN), which its Wine processes run as too."""
+    uid = int(shell(f"cmd package list packages -U {APP}").split("uid:")[1].split()[0])
+    return f"u0_a{uid % 100000 - 10000}"
+
+
+def memory_sample(user: str, processes: dict[str, str] | None = None) -> dict:
+    """System memory, and the resident and swapped memory of every GameNative process (its Wine
+    processes included), in MB. Adds those processes to `processes` (pid -> name)."""
+    out = shell("cat /proc/meminfo /proc/pressure/memory; "
+                f"ps -A -u {user} -o PID=,NAME=; "
+                f"for p in $(ps -A -u {user} -o PID=); do grep -h -E '^Vm(RSS|Swap):' /proc/$p/status; "
+                "done", 30)
+    kb = {"MemAvailable:": 0, "SwapFree:": 0, "VmRSS:": 0, "VmSwap:": 0}
+    psi_full = None
+    for line in out.splitlines():
+        parts = line.split(None, 1)
+        if not parts:
+            continue
+        if parts[0] in kb:
+            kb[parts[0]] += int(parts[1].split()[0])
+        elif parts[0] == "full":
+            psi_full = float(parts[1].split()[0].split("=")[1])
+        elif parts[0].isdigit() and len(parts) == 2 and processes is not None:
+            processes[parts[0]] = parts[1].strip()
+    return {"available_mb": kb["MemAvailable:"] // 1024, "swap_free_mb": kb["SwapFree:"] // 1024,
+            "app_rss_mb": kb["VmRSS:"] // 1024, "app_swap_mb": kb["VmSwap:"] // 1024,
+            "pressure_full_avg10": psi_full}
+
+
+def free_memory(user: str) -> int:
+    """Closes background apps: `am kill-all` ends every process Android considers safe to kill
+    (cached apps), the ones it would reclaim first anyway. Returns available memory in MB."""
+    shell("am kill-all", 60)
+    time.sleep(3)
+    return memory_sample(user)["available_mb"]
+
+
+def logcat_since(since: str, pattern: str) -> list[str]:
+    """Log lines since `since` (the phone's 'MM-DD hh:mm:ss.mmm') that match an extended regex."""
+    out = shell(f"logcat -d -b main,system -T '{since}' | grep -E \"{pattern}\"", 60)
+    # adbd logs each shell command it runs, this grep included, so its lines would always match.
+    return [line for line in out.splitlines() if line.strip() and "service requested" not in line]
+
+
+def drivers_seen(since: str, processes: dict[str, str]) -> list[str]:
+    """Which Vulkan drivers the game's Wine processes loaded, from their log lines. GameNative's
+    own process is left out: Android's UI renderer can open the system Vulkan driver in any app."""
+    wine = {pid for pid, name in processes.items() if name != APP}
+    seen = []
+    for name, marker in DRIVER_MARKERS.items():
+        for line in logcat_since(since, marker):
+            fields = line.split()  # threadtime format: date time pid tid level tag: message
+            if len(fields) > 2 and fields[2] in wine:
+                seen.append(name)
+                break
+    return seen
 
 
 def gpu_temp() -> float:
@@ -101,24 +172,31 @@ def cool_down(target: float, limit_s: float = 120) -> float:
     return gpu_temp()
 
 
-def run_once(bench: str, driver: str, run_dir: Path, tag: str) -> dict:
+def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dict:
     cfg = BENCHES[bench]
     app_id = cfg["ids"][driver]
     shell(f"am force-stop {APP}")
     for key in ("times", "image"):
         if key in cfg:
             shell(f"rm -f {OUT_DIR}/{cfg[key].format(driver=driver)}")
-    result = {"bench": bench, "driver": driver, "app_id": app_id, "gpu_temp_c_before": gpu_temp()}
+    result = {"bench": bench, "driver": driver, "app_id": app_id, "gpu_temp_c_before": gpu_temp(),
+              "available_mb_before": free_memory(user)}
+    since = shell("date '+%m-%d %H:%M:%S.000'")
+    memory, processes = [], {}
     started = time.monotonic()
     shell(f"am start -n {APP}/.MainActivity -a {APP}.LAUNCH_GAME --ei app_id {app_id} "
           f"--es game_source CUSTOM_GAME")
 
-    frames, layer, seen_at, gone_for = set(), None, None, 0
+    frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
     while time.monotonic() - started < cfg["seconds"]:
         time.sleep(1)
         if phone_state() != "device":
             result["status"] = "phone-lost"
             break
+        elapsed = time.monotonic() - started
+        if elapsed - sampled >= MEMORY_EVERY_S:
+            memory.append({"t": round(elapsed), **memory_sample(user, processes)})
+            sampled = elapsed
         layers = game_layers()
         if not layers:
             gone_for = gone_for + 1 if seen_at else 0
@@ -135,7 +213,14 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str) -> dict:
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
     result["surfaceflinger"] = frame_stats(list(frames))
+    result["memory"] = memory
     shell(f"am force-stop {APP}")
+    killed = logcat_since(since, LOW_MEMORY_KILL)
+    if killed:
+        result["status"] = "killed-low-memory"
+        result["low_memory_kill"] = killed[0].strip()
+    result["vulkan_drivers_seen"] = drivers_seen(since, processes)
+    result["processes"] = sorted(set(processes.values()))
 
     if "times" in cfg:
         name = cfg["times"].format(driver=driver)
@@ -157,14 +242,19 @@ def summarize(meta: dict, results: list[dict]) -> str:
     out = [f"# Game benchmark run {meta['started']}", "",
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
            f"first {WARMUP_S} s after the first frame.", "",
-           "| Benchmark | Driver | Run | Status | Avg FPS | 1% low FPS | Median frame time (ms) |",
-           "|---|---|---|---|---|---|---|"]
+           "| Benchmark | Driver | Run | Status | Avg FPS | 1% low FPS | Median frame time (ms) "
+           "| Driver seen | Least free memory (MB) | GameNative peak (MB) |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         s = r.get("surfaceflinger", {})
         fmt = lambda v: f"{v:.1f}" if isinstance(v, (int, float)) else ""  # noqa: E731
+        mem = r.get("memory") or [{}]
+        least = min((m.get("available_mb", 0) for m in mem), default=0)
+        peak = max((m.get("app_rss_mb", 0) + m.get("app_swap_mb", 0) for m in mem), default=0)
         out.append(f"| {r['bench']} | {r['driver']} | {r['run']} | {r['status']} | "
                    f"{fmt(s.get('fps_avg'))} | {fmt(s.get('fps_1pct_low'))} | "
-                   f"{fmt(s.get('frametime_median_ms'))} |")
+                   f"{fmt(s.get('frametime_median_ms'))} | "
+                   f"{', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} |")
     out += ["", "## Medians", ""]
     for bench in dict.fromkeys(r["bench"] for r in results):
         line = []
@@ -186,6 +276,9 @@ def main() -> None:
     ap.add_argument("--bench", default="gravitymark,heaven")
     ap.add_argument("--drivers", default="stock,radv")
     ap.add_argument("--runs", type=int, default=3)
+    ap.add_argument("--radv-log", action="store_true",
+                    help="turn on RADV's diagnostic log (debug.radv_xclipse_log=1) so radv runs "
+                         "prove our driver loaded; it adds CPU work, so leave it off for timing")
     ap.add_argument("--print-args", action="store_true",
                     help="print the Exec Arguments for each container and exit")
     args = ap.parse_args()
@@ -198,6 +291,9 @@ def main() -> None:
         return
     if phone_state() != "device":
         sys.exit("phone not ready on adb")
+    shell("input keyevent KEYCODE_WAKEUP")  # handled by the system, not passed to apps
+    if "isKeyguardShowing=true" in shell("dumpsys window | grep isKeyguardShowing"):
+        sys.exit("the phone is locked; unlock it, then run again")
 
     started = dt.datetime.now()
     run_dir = RESULTS / (started.strftime("%Y-%m-%d_%H%M%S") + "-game")
@@ -207,25 +303,40 @@ def main() -> None:
     meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
             "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline}
 
+    stay_on = shell("settings get global stay_on_while_plugged_in")
+    shell("svc power stayon usb")  # the screen must stay on between runs (30 s timeout otherwise)
+    shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
+    user = app_user()
+    try:
+        results = run_all(args, benches, drivers, run_dir, user, baseline)
+    finally:
+        shell(f"settings put global stay_on_while_plugged_in {stay_on}")
+        shell("setprop debug.radv_xclipse_log 0")
+
+    (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
+                                          encoding="utf-8", newline="\n")
+    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
+    print(f"report: {run_dir / 'summary.md'}")
+
+
+def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: str,
+            baseline: float) -> list[dict]:
     results = []
     for n in range(1, args.runs + 1):
         for bench in benches:
             for driver in (drivers if n % 2 else list(reversed(drivers))):
                 print(f"run {n} {bench:<12} {driver:<5}", end=" ", flush=True)
-                r = run_once(bench, driver, run_dir, f"run{n}")
+                r = run_once(bench, driver, run_dir, f"run{n}", user)
                 r["run"] = n
                 s = r["surfaceflinger"]
                 print(f"{r['status']} {s.get('fps_avg', 0):.1f} fps over {s.get('seconds', 0):.0f} s",
                       flush=True)
                 results.append(r)
                 if r["status"] == "phone-lost":
-                    sys.exit("lost the phone; stopping")
+                    print("lost the phone; stopping")
+                    return results
                 cool_down(target=baseline + 3)
-
-    (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
-                                          encoding="utf-8", newline="\n")
-    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
-    print(f"report: {run_dir / 'summary.md'}")
+    return results
 
 
 if __name__ == "__main__":
