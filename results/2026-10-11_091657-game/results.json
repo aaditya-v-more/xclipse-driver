@@ -1,0 +1,1457 @@
+{
+  "meta": {
+    "started": "2026-10-11T09:16:57",
+    "benches": [
+      "heaven",
+      "gravitymark"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "runs": 1,
+    "gpu_temp_c_start": 36.0
+  },
+  "results": [
+    {
+      "bench": "heaven",
+      "driver": "stock",
+      "app_id": 2000940201,
+      "gpu_temp_c_before": 36.0,
+      "available_mb_before": 3292,
+      "seconds_to_game_process": 6,
+      "seconds_to_first_frame": 8.106678207986988,
+      "layer": "d4fed0 SurfaceView[app.gamenative/app.gamenative.MainActivity]@0(BLAST)#175613",
+      "surfaceflinger": {
+        "frames": 132,
+        "seconds": 9.375538086,
+        "steady_seconds": 2.922543008,
+        "fps_avg": 13.972531368158531,
+        "frametime_median_ms": 16.609649,
+        "fps_1pct_low": 0.3194302482122218
+      },
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 3152,
+          "swap_free_mb": 10335,
+          "app_rss_mb": 226,
+          "app_swap_mb": 36,
+          "gpu_total_mb": 168,
+          "app_gpu_mb": 40,
+          "pressure_full_avg10": 0.34
+        },
+        {
+          "t": 6,
+          "available_mb": 2669,
+          "swap_free_mb": 10349,
+          "app_rss_mb": 700,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 187,
+          "app_gpu_mb": 58,
+          "pressure_full_avg10": 0.37
+        },
+        {
+          "t": 11,
+          "available_mb": 2423,
+          "swap_free_mb": 10298,
+          "app_rss_mb": 718,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 188,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.53
+        },
+        {
+          "t": 17,
+          "available_mb": 2200,
+          "swap_free_mb": 10298,
+          "app_rss_mb": 829,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 169,
+          "app_gpu_mb": 41,
+          "pressure_full_avg10": 0.5
+        },
+        {
+          "t": 22,
+          "available_mb": 2288,
+          "swap_free_mb": 9667,
+          "app_rss_mb": 904,
+          "app_swap_mb": 65,
+          "gpu_total_mb": 170,
+          "app_gpu_mb": 42,
+          "pressure_full_avg10": 2.84
+        },
+        {
+          "t": 28,
+          "available_mb": 2204,
+          "swap_free_mb": 9681,
+          "app_rss_mb": 979,
+          "app_swap_mb": 65,
+          "gpu_total_mb": 173,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 1.56
+        },
+        {
+          "t": 33,
+          "available_mb": 2142,
+          "swap_free_mb": 9734,
+          "app_rss_mb": 1011,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 171,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 1.04
+        },
+        {
+          "t": 38,
+          "available_mb": 2133,
+          "swap_free_mb": 9725,
+          "app_rss_mb": 1013,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.57
+        },
+        {
+          "t": 43,
+          "available_mb": 2111,
+          "swap_free_mb": 9727,
+          "app_rss_mb": 1015,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.31
+        },
+        {
+          "t": 48,
+          "available_mb": 2077,
+          "swap_free_mb": 9732,
+          "app_rss_mb": 1000,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.21
+        },
+        {
+          "t": 53,
+          "available_mb": 2077,
+          "swap_free_mb": 9733,
+          "app_rss_mb": 1001,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.11
+        },
+        {
+          "t": 59,
+          "available_mb": 2088,
+          "swap_free_mb": 9699,
+          "app_rss_mb": 1002,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.07
+        },
+        {
+          "t": 65,
+          "available_mb": 2011,
+          "swap_free_mb": 9708,
+          "app_rss_mb": 1004,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.04
+        },
+        {
+          "t": 71,
+          "available_mb": 2011,
+          "swap_free_mb": 9709,
+          "app_rss_mb": 1006,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 172,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.02
+        },
+        {
+          "t": 77,
+          "available_mb": 2072,
+          "swap_free_mb": 9637,
+          "app_rss_mb": 1007,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 168,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 83,
+          "available_mb": 2069,
+          "swap_free_mb": 9637,
+          "app_rss_mb": 1010,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 168,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 88,
+          "available_mb": 2096,
+          "swap_free_mb": 9589,
+          "app_rss_mb": 1011,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 167,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 94,
+          "available_mb": 2091,
+          "swap_free_mb": 9591,
+          "app_rss_mb": 1013,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 167,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 100,
+          "available_mb": 2010,
+          "swap_free_mb": 9611,
+          "app_rss_mb": 1015,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 157,
+          "app_gpu_mb": 35,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 106,
+          "available_mb": 1995,
+          "swap_free_mb": 9612,
+          "app_rss_mb": 1017,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 112,
+          "available_mb": 2016,
+          "swap_free_mb": 9642,
+          "app_rss_mb": 1018,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 118,
+          "available_mb": 1991,
+          "swap_free_mb": 9645,
+          "app_rss_mb": 1019,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 124,
+          "available_mb": 2015,
+          "swap_free_mb": 9646,
+          "app_rss_mb": 1022,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 129,
+          "available_mb": 2021,
+          "swap_free_mb": 9648,
+          "app_rss_mb": 1023,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 135,
+          "available_mb": 2011,
+          "swap_free_mb": 9649,
+          "app_rss_mb": 1025,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 141,
+          "available_mb": 2007,
+          "swap_free_mb": 9649,
+          "app_rss_mb": 1026,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 147,
+          "available_mb": 2000,
+          "swap_free_mb": 9650,
+          "app_rss_mb": 1028,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 153,
+          "available_mb": 2012,
+          "swap_free_mb": 9650,
+          "app_rss_mb": 1030,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 159,
+          "available_mb": 2009,
+          "swap_free_mb": 9651,
+          "app_rss_mb": 1031,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 165,
+          "available_mb": 1998,
+          "swap_free_mb": 9651,
+          "app_rss_mb": 1032,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 171,
+          "available_mb": 2032,
+          "swap_free_mb": 9600,
+          "app_rss_mb": 1034,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 177,
+          "available_mb": 2078,
+          "swap_free_mb": 9600,
+          "app_rss_mb": 991,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 183,
+          "available_mb": 2086,
+          "swap_free_mb": 9600,
+          "app_rss_mb": 992,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 189,
+          "available_mb": 2101,
+          "swap_free_mb": 9626,
+          "app_rss_mb": 994,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 195,
+          "available_mb": 2161,
+          "swap_free_mb": 9558,
+          "app_rss_mb": 996,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 201,
+          "available_mb": 2154,
+          "swap_free_mb": 9624,
+          "app_rss_mb": 997,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 207,
+          "available_mb": 2151,
+          "swap_free_mb": 9637,
+          "app_rss_mb": 999,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 213,
+          "available_mb": 2142,
+          "swap_free_mb": 9663,
+          "app_rss_mb": 1000,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 219,
+          "available_mb": 2124,
+          "swap_free_mb": 9697,
+          "app_rss_mb": 1002,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 225,
+          "available_mb": 2116,
+          "swap_free_mb": 9699,
+          "app_rss_mb": 1003,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 231,
+          "available_mb": 2112,
+          "swap_free_mb": 9700,
+          "app_rss_mb": 1005,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 237,
+          "available_mb": 2117,
+          "swap_free_mb": 9709,
+          "app_rss_mb": 1007,
+          "app_swap_mb": 54,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 242,
+          "available_mb": 1927,
+          "swap_free_mb": 9840,
+          "app_rss_mb": 930,
+          "app_swap_mb": 71,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.36
+        },
+        {
+          "t": 248,
+          "available_mb": 2056,
+          "swap_free_mb": 9630,
+          "app_rss_mb": 752,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 1.04
+        },
+        {
+          "t": 253,
+          "available_mb": 2134,
+          "swap_free_mb": 9514,
+          "app_rss_mb": 753,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.57
+        },
+        {
+          "t": 259,
+          "available_mb": 2167,
+          "swap_free_mb": 9508,
+          "app_rss_mb": 756,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.38
+        },
+        {
+          "t": 265,
+          "available_mb": 2153,
+          "swap_free_mb": 9594,
+          "app_rss_mb": 757,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.21
+        },
+        {
+          "t": 271,
+          "available_mb": 2160,
+          "swap_free_mb": 9590,
+          "app_rss_mb": 758,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.11
+        },
+        {
+          "t": 277,
+          "available_mb": 2151,
+          "swap_free_mb": 9611,
+          "app_rss_mb": 760,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.06
+        },
+        {
+          "t": 283,
+          "available_mb": 2137,
+          "swap_free_mb": 9616,
+          "app_rss_mb": 762,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.03
+        },
+        {
+          "t": 289,
+          "available_mb": 2136,
+          "swap_free_mb": 9625,
+          "app_rss_mb": 764,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 295,
+          "available_mb": 2140,
+          "swap_free_mb": 9615,
+          "app_rss_mb": 766,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 301,
+          "available_mb": 2132,
+          "swap_free_mb": 9622,
+          "app_rss_mb": 767,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 307,
+          "available_mb": 2139,
+          "swap_free_mb": 9632,
+          "app_rss_mb": 768,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 313,
+          "available_mb": 2140,
+          "swap_free_mb": 9652,
+          "app_rss_mb": 769,
+          "app_swap_mb": 235,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 318,
+          "available_mb": 2150,
+          "swap_free_mb": 9412,
+          "app_rss_mb": 683,
+          "app_swap_mb": 312,
+          "gpu_total_mb": 166,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 2.3
+        },
+        {
+          "t": 324,
+          "available_mb": 2174,
+          "swap_free_mb": 9445,
+          "app_rss_mb": 685,
+          "app_swap_mb": 312,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 1.26
+        },
+        {
+          "t": 330,
+          "available_mb": 2226,
+          "swap_free_mb": 9453,
+          "app_rss_mb": 674,
+          "app_swap_mb": 324,
+          "gpu_total_mb": 156,
+          "app_gpu_mb": 34,
+          "pressure_full_avg10": 0.69
+        }
+      ],
+      "screenshot": "run1-heaven-stock-screen.png",
+      "vulkan_drivers_seen": [
+        "samsung"
+      ],
+      "launch_settings": [
+        "Screen Size: 1280x720",
+        "Graphics Driver: Wrapper",
+        "DX Wrapper: dxvk (Config: 'version=async-1.10.3,framerate=0,maxDeviceMemory=0,async=1,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+        "WoW64 Mode: true",
+        "Box64 Version: 0.3.6",
+        "Box64 Preset: COMPATIBILITY",
+        "FEXCore Preset: INTERMEDIATE",
+        "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WINEDLLOVERRIDES=msvcr100,msvcp100=b WRAPPER_NATIVE_BCN=1",
+        "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_ASYNC=1 DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=\"\" VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 ENABLE_BCN_COMPUTE=1 BCN_COMPUTE_AUTO=0 WRAPPER_EMULATE_BCN=2 WRAPPER_USE_BCN_CACHE=0 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=+warn,+err,+fixme,+loaddll WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WINEDLLOVERRIDES=msvcr100,msvcp100=b WRAPPER_NATIVE_BCN=1 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+      ],
+      "processes": [
+        "A:\\bin\\Heaven.exe",
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe"
+      ],
+      "status": "too-short",
+      "gpu_temp_c_after": 47.0,
+      "run": 1
+    },
+    {
+      "bench": "heaven",
+      "driver": "radv",
+      "app_id": 2000940202,
+      "gpu_temp_c_before": 39.0,
+      "available_mb_before": 3473,
+      "seconds_to_game_process": 7,
+      "seconds_to_first_frame": 7.970334499957971,
+      "layer": "8e5ce85 SurfaceView[app.gamenative/app.gamenative.MainActivity]@0(BLAST)#175666",
+      "surfaceflinger": {
+        "frames": 594,
+        "seconds": 297.460895078,
+        "steady_seconds": 176.627272461,
+        "fps_avg": 1.9935393519356683,
+        "frametime_median_ms": 66.571758,
+        "fps_1pct_low": 0.20461815175442674
+      },
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 3268,
+          "swap_free_mb": 10351,
+          "app_rss_mb": 212,
+          "app_swap_mb": 36,
+          "gpu_total_mb": 176,
+          "app_gpu_mb": 39,
+          "pressure_full_avg10": 0.13
+        },
+        {
+          "t": 7,
+          "available_mb": 2916,
+          "swap_free_mb": 10367,
+          "app_rss_mb": 554,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.31
+        },
+        {
+          "t": 12,
+          "available_mb": 2706,
+          "swap_free_mb": 10368,
+          "app_rss_mb": 655,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 175,
+          "app_gpu_mb": 38,
+          "pressure_full_avg10": 0.17
+        },
+        {
+          "t": 18,
+          "available_mb": 2541,
+          "swap_free_mb": 10298,
+          "app_rss_mb": 740,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 175,
+          "app_gpu_mb": 38,
+          "pressure_full_avg10": 0.11
+        },
+        {
+          "t": 23,
+          "available_mb": 2342,
+          "swap_free_mb": 10304,
+          "app_rss_mb": 831,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 178,
+          "app_gpu_mb": 41,
+          "pressure_full_avg10": 0.06
+        },
+        {
+          "t": 29,
+          "available_mb": 2199,
+          "swap_free_mb": 10297,
+          "app_rss_mb": 864,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 177,
+          "app_gpu_mb": 41,
+          "pressure_full_avg10": 0.03
+        },
+        {
+          "t": 35,
+          "available_mb": 2245,
+          "swap_free_mb": 10079,
+          "app_rss_mb": 871,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 165,
+          "app_gpu_mb": 43,
+          "pressure_full_avg10": 1.03
+        },
+        {
+          "t": 40,
+          "available_mb": 2201,
+          "swap_free_mb": 10075,
+          "app_rss_mb": 875,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 168,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.69
+        },
+        {
+          "t": 46,
+          "available_mb": 2217,
+          "swap_free_mb": 9999,
+          "app_rss_mb": 898,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 180,
+          "app_gpu_mb": 57,
+          "pressure_full_avg10": 0.37
+        },
+        {
+          "t": 52,
+          "available_mb": 2198,
+          "swap_free_mb": 9999,
+          "app_rss_mb": 898,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.2
+        },
+        {
+          "t": 59,
+          "available_mb": 2191,
+          "swap_free_mb": 10000,
+          "app_rss_mb": 901,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 184,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.09
+        },
+        {
+          "t": 64,
+          "available_mb": 2236,
+          "swap_free_mb": 9995,
+          "app_rss_mb": 901,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 185,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.06
+        },
+        {
+          "t": 69,
+          "available_mb": 2317,
+          "swap_free_mb": 9909,
+          "app_rss_mb": 903,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 185,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.03
+        },
+        {
+          "t": 76,
+          "available_mb": 2300,
+          "swap_free_mb": 9978,
+          "app_rss_mb": 907,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 188,
+          "app_gpu_mb": 65,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 81,
+          "available_mb": 2280,
+          "swap_free_mb": 9993,
+          "app_rss_mb": 909,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 191,
+          "app_gpu_mb": 68,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 87,
+          "available_mb": 2266,
+          "swap_free_mb": 9999,
+          "app_rss_mb": 911,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 191,
+          "app_gpu_mb": 68,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 93,
+          "available_mb": 2219,
+          "swap_free_mb": 10011,
+          "app_rss_mb": 912,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 191,
+          "app_gpu_mb": 68,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 98,
+          "available_mb": 2208,
+          "swap_free_mb": 10012,
+          "app_rss_mb": 914,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 191,
+          "app_gpu_mb": 68,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 103,
+          "available_mb": 2261,
+          "swap_free_mb": 9995,
+          "app_rss_mb": 915,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 180,
+          "app_gpu_mb": 58,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 109,
+          "available_mb": 2245,
+          "swap_free_mb": 9996,
+          "app_rss_mb": 917,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 181,
+          "app_gpu_mb": 59,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 114,
+          "available_mb": 2257,
+          "swap_free_mb": 9996,
+          "app_rss_mb": 919,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 182,
+          "app_gpu_mb": 59,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 119,
+          "available_mb": 2237,
+          "swap_free_mb": 9997,
+          "app_rss_mb": 920,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 182,
+          "app_gpu_mb": 59,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 125,
+          "available_mb": 2224,
+          "swap_free_mb": 9998,
+          "app_rss_mb": 921,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 182,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 131,
+          "available_mb": 2224,
+          "swap_free_mb": 10002,
+          "app_rss_mb": 923,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 137,
+          "available_mb": 2234,
+          "swap_free_mb": 9994,
+          "app_rss_mb": 925,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 142,
+          "available_mb": 2226,
+          "swap_free_mb": 9996,
+          "app_rss_mb": 926,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 147,
+          "available_mb": 2220,
+          "swap_free_mb": 9997,
+          "app_rss_mb": 928,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 184,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 153,
+          "available_mb": 2217,
+          "swap_free_mb": 9997,
+          "app_rss_mb": 930,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 158,
+          "available_mb": 2253,
+          "swap_free_mb": 9998,
+          "app_rss_mb": 891,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 166,
+          "available_mb": 2251,
+          "swap_free_mb": 9999,
+          "app_rss_mb": 895,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 171,
+          "available_mb": 2243,
+          "swap_free_mb": 10003,
+          "app_rss_mb": 900,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 177,
+          "available_mb": 2242,
+          "swap_free_mb": 10004,
+          "app_rss_mb": 902,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 183,
+          "available_mb": 1981,
+          "swap_free_mb": 10110,
+          "app_rss_mb": 808,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 183,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.36
+        },
+        {
+          "t": 190,
+          "available_mb": 1837,
+          "swap_free_mb": 10124,
+          "app_rss_mb": 780,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 211,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.34
+        },
+        {
+          "t": 195,
+          "available_mb": 1838,
+          "swap_free_mb": 10127,
+          "app_rss_mb": 782,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.18
+        },
+        {
+          "t": 200,
+          "available_mb": 1826,
+          "swap_free_mb": 10150,
+          "app_rss_mb": 783,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.1
+        },
+        {
+          "t": 207,
+          "available_mb": 1942,
+          "swap_free_mb": 9994,
+          "app_rss_mb": 643,
+          "app_swap_mb": 174,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.05
+        },
+        {
+          "t": 213,
+          "available_mb": 1920,
+          "swap_free_mb": 10001,
+          "app_rss_mb": 645,
+          "app_swap_mb": 174,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.03
+        },
+        {
+          "t": 219,
+          "available_mb": 1916,
+          "swap_free_mb": 9983,
+          "app_rss_mb": 645,
+          "app_swap_mb": 174,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.01
+        },
+        {
+          "t": 225,
+          "available_mb": 1983,
+          "swap_free_mb": 10003,
+          "app_rss_mb": 651,
+          "app_swap_mb": 174,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 231,
+          "available_mb": 1996,
+          "swap_free_mb": 10014,
+          "app_rss_mb": 652,
+          "app_swap_mb": 174,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 61,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 236,
+          "available_mb": 1957,
+          "swap_free_mb": 10022,
+          "app_rss_mb": 657,
+          "app_swap_mb": 173,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 242,
+          "available_mb": 1945,
+          "swap_free_mb": 10013,
+          "app_rss_mb": 657,
+          "app_swap_mb": 173,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 248,
+          "available_mb": 1940,
+          "swap_free_mb": 10016,
+          "app_rss_mb": 661,
+          "app_swap_mb": 173,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 253,
+          "available_mb": 1993,
+          "swap_free_mb": 10017,
+          "app_rss_mb": 662,
+          "app_swap_mb": 173,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 259,
+          "available_mb": 1993,
+          "swap_free_mb": 10022,
+          "app_rss_mb": 664,
+          "app_swap_mb": 173,
+          "gpu_total_mb": 198,
+          "app_gpu_mb": 62,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 264,
+          "available_mb": 1990,
+          "swap_free_mb": 10026,
+          "app_rss_mb": 664,
+          "app_swap_mb": 175,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 271,
+          "available_mb": 1962,
+          "swap_free_mb": 10051,
+          "app_rss_mb": 666,
+          "app_swap_mb": 175,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 276,
+          "available_mb": 1951,
+          "swap_free_mb": 10090,
+          "app_rss_mb": 667,
+          "app_swap_mb": 175,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 281,
+          "available_mb": 1948,
+          "swap_free_mb": 10093,
+          "app_rss_mb": 668,
+          "app_swap_mb": 175,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 287,
+          "available_mb": 2015,
+          "swap_free_mb": 10017,
+          "app_rss_mb": 668,
+          "app_swap_mb": 177,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 293,
+          "available_mb": 2011,
+          "swap_free_mb": 10020,
+          "app_rss_mb": 670,
+          "app_swap_mb": 177,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 298,
+          "available_mb": 2005,
+          "swap_free_mb": 10020,
+          "app_rss_mb": 672,
+          "app_swap_mb": 177,
+          "gpu_total_mb": 199,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 304,
+          "available_mb": 1984,
+          "swap_free_mb": 9994,
+          "app_rss_mb": 665,
+          "app_swap_mb": 190,
+          "gpu_total_mb": 201,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 310,
+          "available_mb": 1957,
+          "swap_free_mb": 9996,
+          "app_rss_mb": 666,
+          "app_swap_mb": 190,
+          "gpu_total_mb": 196,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 317,
+          "available_mb": 1955,
+          "swap_free_mb": 9992,
+          "app_rss_mb": 676,
+          "app_swap_mb": 180,
+          "gpu_total_mb": 196,
+          "app_gpu_mb": 63,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 322,
+          "available_mb": 2974,
+          "swap_free_mb": 10158,
+          "app_rss_mb": 142,
+          "app_swap_mb": 52,
+          "gpu_total_mb": 146,
+          "app_gpu_mb": 0,
+          "pressure_full_avg10": 0.0
+        }
+      ],
+      "vulkan_drivers_seen": [
+        "radv"
+      ],
+      "launch_settings": [
+        "Screen Size: 1280x720",
+        "Graphics Driver: Wrapper",
+        "DX Wrapper: dxvk (Config: 'version=async-1.10.3,framerate=0,maxDeviceMemory=0,async=1,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+        "WoW64 Mode: true",
+        "Box64 Version: 0.3.6",
+        "Box64 Preset: COMPATIBILITY",
+        "FEXCore Preset: INTERMEDIATE",
+        "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WINEDLLOVERRIDES=msvcr100,msvcp100=b WRAPPER_NATIVE_BCN=1",
+        "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_ASYNC=1 DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=\"\" VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-ea7b521)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 ENABLE_BCN_COMPUTE=1 BCN_COMPUTE_AUTO=1 WRAPPER_EMULATE_BCN=3 WRAPPER_USE_BCN_CACHE=0 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=+warn,+err,+fixme,+loaddll WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WINEDLLOVERRIDES=msvcr100,msvcp100=b WRAPPER_NATIVE_BCN=1 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+      ],
+      "processes": [
+        "A:\\bin\\Heaven.exe",
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe"
+      ],
+      "status": "ran",
+      "gpu_temp_c_after": 47.0,
+      "run": 1
+    },
+    {
+      "bench": "gravitymark",
+      "driver": "stock",
+      "app_id": 2000940101,
+      "gpu_temp_c_before": 40.0,
+      "available_mb_before": 3470,
+      "seconds_to_game_process": 6,
+      "seconds_to_first_frame": 6.947586124995723,
+      "layer": "b2372e SurfaceView[app.gamenative/app.gamenative.MainActivity]@0(BLAST)#175716",
+      "surfaceflinger": {
+        "frames": 235,
+        "seconds": 4.754298594,
+        "steady_seconds": 4.754298594,
+        "fps_avg": 49.21861666309973,
+        "frametime_median_ms": 16.652383,
+        "fps_1pct_low": 3.4984656137972205
+      },
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 3393,
+          "swap_free_mb": 10725,
+          "app_rss_mb": 229,
+          "app_swap_mb": 36,
+          "gpu_total_mb": 176,
+          "app_gpu_mb": 45,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 6,
+          "available_mb": 2954,
+          "swap_free_mb": 10726,
+          "app_rss_mb": 1041,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 444,
+          "app_gpu_mb": 308,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 12,
+          "available_mb": 903,
+          "swap_free_mb": 10570,
+          "app_rss_mb": 540,
+          "app_swap_mb": 474,
+          "gpu_total_mb": 2046,
+          "app_gpu_mb": 1914,
+          "pressure_full_avg10": 1.76
+        },
+        {
+          "t": 17,
+          "available_mb": 619,
+          "swap_free_mb": 9316,
+          "app_rss_mb": 108,
+          "app_swap_mb": 1008,
+          "gpu_total_mb": 3748,
+          "app_gpu_mb": 3663,
+          "pressure_full_avg10": 12.21
+        },
+        {
+          "t": 23,
+          "available_mb": 3252,
+          "swap_free_mb": 10784,
+          "app_rss_mb": 93,
+          "app_swap_mb": 42,
+          "gpu_total_mb": 119,
+          "app_gpu_mb": 0,
+          "pressure_full_avg10": 12.61
+        }
+      ],
+      "screenshot": "run1-gravitymark-stock-screen.png",
+      "status": "killed-low-memory",
+      "low_memory_kill": "10-11 09:28:55.008   589   589 I lmkd    : Reclaim 'app.gamenative' (10367), uid 10402, oom_score_adj 0, state 2 to free 45156kB rss, 102040kB swap; reason: min2x watermark is breached even after kill; level: 1",
+      "vulkan_drivers_seen": [
+        "samsung"
+      ],
+      "launch_settings": [
+        "Screen Size: 1280x720",
+        "Graphics Driver: Wrapper",
+        "DX Wrapper: dxvk (Config: 'version=async-1.10.3,framerate=0,maxDeviceMemory=0,async=1,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+        "WoW64 Mode: true",
+        "Box64 Version: 0.3.6",
+        "Box64 Preset: COMPATIBILITY",
+        "FEXCore Preset: INTERMEDIATE",
+        "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WRAPPER_NATIVE_BCN=1",
+        "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_ASYNC=1 DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=\"\" VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 ENABLE_BCN_COMPUTE=1 BCN_COMPUTE_AUTO=1 WRAPPER_EMULATE_BCN=3 WRAPPER_USE_BCN_CACHE=0 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=+warn,+err,+fixme,+loaddll WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WRAPPER_NATIVE_BCN=1 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+      ],
+      "processes": [
+        "A:\\bin\\GravityMark.exe",
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe"
+      ],
+      "gpu_temp_c_after": 56.0,
+      "run": 1
+    },
+    {
+      "bench": "gravitymark",
+      "driver": "radv",
+      "app_id": 2000940102,
+      "gpu_temp_c_before": 40.0,
+      "available_mb_before": 3397,
+      "seconds_to_game_process": 7,
+      "seconds_to_first_frame": 7.673884707968682,
+      "layer": "b84e2f4 SurfaceView[app.gamenative/app.gamenative.MainActivity]@0(BLAST)#175781",
+      "surfaceflinger": {
+        "frames": 0
+      },
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 3197,
+          "swap_free_mb": 10726,
+          "app_rss_mb": 216,
+          "app_swap_mb": 37,
+          "gpu_total_mb": 129,
+          "app_gpu_mb": 38,
+          "pressure_full_avg10": 0.0
+        },
+        {
+          "t": 7,
+          "available_mb": 1482,
+          "swap_free_mb": 10485,
+          "app_rss_mb": 560,
+          "app_swap_mb": 33,
+          "gpu_total_mb": 1508,
+          "app_gpu_mb": 1416,
+          "pressure_full_avg10": 1.86
+        },
+        {
+          "t": 13,
+          "available_mb": 575,
+          "swap_free_mb": 9190,
+          "app_rss_mb": 151,
+          "app_swap_mb": 324,
+          "gpu_total_mb": 3664,
+          "app_gpu_mb": 3573,
+          "pressure_full_avg10": 14.38
+        },
+        {
+          "t": 18,
+          "available_mb": 3101,
+          "swap_free_mb": 10623,
+          "app_rss_mb": 94,
+          "app_swap_mb": 42,
+          "gpu_total_mb": 100,
+          "app_gpu_mb": 0,
+          "pressure_full_avg10": 16.64
+        }
+      ],
+      "screenshot": "run1-gravitymark-radv-screen.png",
+      "status": "killed-low-memory",
+      "low_memory_kill": "10-11 09:30:47.706   589   589 I lmkd    : Reclaim 'app.gamenative' (17969), uid 10402, oom_score_adj 0, state 2 to free 352kB rss, 117032kB swap; reason: min2x watermark is breached even after kill; level: 2",
+      "vulkan_drivers_seen": [
+        "radv"
+      ],
+      "launch_settings": [
+        "Screen Size: 1280x720",
+        "Graphics Driver: Wrapper",
+        "DX Wrapper: dxvk (Config: 'version=async-1.10.3,framerate=0,maxDeviceMemory=0,async=1,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+        "WoW64 Mode: true",
+        "Box64 Version: 0.3.6",
+        "Box64 Preset: COMPATIBILITY",
+        "FEXCore Preset: INTERMEDIATE",
+        "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WRAPPER_NATIVE_BCN=1",
+        "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_ASYNC=1 DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=\"\" VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-ea7b521)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 ENABLE_BCN_COMPUTE=1 BCN_COMPUTE_AUTO=1 WRAPPER_EMULATE_BCN=3 WRAPPER_USE_BCN_CACHE=0 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=+warn,+err,+fixme,+loaddll WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WRAPPER_NATIVE_BCN=1 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+      ],
+      "processes": [
+        "A:\\bin\\GravityMark.exe",
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe"
+      ],
+      "gpu_temp_c_after": 62.0,
+      "run": 1
+    }
+  ]
+}

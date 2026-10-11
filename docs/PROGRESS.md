@@ -146,6 +146,18 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - Cause: RADV runs GFX10.3 transform feedback on the legacy geometry path, and the 940 has no legacy streamout hardware. The GPL kernel's register map for this chip has GFX11's streamout counters and no GDS, GWS or OA (`docs/findings.md`).
   - `run.py` runs `xfb` last, so its hang doesn't cost the rest of a run.
   - Fix: GFX11's NGG streamout without the `ds_ordered_count` lock that needs OA. Games that use D3D11 stream output would hang our driver until then.
+- [ ] **Heaven runs to the end on our driver, at 2 FPS; GravityMark still runs out of memory on both (2026-10-11, `results/2026-10-11_091657-game`).**
+  - Driver `xd-ea7b521` (queries without GDS) is imported and selected in both radv containers.
+  - **Heaven-stock, with BCn Emulation `full`:** the BC1/BC3 errors are gone, but Unigine still stops with a fatal error on the 2048x2048 D24 depth texture. `game.py` called it `too-short` (9 s of frames), as intended.
+    - Neither driver supports `D24_UNORM_S8_UINT`, so DXVK falls back to `D32_SFLOAT_S8_UINT`.
+    - Samsung's driver reports that format without linear filtering (format features 0xc601; ours 0x1d601). That's the likely difference; not confirmed yet.
+  - **Heaven-radv ran the whole 297 s.** 594 frames: the median frame took 66.6 ms, but the average is 2.0 FPS with 1% lows of 0.2 FPS. Half the frames come within 67 ms, and the other half take about a second each.
+    - Our driver's CPU time stayed under 1% of each second (its `[CPUSHARE]` log), at about 8 submissions per second.
+    - There were no driver or kernel errors.
+    - The Wine debug log was only 43 KB.
+    - So neither driver CPU time nor logging explains the stalls. Next: measure GPU busy time during a run, to tell GPU-bound from waiting.
+  - **GravityMark:** lmkd killed both runs. GPU memory peaked at 3663 MB on stock (after 5 s of frames at 49 FPS) and 3573 MB on radv (before its first frame). DXVK's `maxDeviceMemory` was 0 (no limit). Next: Max Device Memory 2048 MB in both GravityMark containers.
+  - `WRAPPER_NATIVE_BCN=1` reached all four launches (`launch_settings` in `results.json`).
 
 ## Optimization targets (from the speed tests)
 
