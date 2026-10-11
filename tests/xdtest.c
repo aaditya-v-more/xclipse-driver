@@ -7,7 +7,7 @@
  * drives both drivers, so every result is an A/B pair.
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
- *   correctness: info device submit compute render
+ *   correctness: info device submit compute render queries
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -32,6 +32,7 @@
 #include "screen_vert.h"
 #include "tiny_vert.h"
 #include "tri_frag.h"
+#include "tri_geom.h"
 #include "tri_vert.h"
 
 /* A fence that hasn't signaled after this long means the GPU stopped responding. */
@@ -186,7 +187,7 @@ static double median(const double *v, int n)
    X(vkCmdEndRendering) X(vkCmdSetViewport) X(vkCmdSetScissor) X(vkCmdDraw)                         \
    X(vkCmdCopyImageToBuffer) X(vkCreateQueryPool) X(vkDestroyQueryPool) X(vkCmdResetQueryPool)      \
    X(vkCmdWriteTimestamp) X(vkGetQueryPoolResults) X(vkCmdCopyBuffer) X(vkCmdPushConstants)         \
-   X(vkCmdFillBuffer)
+   X(vkCmdFillBuffer) X(vkCmdBeginQuery) X(vkCmdEndQuery)
 
 #define DECLARE(fn) static PFN_##fn fn;
 INSTANCE_FUNCS(DECLARE)
@@ -436,7 +437,23 @@ static void run_info(void)
 
 /* ---- device, commands and resources ---- */
 
-static void start_device(bool dynamic_rendering)
+/* Set by start_device for the queries test: what the driver has of what that test uses. */
+static bool has_geometry_shader, has_stats_query, has_pg_query;
+
+static bool has_device_extension(const char *name)
+{
+   VkExtensionProperties exts[512];
+   uint32_t n = 512;
+   VkResult r = vkEnumerateDeviceExtensionProperties(pdev, NULL, &n, exts);
+   if (r != VK_SUCCESS && r != VK_INCOMPLETE)
+      return false;
+   for (uint32_t i = 0; i < n; i++)
+      if (!strcmp(exts[i].extensionName, name))
+         return true;
+   return false;
+}
+
+static void start_device(bool dynamic_rendering, bool queries)
 {
    if (qfam == UINT32_MAX)
       finish("fail", "no queue family with both graphics and compute");
@@ -457,6 +474,34 @@ static void start_device(bool dynamic_rendering)
       .queueCreateInfoCount = 1,
       .pQueueCreateInfos = &qci,
    };
+   VkPhysicalDeviceFeatures features = {0};
+   VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT pgq = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT,
+   };
+   const char *pgq_ext = VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME;
+   if (queries) {
+      bool pgq_listed = has_device_extension(pgq_ext);
+      VkPhysicalDeviceFeatures2 f2 = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+         .pNext = pgq_listed ? &pgq : NULL,
+      };
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_geometry_shader = f2.features.geometryShader;
+      has_stats_query = f2.features.pipelineStatisticsQuery;
+      has_pg_query = pgq_listed && pgq.primitivesGeneratedQuery;
+      features.geometryShader = has_geometry_shader;
+      features.pipelineStatisticsQuery = has_stats_query;
+      dci.pEnabledFeatures = &features;
+      if (has_pg_query) {
+         pgq = (VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT){
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT,
+            .primitivesGeneratedQuery = VK_TRUE,
+         };
+         f13.pNext = &pgq;
+         dci.enabledExtensionCount = 1;
+         dci.ppEnabledExtensionNames = &pgq_ext;
+      }
+   }
    step("creating device");
    double t = now_ms();
    VKCHECK("vkCreateDevice", vkCreateDevice(pdev, &dci, NULL, &dev));
@@ -784,16 +829,18 @@ static void bind_compute(VkCommandBuffer cb, const struct compute *c)
 }
 
 struct graphics {
-   VkShaderModule vs, fs;
+   VkShaderModule vs, gs, fs;
    VkPipelineLayout layout;
    VkPipeline pipeline;
 };
 
 /* A graphics pipeline for dynamic rendering into one color attachment, with dynamic viewport and
- * scissor, optional alpha blending and an optional vertex-stage push-constant block. */
-static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
-                                     const uint32_t *fs_code, size_t fs_size, VkFormat format,
-                                     bool blend, uint32_t push_size, double *ms)
+ * scissor, an optional geometry shader, optional alpha blending and an optional vertex-stage
+ * push-constant block. */
+static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
+                                        const uint32_t *gs_code, size_t gs_size,
+                                        const uint32_t *fs_code, size_t fs_size, VkFormat format,
+                                        bool blend, uint32_t push_size, double *ms)
 {
    struct graphics g = {0};
    VkPushConstantRange push = {VK_SHADER_STAGE_VERTEX_BIT, 0, push_size};
@@ -807,7 +854,7 @@ static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
    double t = now_ms();
    g.vs = make_shader(vs_code, vs_size);
    g.fs = make_shader(fs_code, fs_size);
-   VkPipelineShaderStageCreateInfo stages[2] = {
+   VkPipelineShaderStageCreateInfo stages[3] = {
       {
          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
          .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -821,6 +868,16 @@ static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
          .pName = "main",
       },
    };
+   uint32_t stage_count = 2;
+   if (gs_code) {
+      g.gs = make_shader(gs_code, gs_size);
+      stages[stage_count++] = (VkPipelineShaderStageCreateInfo){
+         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+         .stage = VK_SHADER_STAGE_GEOMETRY_BIT,
+         .module = g.gs,
+         .pName = "main",
+      };
+   }
    VkPipelineVertexInputStateCreateInfo vertex_input = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
    };
@@ -873,7 +930,7 @@ static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
    VkGraphicsPipelineCreateInfo gpci = {
       .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
       .pNext = &rendering_info,
-      .stageCount = 2,
+      .stageCount = stage_count,
       .pStages = stages,
       .pVertexInputState = &vertex_input,
       .pInputAssemblyState = &input_assembly,
@@ -890,11 +947,20 @@ static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
    return g;
 }
 
+static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
+                                     const uint32_t *fs_code, size_t fs_size, VkFormat format,
+                                     bool blend, uint32_t push_size, double *ms)
+{
+   return make_graphics_gs(vs_code, vs_size, NULL, 0, fs_code, fs_size, format, blend, push_size,
+                           ms);
+}
+
 static void free_graphics(struct graphics *g)
 {
    vkDestroyPipeline(dev, g->pipeline, NULL);
    vkDestroyPipelineLayout(dev, g->layout, NULL);
    vkDestroyShaderModule(dev, g->vs, NULL);
+   vkDestroyShaderModule(dev, g->gs, NULL);
    vkDestroyShaderModule(dev, g->fs, NULL);
 }
 
@@ -1135,6 +1201,155 @@ static void run_render(void)
 
    free_graphics(&g);
    free_buffer(&readback);
+   free_target(&t);
+}
+
+/* ---- queries: pipeline statistics as D3D11 uses them (through DXVK), and primitives generated ----
+ *
+ * Draws INSTANCES triangles with a plain pipeline and again with a geometry shader that turns
+ * every triangle into two, each in its own submission and inside a pipeline-statistics query with
+ * all eleven statistics (what DXVK asks for) and, where the driver has
+ * VK_EXT_primitives_generated_query, a primitives-generated query. RADV counts geometry-shader
+ * primitives and generated primitives from NGG shaders itself; on the Xclipse it used to ask the
+ * kernel for GDS to do that, the kernel has none, and the submission failed. The counts the test
+ * can predict are checked; the rest (fragment invocations, clipping output) are recorded.
+ *
+ * To find which part of it a driver chokes on, these environment variables leave parts out:
+ * XD_QUERY_STATS (the statistics mask, hex; 0 = no statistics query), XD_QUERY_PG=0 (no
+ * primitives-generated query) and XD_QUERY_GS=0 (no geometry-shader draw). */
+
+static const char *const stat_names[] = {
+   "ia_vertices",          "ia_primitives",       "vs_invocations", "gs_invocations",
+   "gs_primitives",        "clipping_invocations", "clipping_primitives",
+   "fs_invocations",       "tcs_patches",         "tes_invocations", "cs_invocations",
+};
+#define NUM_STATS (sizeof(stat_names) / sizeof(stat_names[0]))
+
+static unsigned env_uint(const char *name, unsigned fallback)
+{
+   const char *v = getenv(name);
+   return v && *v ? (unsigned)strtoul(v, NULL, 16) : fallback;
+}
+
+static void run_queries(void)
+{
+   enum { W = 128, H = 128, INSTANCES = 5 };
+   const uint32_t stats_mask = env_uint("XD_QUERY_STATS", (1u << NUM_STATS) - 1) &
+                               ((1u << NUM_STATS) - 1);
+   const bool use_pg = has_pg_query && env_uint("XD_QUERY_PG", 1);
+   const bool use_gs = has_geometry_shader && env_uint("XD_QUERY_GS", 1);
+   if (stats_mask && !has_stats_query)
+      finish("skip", "no pipelineStatisticsQuery");
+   jbool("has_geometry_shader", has_geometry_shader);
+   jbool("has_primitives_generated_query", has_pg_query);
+   jhex("stats_mask", stats_mask);
+   jbool("pg_query", use_pg);
+   jbool("gs_draw", use_gs);
+
+   struct target t = make_target(W, H);
+   double ms;
+   step("creating graphics pipelines");
+   struct graphics pipes[2];
+   pipes[0] = make_graphics(tri_vert, sizeof(tri_vert), tri_frag, sizeof(tri_frag),
+                            VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+   const int num_pipes = use_gs ? 2 : 1;
+   if (use_gs)
+      pipes[1] = make_graphics_gs(tri_vert, sizeof(tri_vert), tri_geom, sizeof(tri_geom), tri_frag,
+                                  sizeof(tri_frag), VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+
+   VkQueryPool stats_pool = VK_NULL_HANDLE, pg_pool = VK_NULL_HANDLE;
+   VkQueryPoolCreateInfo qci = {
+      .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+      .queryType = VK_QUERY_TYPE_PIPELINE_STATISTICS,
+      .queryCount = num_pipes,
+      .pipelineStatistics = stats_mask,
+   };
+   if (stats_mask)
+      VKCHECK("vkCreateQueryPool", vkCreateQueryPool(dev, &qci, NULL, &stats_pool));
+   if (use_pg) {
+      qci.queryType = VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT;
+      qci.pipelineStatistics = 0;
+      VKCHECK("vkCreateQueryPool", vkCreateQueryPool(dev, &qci, NULL, &pg_pool));
+   }
+
+   static const char *const what[2] = {"plain draw inside queries",
+                                        "geometry-shader draw inside queries"};
+   const float clear[4] = {0.0f, 0.0f, 0.25f, 1.0f};
+   for (int i = 0; i < num_pipes; i++) {
+      VkCommandBuffer cb = begin_cmd();
+      if (stats_pool)
+         vkCmdResetQueryPool(cb, stats_pool, i, 1);
+      if (pg_pool)
+         vkCmdResetQueryPool(cb, pg_pool, i, 1);
+      begin_target(cb, &t, clear);
+      vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipes[i].pipeline);
+      if (stats_pool)
+         vkCmdBeginQuery(cb, stats_pool, i, 0);
+      if (pg_pool)
+         vkCmdBeginQuery(cb, pg_pool, i, 0);
+      vkCmdDraw(cb, 3, INSTANCES, 0, 0);
+      if (pg_pool)
+         vkCmdEndQuery(cb, pg_pool, i);
+      if (stats_pool)
+         vkCmdEndQuery(cb, stats_pool, i);
+      vkCmdEndRendering(cb);
+      VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+      jnum(i == 0 ? "ms_gpu" : "ms_gpu_gs", submit_and_wait(cb, what[i]));
+   }
+
+   /* Results come back packed: one value per statistic in the mask, in bit order. */
+   uint64_t packed[2][NUM_STATS], pg[2] = {0};
+   step("reading query results");
+   if (stats_pool)
+      VKCHECK("vkGetQueryPoolResults (statistics)",
+              vkGetQueryPoolResults(dev, stats_pool, 0, num_pipes, sizeof(packed), packed,
+                                    sizeof(packed[0]),
+                                    VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+   if (pg_pool)
+      VKCHECK("vkGetQueryPoolResults (primitives generated)",
+              vkGetQueryPoolResults(dev, pg_pool, 0, num_pipes, sizeof(pg), pg, sizeof(pg[0]),
+                                    VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+
+   /* What each pipeline must count: the geometry shader doubles every triangle. Fragment
+    * invocations and the clipper's output depend on the hardware, so they're only recorded. */
+   char wrong[400] = "";
+   for (int i = 0; i < num_pipes; i++) {
+      const uint64_t prims = i == 0 ? INSTANCES : 2 * INSTANCES;
+      const uint64_t want[NUM_STATS] = {
+         3 * INSTANCES, INSTANCES, 3 * INSTANCES, i == 0 ? 0 : INSTANCES, i == 0 ? 0 : prims,
+         prims,         UINT64_MAX, UINT64_MAX, 0, 0, 0,
+      };
+      jopen(i == 0 ? "plain" : "gs", '{');
+      unsigned n = 0;
+      for (unsigned s = 0; s < NUM_STATS; s++) {
+         if (!(stats_mask & (1u << s)))
+            continue;
+         const uint64_t got = packed[i][n++];
+         jint(stat_names[s], (long long)got);
+         if (want[s] != UINT64_MAX && got != want[s])
+            snprintf(wrong + strlen(wrong), sizeof(wrong) - strlen(wrong),
+                     "%s%s %s %llu (want %llu)", wrong[0] ? ", " : "", i == 0 ? "plain" : "gs",
+                     stat_names[s], (unsigned long long)got, (unsigned long long)want[s]);
+      }
+      if (pg_pool) {
+         jint("primitives_generated", (long long)pg[i]);
+         if (pg[i] != prims)
+            snprintf(wrong + strlen(wrong), sizeof(wrong) - strlen(wrong),
+                     "%s%s primitives_generated %llu (want %llu)", wrong[0] ? ", " : "",
+                     i == 0 ? "plain" : "gs", (unsigned long long)pg[i],
+                     (unsigned long long)prims);
+      }
+      jclose();
+   }
+   if (wrong[0])
+      finish("fail", "wrong counts: %s", wrong);
+
+   if (pg_pool)
+      vkDestroyQueryPool(dev, pg_pool, NULL);
+   if (stats_pool)
+      vkDestroyQueryPool(dev, stats_pool, NULL);
+   for (int i = 0; i < num_pipes; i++)
+      free_graphics(&pipes[i]);
    free_target(&t);
 }
 
@@ -1382,7 +1597,7 @@ int main(int argc, char **argv)
    }
    if (!driver || !test) {
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
-                      "  correctness: info device submit compute render\n"
+                      "  correctness: info device submit compute render queries\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -1392,13 +1607,13 @@ int main(int argc, char **argv)
    static const struct {
       const char *name;
       void (*run)(void);
-      bool rendering;
+      bool rendering, queries;
    } tests[] = {
-      {"device", NULL, false},          {"submit", run_submit, false},
-      {"compute", run_compute, false},  {"render", run_render, true},
-      {"alu", run_alu, false},          {"bandwidth", run_bandwidth, false},
-      {"fill", run_fill, true},         {"draws", run_draws, true},
-      {"compile", run_compile, false},
+      {"device", NULL, false, false},          {"submit", run_submit, false, false},
+      {"compute", run_compute, false, false},  {"render", run_render, true, false},
+      {"queries", run_queries, true, true},    {"alu", run_alu, false, false},
+      {"bandwidth", run_bandwidth, false, false}, {"fill", run_fill, true, false},
+      {"draws", run_draws, true, false},       {"compile", run_compile, false, false},
    };
    int which = -1;
    for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++)
@@ -1425,7 +1640,7 @@ int main(int argc, char **argv)
       finish("pass", NULL);
    }
 
-   start_device(tests[which].rendering);
+   start_device(tests[which].rendering, tests[which].queries);
    if (tests[which].run)
       tests[which].run();
 
