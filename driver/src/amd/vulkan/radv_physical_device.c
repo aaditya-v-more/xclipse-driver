@@ -705,6 +705,37 @@ radv_xclipse_pal_heaps(const struct radv_physical_device *pdev)
    return v != 0;
 }
 
+/* RADV_XCLIPSE_XFB / debug.radv_xclipse_xfb (enum radv_xclipse_xfb). Unset or out of range =
+ * ORDERED. */
+static enum radv_xclipse_xfb
+radv_xclipse_xfb_mode(void)
+{
+   const char *src = "default";
+   int v = -1;
+   const char *e = getenv("RADV_XCLIPSE_XFB");
+   if (e && e[0]) {
+      v = atoi(e);
+      src = "env";
+   }
+#if DETECT_OS_ANDROID
+   else {
+      char pbuf[PROP_VALUE_MAX] = {0};
+      if (__system_property_get("debug.radv_xclipse_xfb", pbuf) > 0 && pbuf[0]) {
+         v = atoi(pbuf);
+         src = "prop";
+      }
+   }
+#endif
+   if (v < RADV_XCLIPSE_XFB_LEGACY || v > RADV_XCLIPSE_XFB_ORDERED_GFX10)
+      v = RADV_XCLIPSE_XFB_ORDERED;
+#if DETECT_OS_ANDROID
+   AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_ARM", "[ARM] xfb=%d (%s)", v, src);
+#else
+   (void)src;
+#endif
+   return v;
+}
+
 static void
 radv_physical_device_init_mem_types(struct radv_physical_device *pdev)
 {
@@ -3092,6 +3123,16 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
    /* Samsung's sgpu has no GDS. The first query that needed it made the queue allocate it, and the
     * refusal failed the whole submission (D3D11 pipeline statistics through DXVK). */
    pdev->no_gds = pdev->info.xclipse_model != AC_XCLIPSE_NONE;
+
+   /* The 530 and 940 have GFX11's streamout hardware: the kernel's MGFX1/MGFX2 register maps put
+    * GFX11's streamout counters at GFX11's addresses and have none of the legacy streamout
+    * registers. GFX10.3's legacy streamout hangs them, so transform feedback takes GFX11's path. */
+   pdev->xclipse_xfb = RADV_XCLIPSE_XFB_LEGACY;
+   if (pdev->info.xclipse_model == AC_XCLIPSE_530 || pdev->info.xclipse_model == AC_XCLIPSE_940)
+      pdev->xclipse_xfb = radv_xclipse_xfb_mode();
+
+   pdev->use_ngg_streamout =
+      pdev->use_ngg && (pdev->info.gfx_level >= GFX11 || pdev->xclipse_xfb != RADV_XCLIPSE_XFB_LEGACY);
 
    /* Xclipse counts NGG GS primitives in hardware, as GFX11 does. Emulating them as well counted
     * every primitive twice. */

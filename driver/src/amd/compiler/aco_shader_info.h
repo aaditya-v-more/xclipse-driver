@@ -171,6 +171,12 @@ struct aco_compiler_options {
     * does, so without this every scratch access faults until the kernel's 5 s job timeout
     * (probe/gfx/rt/scratchprobe). */
    bool gfx10_scratch_init;
+   /* Transform feedback on chips with GFX11's streamout counters but no GDS ordered append (the
+    * Xclipse 530 and 940): take the buffer space with the counter adds alone, without the
+    * ds_ordered_count lock around them. */
+   bool xfb_unordered;
+   /* Encode ds_ordered_count with the GS shader type, as before GFX11. */
+   bool ds_ordered_count_gs_type;
    uint32_t address32_hi;
 };
 

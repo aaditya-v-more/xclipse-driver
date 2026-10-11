@@ -67,6 +67,22 @@ enum radv_gfx12_hiz_wa {
    RADV_GFX12_HIZ_WA_FULL,
 };
 
+/* How the Xclipse 530 and 940 run transform feedback (RADV_XCLIPSE_XFB / debug.radv_xclipse_xfb).
+ * They have GFX11's streamout hardware but no GDS ordered append (docs/findings.md), and GFX11
+ * orders the workgroups' buffer writes with ds_ordered_count, which uses it.
+ */
+enum radv_xclipse_xfb {
+   /* GFX10.3's legacy streamout. It hangs: these chips have no legacy streamout registers. */
+   RADV_XCLIPSE_XFB_LEGACY = 0,
+   /* GFX11's NGG streamout as is: a ds_ordered_count lock around the counter adds. */
+   RADV_XCLIPSE_XFB_ORDERED = 1,
+   /* The counter adds without the lock. Workgroups then take buffer space in the order they get
+    * there, which can differ from draw order, and between buffers. */
+   RADV_XCLIPSE_XFB_UNORDERED = 2,
+   /* The lock encoded as on GFX10, with the GS shader type. */
+   RADV_XCLIPSE_XFB_ORDERED_GFX10 = 3,
+};
+
 enum radv_drm_device_type {
    RADV_DRM_DEVICE_AMDGPU,
    RADV_DRM_DEVICE_AMDGPU_VPIPE,
@@ -122,6 +138,11 @@ struct radv_physical_device {
    /* Samsung's sgpu kernel driver has no GDS (Xclipse). The emulated queries above then count in
     * the shader query buffer in memory, as GFX11 does, instead of in GDS. */
    bool no_gds;
+
+   /* Whether transform feedback runs in the NGG shaders with GFX11's streamout counters: GFX11+,
+    * and the Xclipse 530 and 940 unless RADV_XCLIPSE_XFB=0 (see enum radv_xclipse_xfb). */
+   bool use_ngg_streamout;
+   enum radv_xclipse_xfb xclipse_xfb;
 
    /* Whether to inline the compute dispatch size in user sgprs. */
    bool load_grid_size_from_user_sgpr;

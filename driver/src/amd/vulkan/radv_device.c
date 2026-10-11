@@ -1234,6 +1234,8 @@ radv_device_init_compiler_info(struct radv_device *device)
             .rbplus_allowed = pdev->info.rbplus_allowed,
             .gfx11_isa = gfx11_isa,
             .no_gds = pdev->no_gds,
+            .ngg_streamout = pdev->use_ngg_streamout,
+            .xclipse_xfb = pdev->xclipse_xfb,
          },
       /* Misc values included as part of the cache key */
       .key =

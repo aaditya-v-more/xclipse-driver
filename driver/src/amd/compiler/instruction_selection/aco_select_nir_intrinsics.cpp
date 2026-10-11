@@ -3601,7 +3601,7 @@ ds_ordered_count_offsets(isel_context* ctx, unsigned index_operand, unsigned wav
    *offset0 = ordered_count_index << 2;
    *offset1 = wave_release | (wave_done << 1) | ((count_dword - 1) << 6);
 
-   if (ctx->options->gfx_level < GFX11)
+   if (ctx->options->gfx_level < GFX11 || ctx->options->ds_ordered_count_gs_type)
       *offset1 |= 3 /* GS shader type */ << 2;
 }
 
@@ -4829,11 +4829,13 @@ visit_intrinsic(isel_context* ctx, nir_intrinsic_instr* instr)
       Operand m;
 
       /* Lock a GDS mutex. */
-      ds_ordered_count_offsets(ctx, 1 << 24u, false, false, &offset0, &offset1);
-      m = bld.m0(bld.as_uniform(ordered_id));
-      ds_instr =
-         bld.ds(aco_opcode::ds_ordered_count, bld.def(v1), gds_base, m, offset0, offset1, true);
-      ds_instr->ds().sync = memory_sync_info(storage_gds, semantic_volatile);
+      if (!ctx->options->xfb_unordered) {
+         ds_ordered_count_offsets(ctx, 1 << 24u, false, false, &offset0, &offset1);
+         m = bld.m0(bld.as_uniform(ordered_id));
+         ds_instr =
+            bld.ds(aco_opcode::ds_ordered_count, bld.def(v1), gds_base, m, offset0, offset1, true);
+         ds_instr->ds().sync = memory_sync_info(storage_gds, semantic_volatile);
+      }
 
       aco_ptr<Instruction> vec{
          create_instruction(aco_opcode::p_create_vector, Format::PSEUDO, instr->num_components, 1)};
@@ -4857,11 +4859,13 @@ visit_intrinsic(isel_context* ctx, nir_intrinsic_instr* instr)
       ctx->block->instructions.emplace_back(std::move(vec));
 
       /* Unlock a GDS mutex. */
-      ds_ordered_count_offsets(ctx, 1 << 24u, true, true, &offset0, &offset1);
-      m = bld.m0(bld.as_uniform(ordered_id));
-      ds_instr =
-         bld.ds(aco_opcode::ds_ordered_count, bld.def(v1), gds_base, m, offset0, offset1, true);
-      ds_instr->ds().sync = memory_sync_info(storage_gds, semantic_volatile);
+      if (!ctx->options->xfb_unordered) {
+         ds_ordered_count_offsets(ctx, 1 << 24u, true, true, &offset0, &offset1);
+         m = bld.m0(bld.as_uniform(ordered_id));
+         ds_instr =
+            bld.ds(aco_opcode::ds_ordered_count, bld.def(v1), gds_base, m, offset0, offset1, true);
+         ds_instr->ds().sync = memory_sync_info(storage_gds, semantic_volatile);
+      }
 
       emit_split_vector(ctx, dst, instr->num_components);
       break;

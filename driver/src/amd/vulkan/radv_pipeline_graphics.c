@@ -1869,7 +1869,9 @@ radv_fill_shader_info_ngg(const struct radv_compiler_info *compiler_info, struct
       stages[MESA_SHADER_MESH].info.is_ngg = true;
    }
 
-   if (compiler_info->ac->gfx_level >= GFX11) {
+   /* With NGG streamout (the Xclipse 530 and 940 too), NGG has nothing left to fall back for, and
+    * these chips hang on the legacy geometry path. */
+   if (compiler_info->ac->gfx_level >= GFX11 || compiler_info->hw.ngg_streamout) {
       if (stages[MESA_SHADER_GEOMETRY].nir)
          stages[MESA_SHADER_GEOMETRY].info.is_ngg = true;
    } else {

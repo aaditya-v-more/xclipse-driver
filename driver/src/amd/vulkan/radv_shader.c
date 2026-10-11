@@ -1037,7 +1037,7 @@ radv_lower_ngg(const struct radv_compiler_info *compiler_info, struct radv_shade
    options.vs_output_param_offset = info->outinfo.vs_output_param_offset;
    options.has_param_exports = info->outinfo.param_exports || info->outinfo.prim_param_exports;
    options.can_cull = info->has_ngg_culling;
-   options.disable_streamout = compiler_info->ac->gfx_level < GFX11;
+   options.disable_streamout = compiler_info->ac->gfx_level < GFX11 && !compiler_info->hw.ngg_streamout;
    options.has_xfb_prim_query = info->has_xfb_query;
    options.has_gs_primitives_query = compiler_info->key.emulate_ngg_gs_query_pipeline_stat;
    options.force_vrs = info->force_vrs_per_vertex;
@@ -2390,7 +2390,10 @@ radv_postprocess_binary_config(const struct radv_compiler_info *compiler_info, s
       }
    }
 
-   if (gfx_level < GFX11) {
+   /* These are hardware VS fields. NGG shaders run as the hardware GS, whose RSRC2 has EXCP_EN at
+    * bits 7-15, so on chips that stream out from NGG before GFX11 (the Xclipse 530 and 940) the same
+    * bits would turn on float exceptions. */
+   if (gfx_level < GFX11 && !info->is_ngg) {
       config->rsrc2 |= S_00B12C_SO_BASE0_EN(!!info->so.strides[0]) | S_00B12C_SO_BASE1_EN(!!info->so.strides[1]) |
                        S_00B12C_SO_BASE2_EN(!!info->so.strides[2]) | S_00B12C_SO_BASE3_EN(!!info->so.strides[3]) |
                        S_00B12C_SO_EN(!!info->so.enabled_stream_buffers_mask);
@@ -3582,6 +3585,8 @@ radv_aco_fill_compiler_options(struct aco_compiler_options *aco_info, const stru
       scratch_init = e && e[0] ? atoi(e) != 0 : 1;
    }
    aco_info->gfx10_scratch_init = compiler_info->hw.gfx11_isa && scratch_init;
+   aco_info->xfb_unordered = compiler_info->hw.xclipse_xfb == RADV_XCLIPSE_XFB_UNORDERED;
+   aco_info->ds_ordered_count_gs_type = compiler_info->hw.xclipse_xfb == RADV_XCLIPSE_XFB_ORDERED_GFX10;
 }
 
 void
