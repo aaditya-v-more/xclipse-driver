@@ -19,6 +19,7 @@
 #include "ac_surface.h"
 #include "radv_amdgpu_bo.h"
 #include "radv_amdgpu_cs.h"
+#include "radv_amdgpu_vmfault.h"
 #include "radv_amdgpu_winsys_public.h"
 #include "vk_drm_syncobj.h"
 
@@ -194,6 +195,9 @@ radv_amdgpu_winsys_destroy(struct radeon_winsys *rws)
 
    radv_xclipse_ibcache_winsys_end_destroy(ws);
 
+   /* After the last BO this winsys frees. */
+   radv_xclipse_vmfault_finish(ws);
+
    radv_amdgpu_alloc_tracker_release(ws->alloc_tracker);
 
    ac_drm_device_deinitialize(ws->dev);
@@ -296,6 +300,9 @@ radv_amdgpu_winsys_create(int fd, const struct radeon_info *info, uint64_t debug
    ws->base.unreserve_vmid = radv_amdgpu_winsys_unreserve_vmid;
    radv_amdgpu_bo_init_functions(ws);
    radv_amdgpu_cs_init_functions(ws);
+
+   /* Before the first BO, so every BO is recorded. */
+   radv_xclipse_vmfault_init(ws);
 
    if (ws->info.compiler_info.has_smem_with_null_prt_bug)
       simple_mtx_init(&ws->null_prt_bug.lock, mtx_plain);

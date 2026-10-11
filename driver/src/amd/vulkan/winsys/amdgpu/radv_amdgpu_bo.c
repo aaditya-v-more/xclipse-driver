@@ -14,6 +14,7 @@
 
 #include "tools/radv_debug.h"
 #include "radv_amdgpu_bo.h"
+#include "radv_amdgpu_vmfault.h"
 #include "ac_cmdbuf.h"
 #include "radv_logcat.h"
 #include <android/log.h>
@@ -636,6 +637,8 @@ radv_xclipse_ibcache_park(struct radv_amdgpu_winsys *ws, struct radv_amdgpu_wins
    e->flags = bo->flags;
    e->domain = bo->base.initial_domain;
    radv_xclipse_ibcache_bytes += bo->base.size;
+   /* Under the cache lock, so a reuse on another thread can't be marked first. */
+   radv_xclipse_vmfault_bo_park(ws, bo, true, NULL);
    simple_mtx_unlock(&radv_xclipse_ibcache_lock);
    return true;
 }
@@ -724,6 +727,7 @@ radv_amdgpu_winsys_bo_destroy(struct radeon_winsys *_ws, struct radeon_winsys_bo
    if (radv_xclipse_ibcache_park(ws, bo, bo->xclipse_alignment))
       return;
 
+   radv_xclipse_vmfault_bo_remove(ws, bo);
    radv_amdgpu_log_bo(ws, bo, true);
    /* Only un-count what was counted: imports never passed through the allocate path. */
    if (bo->churn_counted)
@@ -793,7 +797,7 @@ radv_amdgpu_init_null_prt_bo(struct radv_amdgpu_winsys *ws)
 static VkResult
 radv_amdgpu_winsys_virtual_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned alignment,
                                      enum radeon_bo_flag flags, uint64_t replay_address,
-                                     struct radeon_winsys_bo **out_bo)
+                                     struct radeon_winsys_bo **out_bo, const void *caller)
 {
    struct radv_amdgpu_winsys *ws = radv_amdgpu_winsys(_ws);
    struct radv_amdgpu_winsys_bo *bo;
@@ -860,6 +864,7 @@ radv_amdgpu_winsys_virtual_bo_create(struct radeon_winsys *_ws, uint64_t size, u
    }
 
    radv_amdgpu_log_bo(ws, bo, false);
+   radv_xclipse_vmfault_bo_add(ws, bo, RADV_XCLIPSE_BO_VIRTUAL, flags, caller);
 
    *out_bo = (struct radeon_winsys_bo *)bo;
    return VK_SUCCESS;
@@ -885,9 +890,10 @@ radv_amdgpu_winsys_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned 
    amdgpu_va_handle va_handle;
    int r;
    VkResult result = VK_SUCCESS;
+   const void *caller = __builtin_return_address(0);
 
    if (flags & RADEON_FLAG_VIRTUAL)
-      return radv_amdgpu_winsys_virtual_bo_create(_ws, size, alignment, flags, replay_address, out_bo);
+      return radv_amdgpu_winsys_virtual_bo_create(_ws, size, alignment, flags, replay_address, out_bo, caller);
 
    /* Just be robust for callers that might use NULL-ness for determining if things should be freed.
     */
@@ -902,6 +908,7 @@ radv_amdgpu_winsys_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned 
       struct radv_amdgpu_winsys_bo *reused = radv_xclipse_ibcache_reuse(ws, size, alignment, initial_domain, flags);
       if (reused) {
          reused->priority = priority;
+         radv_xclipse_vmfault_bo_park(ws, reused, false, caller);
          *out_bo = &reused->base;
          return VK_SUCCESS;
       }
@@ -1083,6 +1090,7 @@ radv_amdgpu_winsys_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned 
    if (ws->debug_all_bos)
       radv_amdgpu_global_bo_list_add(ws, bo);
    radv_amdgpu_log_bo(ws, bo, false);
+   radv_xclipse_vmfault_bo_add(ws, bo, RADV_XCLIPSE_BO_CREATE, flags, caller);
 
    *out_bo = (struct radeon_winsys_bo *)bo;
    return VK_SUCCESS;
@@ -1252,6 +1260,7 @@ radv_amdgpu_winsys_bo_from_ptr(struct radeon_winsys *_ws, void *pointer, uint64_
    if (ws->debug_all_bos)
       radv_amdgpu_global_bo_list_add(ws, bo);
    radv_amdgpu_log_bo(ws, bo, false);
+   radv_xclipse_vmfault_bo_add(ws, bo, RADV_XCLIPSE_BO_FROM_PTR, 0, __builtin_return_address(0));
 
    *out_bo = (struct radeon_winsys_bo *)bo;
    return VK_SUCCESS;
@@ -1364,6 +1373,7 @@ radv_amdgpu_winsys_bo_from_fd(struct radeon_winsys *_ws, int fd, unsigned priori
    if (ws->debug_all_bos)
       radv_amdgpu_global_bo_list_add(ws, bo);
    radv_amdgpu_log_bo(ws, bo, false);
+   radv_xclipse_vmfault_bo_add(ws, bo, RADV_XCLIPSE_BO_FROM_FD, 0, __builtin_return_address(0));
 
    *out_bo = (struct radeon_winsys_bo *)bo;
    return VK_SUCCESS;

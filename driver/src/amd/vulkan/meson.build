@@ -229,6 +229,8 @@ if not with_platform_windows
     'winsys/amdgpu/radv_amdgpu_bo.h',
     'winsys/amdgpu/radv_amdgpu_cs.c',
     'winsys/amdgpu/radv_amdgpu_cs.h',
+    'winsys/amdgpu/radv_amdgpu_vmfault.c',
+    'winsys/amdgpu/radv_amdgpu_vmfault.h',
     'winsys/amdgpu/radv_amdgpu_winsys.c',
     'winsys/amdgpu/radv_amdgpu_winsys.h',
     'winsys/amdgpu/radv_amdgpu_winsys_public.h',

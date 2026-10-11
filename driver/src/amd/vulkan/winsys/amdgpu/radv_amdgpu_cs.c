@@ -22,6 +22,7 @@
 #include "ac_linux_drm.h"
 #include "radv_amdgpu_bo.h"
 #include "radv_amdgpu_cs.h"
+#include "radv_amdgpu_vmfault.h"
 #include <android/log.h>
 #include "radv_amdgpu_winsys.h"
 #include "radv_radeon_winsys.h"
@@ -2129,6 +2130,9 @@ radv_amdgpu_cs_submit(struct radv_amdgpu_ctx *ctx, struct radv_amdgpu_cs_request
 
    if (xperf)
       vk_xclipse_perf_submit(os_time_get_nano() - xperf_t0);
+
+   /* Log GPU page faults since the last submission ([VMFAULT], debug.radv_xclipse_log >= 1). */
+   radv_xclipse_vmfault_poll(ctx->ws);
 
    if (r) {
       /* Read the GPU busy/stall registers right after the GPU refused work. No BO, no CS, no

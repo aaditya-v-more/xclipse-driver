@@ -44,6 +44,10 @@ struct radv_amdgpu_winsys_bo {
    /* Counted by radv_xclipse_bo_churn() at create? Read back at destroy, so imports (never counted)
     * are not subtracted. */
    bool churn_counted;
+
+   /* The [VMFAULT] logger's record of this BO: its index plus one, 0 when untracked
+    * (radv_amdgpu_vmfault.c). */
+   uint32_t xclipse_rec;
 };
 
 static inline struct radv_amdgpu_winsys_bo *

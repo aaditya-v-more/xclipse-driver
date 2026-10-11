@@ -268,6 +268,11 @@ struct radeon_winsys {
 
    VkResult (*buffer_make_resident)(struct radeon_winsys *ws, struct radeon_winsys_bo *bo, bool resident);
 
+   /* Xclipse [VMFAULT] logger: the Vulkan object that owns a new BO (a VkObjectType and its
+    * handle) and the code that created it. Optional, NULL when the winsys doesn't log faults. */
+   void (*buffer_set_owner)(struct radeon_winsys *ws, struct radeon_winsys_bo *bo, int32_t object_type,
+                            uint64_t object_handle, bool internal, const void *caller);
+
    VkResult (*ctx_create)(struct radeon_winsys *ws, enum radeon_ctx_priority priority, struct radeon_winsys_ctx **ctx);
    void (*ctx_destroy)(struct radeon_winsys_ctx *ctx);
 

@@ -261,7 +261,17 @@ radv_GetBufferOpaqueCaptureDescriptorDataEXT(VkDevice device, const VkBufferCapt
    return VK_SUCCESS;
 }
 
-VkResult
+/* Xclipse [VMFAULT] logger: tell the winsys which Vulkan object owns a new BO and who created it. */
+static void
+radv_bo_set_owner(struct radeon_winsys *ws, struct radeon_winsys_bo *bo, const struct vk_object_base *object,
+                  bool is_internal, const void *caller)
+{
+   if (ws->buffer_set_owner)
+      ws->buffer_set_owner(ws, bo, object->type, (uint64_t)(uintptr_t)object, is_internal, caller);
+}
+
+/* noinline here and below: the logger records __builtin_return_address(0) as the creator. */
+__attribute__((noinline)) VkResult
 radv_bo_create(struct radv_device *device, struct vk_object_base *object, uint64_t size, unsigned alignment,
                enum radeon_bo_domain domain, enum radeon_bo_flag flags, unsigned priority, uint64_t address,
                bool is_internal, struct radeon_winsys_bo **out_bo)
@@ -285,6 +295,7 @@ radv_bo_create(struct radv_device *device, struct vk_object_base *object, uint64
       return result;
 
    radv_rmv_log_bo_allocate(device, *out_bo, is_internal);
+   radv_bo_set_owner(ws, *out_bo, object ? object : &device->vk.base, is_internal, __builtin_return_address(0));
 
    vk_address_binding_report(&instance->vk, object ? object : &device->vk.base, radv_buffer_get_va(*out_bo),
                              (*out_bo)->size, VK_DEVICE_ADDRESS_BINDING_TYPE_BIND_EXT);
@@ -330,7 +341,7 @@ radv_bo_virtual_bind(struct radv_device *device, struct vk_object_base *object, 
    return VK_SUCCESS;
 }
 
-VkResult
+__attribute__((noinline)) VkResult
 radv_bo_from_fd(struct radv_device *device, int fd, unsigned priority, struct radv_device_memory *mem,
                 uint64_t *alloc_size)
 {
@@ -343,13 +354,15 @@ radv_bo_from_fd(struct radv_device *device, int fd, unsigned priority, struct ra
    if (result != VK_SUCCESS)
       return result;
 
+   radv_bo_set_owner(ws, mem->bo, &mem->base, false, __builtin_return_address(0));
+
    vk_address_binding_report(&instance->vk, &mem->base, radv_buffer_get_va(mem->bo), mem->bo->size,
                              VK_DEVICE_ADDRESS_BINDING_TYPE_BIND_EXT);
 
    return result;
 }
 
-VkResult
+__attribute__((noinline)) VkResult
 radv_bo_from_ptr(struct radv_device *device, void *host_ptr, uint64_t alloc_size, unsigned priority,
                  struct radv_device_memory *mem)
 {
@@ -361,6 +374,8 @@ radv_bo_from_ptr(struct radv_device *device, void *host_ptr, uint64_t alloc_size
    result = ws->buffer_from_ptr(ws, host_ptr, alloc_size, priority, &mem->bo);
    if (result != VK_SUCCESS)
       return result;
+
+   radv_bo_set_owner(ws, mem->bo, &mem->base, false, __builtin_return_address(0));
 
    vk_address_binding_report(&instance->vk, &mem->base, radv_buffer_get_va(mem->bo), mem->bo->size,
                              VK_DEVICE_ADDRESS_BINDING_TYPE_BIND_EXT);

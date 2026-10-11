@@ -91,6 +91,10 @@ struct radv_amdgpu_winsys {
       /* hits/misses feed the [IB_CACHE] log line */
       uint32_t hits, misses, returns;
    } ib_cache;
+
+   /* Xclipse [VMFAULT] logger: every BO's VA range and owner, to name the buffer behind a GPU page
+    * fault (radv_amdgpu_vmfault.c). NULL on other chips. */
+   struct radv_xclipse_vmfault *vmfault;
 };
 
 static inline struct radv_amdgpu_winsys *
