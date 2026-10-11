@@ -12,6 +12,10 @@ most of the phone's memory: on the first try Android's low-memory killer stopped
 into the benchmark. Free memory, swap, and GameNative's own memory are sampled during the run, and
 a run that the low-memory killer ends is reported as such, not as a finished benchmark.
 
+A run stops early, with a screenshot, when the game shows a message box (an error from the game or
+from Wine, found in a raw screenshot while frames are scarce) or presents no new frame for a minute.
+The later runs still go ahead: stock Heaven's fatal error on its D24 depth texture comes and goes.
+
 usage: python pipeline/game.py [--bench gravitymark,heaven] [--runs 3] [--radv-log]
 """
 
@@ -25,6 +29,7 @@ import statistics
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -56,6 +61,14 @@ WARMUP_S = 10  # ignore frames from the first seconds after the game starts rend
 # apart. Wine's error box presented 8.8 FPS for 15 s and once passed for a finished run.
 MIN_STEADY_S = 30
 STALL_S = 2
+# Heaven on radv loads with gaps of up to 16 s between frames and renders steadily 48 s after
+# launch. From CHECK_AFTER_S after the game's process appears, the screen is checked for a message
+# box whenever the last CHECK_EVERY_S brought under CHECK_BELOW_FPS, and a run with no new frame for
+# STUCK_S is stopped.
+CHECK_AFTER_S = 30
+CHECK_EVERY_S = 15
+CHECK_BELOW_FPS = 10
+STUCK_S = 60
 MEMORY_EVERY_S = 5
 # Log lines that show which Vulkan driver a run loaded. Samsung's driver logs OpenDevice on its
 # own; RADV logs [BUILD] only with debug.radv_xclipse_log >= 1 (--radv-log).
@@ -196,6 +209,40 @@ def screenshot(path: Path) -> bool:
     return True
 
 
+LIGHT = bytes(int(v >= 200) for v in range(256))
+
+
+def find_box(w: int, h: int, px: bytes) -> list[int] | None:
+    """Bounds [x0, y0, x1, y1] of a message box in RGBA pixels, or None. Wine draws its boxes as a
+    light rectangle on a black desktop, so the rows with a light run of the same left and right
+    edges are counted (text breaks up the others). Runs under an eighth of the screen's long side
+    (icons) or over 70% of its width (light scenes) don't count."""
+    runs = []
+    for y in range(0, h, 2):
+        row = px[y * w * 4:(y + 1) * w * 4].translate(LIGHT)
+        mask = (int.from_bytes(row[0::4], "big") & int.from_bytes(row[1::4], "big")
+                & int.from_bytes(row[2::4], "big")).to_bytes(w, "big")
+        for m in re.finditer(rb"\x01{%d,}" % (max(w, h) // 8), mask):
+            if m.end() - m.start() <= 0.7 * w:
+                runs.append((m.start(), m.end(), y))
+    if not runs:
+        return None
+    (x0, x1), _ = Counter((a, b) for a, b, _ in runs).most_common(1)[0]
+    ys = [y for a, b, y in runs if (a, b) == (x0, x1)]
+    if len(ys) >= 10 and ys[-1] - ys[0] >= max(w, h) // 24:
+        return [x0, ys[0], x1, ys[-1]]
+    return None
+
+
+def message_box() -> list[int] | None:
+    """Looks for a message box on screen, from raw pixels (no image library needed)."""
+    raw = subprocess.run([ADB, "exec-out", "screencap"], capture_output=True, timeout=60).stdout
+    w, h = int.from_bytes(raw[0:4], "little"), int.from_bytes(raw[4:8], "little")
+    if len(raw) < 12 + w * h * 4:
+        return None
+    return find_box(w, h, raw[len(raw) - w * h * 4:])  # after a 12- or 16-byte header
+
+
 def gpu_sample() -> tuple[int, int] | None:
     """How busy the GPU was over the kernel's last DVFS window (8 ms), in percent, and its clock in
     kHz. Sampled once a second, the busy share averages out to the share of time the GPU had work."""
@@ -250,6 +297,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
 
     frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
     exe_seen = exe_gone = 0
+    history, last_new, checked = [], 0.0, 0.0  # (seconds, frames so far); when the count last grew
     while time.monotonic() - started < cfg["seconds"]:
         time.sleep(1)
         if phone_state() != "device":
@@ -273,6 +321,18 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
                 if exe_gone >= 2:
                     result["game_exited_s"] = round(elapsed)
                     break
+        if exe_seen and elapsed - exe_seen >= CHECK_AFTER_S:
+            before = next((n for t, n in history if t >= elapsed - CHECK_EVERY_S), len(frames))
+            if (len(frames) - before < CHECK_BELOW_FPS * CHECK_EVERY_S
+                    and elapsed - checked >= CHECK_EVERY_S):
+                checked = elapsed
+                box = message_box()
+                if box:
+                    result["status"], result["message_box"] = "error-box", box
+                    break
+            if elapsed - max(exe_seen, last_new) >= STUCK_S:
+                result["status"] = "stalled"
+                break
         layers = game_layers()
         if not layers:
             gone_for = gone_for + 1 if seen_at else 0
@@ -290,6 +350,9 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
         if new and seen_at is None:
             seen_at = time.monotonic() - started
         frames.update(new)
+        if len(frames) > (history[-1][1] if history else 0):
+            last_new = elapsed
+        history.append((elapsed, len(frames)))
     result["seconds_to_game_process"] = exe_seen or None
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
@@ -301,8 +364,9 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
     if busy:
         result["gpu_busy_pct"] = statistics.mean(busy)
     counts = stats.get("steady_seconds", 0) >= MIN_STEADY_S
-    # A run without enough frames has usually stopped at a message box, from the game or from Wine.
-    if not counts and "status" not in result:
+    # A run that stopped early or without enough frames has usually stopped at a message box, from
+    # the game or from Wine.
+    if result.get("status") != "phone-lost" and ("status" in result or not counts):
         shot = run_dir / f"{tag}-{bench}-{driver}-screen.png"
         if screenshot(shot):
             result["screenshot"] = shot.name
@@ -367,6 +431,19 @@ def summarize(meta: dict, results: list[dict]) -> str:
         if len(line) == 2 and line[0][1] > 0:
             text += f" (radv/stock {line[1][1] / line[0][1]:.2f}x)"
         out.append(f"- **{bench}**: {text}")
+    why = {"error-box": "stopped at a message box (an error from the game or from Wine)",
+           "stalled": f"no new frame for {STUCK_S} s",
+           "no-frames": "no frames from the game",
+           "too-short": f"under {MIN_STEADY_S} s of steady frames",
+           "killed-low-memory": "Android's low-memory killer stopped GameNative",
+           "phone-lost": "the phone dropped off adb (a GPU hang can reboot it)"}
+    failed = [r for r in results if r["status"] != "ran"]
+    if failed:
+        out += ["", "## Runs that didn't count", ""]
+        for r in failed:
+            shot = f" Screen: `{r['screenshot']}`." if r.get("screenshot") else ""
+            out.append(f"- Run {r['run']}, {r['bench']} on {r['driver']}: {why.get(r['status'], r['status'])}."
+                       f"{shot}")
     return "\n".join(out) + "\n"
 
 
@@ -444,8 +521,8 @@ def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: s
                     r["run"] = n
                     s = r["surfaceflinger"]
                     print(f"{r['status']} {s.get('fps_avg', 0):.1f} fps over "
-                          f"{s.get('seconds', 0):.0f} s, {r.get('gpu_page_faults', '?')} GPU faults",
-                          flush=True)
+                          f"{s.get('seconds', 0):.0f} s, {r.get('gpu_page_faults', '?')} GPU faults"
+                          + (f", screen {r['screenshot']}" if r.get("screenshot") else ""), flush=True)
                     results.append(r)
                     if r["status"] == "phone-lost":
                         print("lost the phone; stopping")
