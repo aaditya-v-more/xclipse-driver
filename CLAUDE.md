@@ -67,16 +67,11 @@ tools/python/bin/python3 pipeline/game.py --runs 3
 - Put test binaries in `/data/local/tmp`. **Keep the user's files on the phone.** Don't delete benchmark folders, installers, or the driver zip; document them instead (user instruction, 2026-10-10).
 - **When driving the phone's UI, nobody else may touch it.** Keep the screen on with `adb shell svc power stayon usb`, and restore it afterwards with `adb shell settings put global stay_on_while_plugged_in 0` (the original value). Don't use key presses as a keep-alive; GameNative treats them as input.
 - Never enter credentials. GameNative's Steam sign-in is skipped with "Skip login".
-- **Hand phone UI navigation to Sonnet subagents** (standing instruction from the user, 2026-10-11).
-  - This covers work like editing GameNative containers, importing a driver in Driver Manager, toggling app settings, and reading values off screens.
-  - It's slow and mechanical, so launch it as a background subagent with the Sonnet model, and keep the main session on analysis and code.
-  - Give the subagent:
-    - the exact values;
-    - the rules in this section;
-    - `pipeline/phone_ui.py` (`dump`, `tap`, `type`, `clear`, `shot`).
-  - Ask it to read every change back after saving.
-  - Tell it to tap tabs by coordinates or exact names, not substrings, and never to tap Reset container, Uninstall, Delete variable or Import config.
-  - Only one agent drives the phone at a time. Don't run `game.py` while a subagent is driving.
+- **Script repeated phone UI work instead of using subagents, and keep token usage low** (standing instruction from the user, 2026-10-11). This replaces the earlier rule that sent UI navigation to Sonnet subagents.
+  - Recurring work goes in scripts under `pipeline/`, built on `pipeline/phone_ui.py` (`dump`, `tap`, `type`, `clear`, `shot`). That covers importing a driver in Driver Manager, selecting it in a container, toggling settings, and reading values off screens. Check for an existing script before driving the UI by hand.
+  - Scripts read every change back after saving. They tap by coordinates from a fresh dump or by exact labels, never substrings. They never tap Reset container, Uninstall, Delete variable, Import config, the trash icons in Driver Manager, or the Clear buttons under Settings → Debug.
+  - Use a subagent only for one-off UI exploration that a script can't sensibly cover.
+  - Only one thing drives the phone at a time. Don't run `game.py` while a script or an agent is driving.
 - Don't make system changes, such as installing WSL, enabling Windows features, or changing macOS security settings. Give the user the command to run instead.
 
 ## Conventions
