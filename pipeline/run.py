@@ -42,8 +42,8 @@ DRIVER_SO = ROOT / "driver" / "build-android" / "vulkan.radeon.so"
 RESULTS = ROOT / "results"
 ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / f"adb{EXE}")
 PHONE_DIR = "/data/local/tmp/xd"
-CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "queries", "xfb", "xfbmany",
-                     "xfbmanygs"]
+CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "tess", "scratch", "scratchcs",
+                     "queries", "xfb", "xfbmany", "xfbmanygs"]
 PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
 # Tests that hang our driver's GPU today. They run last, because after a hang the run stops testing
 # our driver.
@@ -55,6 +55,8 @@ SHADERS = {
     "screen.vert": "screen_vert", "flat.frag": "flat_frag", "tiny.vert": "tiny_vert",
     "tri.geom": "tri_geom", "xfb.vert": "xfb_vert", "xfb_many.vert": "xfb_many_vert",
     "grid.vert": "grid_vert", "xfb_many.geom": "xfb_many_geom", "inputs.frag": "inputs_frag",
+    "tess.tesc": "tess_tesc", "tess.tese": "tess_tese", "scratch.vert": "scratch_vert",
+    "fill_scratch.comp": "fill_scratch_comp",
 }
 # Performance metrics per test: (result key, label, higher is better).
 PERF_METRICS = {

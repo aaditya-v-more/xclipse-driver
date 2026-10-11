@@ -7,7 +7,8 @@
  * drives both drivers, so every result is an A/B pair.
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
- *   correctness: info device submit compute render queries xfb xfbmany xfbmanygs
+ *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
+ *                xfbmanygs
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -28,9 +29,13 @@
 #include "complex_comp.h"
 #include "copy_comp.h"
 #include "fill_comp.h"
+#include "fill_scratch_comp.h"
 #include "flat_frag.h"
 #include "grid_vert.h"
+#include "scratch_vert.h"
 #include "screen_vert.h"
+#include "tess_tesc.h"
+#include "tess_tese.h"
 #include "tiny_vert.h"
 #include "tri_frag.h"
 #include "tri_geom.h"
@@ -118,7 +123,12 @@ static void jruns(const char *k, const double *v, int n)
    jclose();
 }
 
-/* Ends the run: closes any open JSON levels, records the status and exits. */
+/* Set once there's a device: destroys it, for finish() on a failure. */
+static void (*destroy_device_on_failure)(void);
+
+/* Ends the run: closes any open JSON levels, records the status and exits. After a failure, the
+ * device is destroyed first, so the driver can log what it learns at teardown (such as GPU page
+ * faults in the last submission). */
 static void finish(const char *status, const char *fmt, ...)
 {
    while (jdepth > 1)
@@ -136,6 +146,11 @@ static void finish(const char *status, const char *fmt, ...)
    jclose();
    putchar('\n');
    fflush(stdout);
+   if (strcmp(status, "pass") && destroy_device_on_failure) {
+      void (*destroy)(void) = destroy_device_on_failure;
+      destroy_device_on_failure = NULL;
+      destroy();
+   }
    _exit(strcmp(status, "pass") == 0 ? 0 : 1);
 }
 
@@ -178,8 +193,9 @@ static double median(const double *v, int n)
    X(vkGetPhysicalDeviceFormatProperties) X(vkCreateDevice) X(vkGetDeviceProcAddr)
 
 #define DEVICE_FUNCS(X)                                                                            \
-   X(vkDestroyDevice) X(vkGetDeviceQueue) X(vkQueueSubmit) X(vkCreateFence) X(vkDestroyFence)       \
-   X(vkWaitForFences) X(vkCreateCommandPool) X(vkDestroyCommandPool) X(vkAllocateCommandBuffers)    \
+   X(vkDestroyDevice) X(vkDeviceWaitIdle) X(vkGetDeviceQueue) X(vkQueueSubmit) X(vkCreateFence)     \
+   X(vkDestroyFence) X(vkWaitForFences) X(vkCreateCommandPool) X(vkDestroyCommandPool)             \
+   X(vkAllocateCommandBuffers)                                                                     \
    X(vkBeginCommandBuffer) X(vkEndCommandBuffer) X(vkCreateBuffer) X(vkDestroyBuffer)               \
    X(vkGetBufferMemoryRequirements) X(vkAllocateMemory) X(vkFreeMemory) X(vkBindBufferMemory)       \
    X(vkMapMemory) X(vkCreateShaderModule) X(vkDestroyShaderModule) X(vkCreateDescriptorSetLayout)   \
@@ -443,10 +459,11 @@ static void run_info(void)
 /* ---- device, commands and resources ---- */
 
 /* What a test needs enabled beyond the basics. */
-enum { NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4 };
+enum { NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8 };
 
 /* Set by start_device for the queries and xfb tests: what the driver has of what they use. */
-static bool has_geometry_shader, has_stats_query, has_pg_query, has_xfb, has_xfb_queries;
+static bool has_geometry_shader, has_tessellation_shader, has_stats_query, has_pg_query, has_xfb,
+   has_xfb_queries;
 
 static bool has_device_extension(const char *name)
 {
@@ -459,6 +476,15 @@ static bool has_device_extension(const char *name)
       if (!strcmp(exts[i].extensionName, name))
          return true;
    return false;
+}
+
+/* After a failure, objects are left alive; the driver frees what it has to. Destroying the
+ * instance as well is what destroys RADV's winsys. */
+static void destroy_device(void)
+{
+   vkDeviceWaitIdle(dev);
+   vkDestroyDevice(dev, NULL);
+   vkDestroyInstance(inst, NULL);
 }
 
 static void start_device(bool dynamic_rendering, unsigned needs)
@@ -523,6 +549,13 @@ static void start_device(bool dynamic_rendering, unsigned needs)
       features.geometryShader = has_geometry_shader;
       dci.pEnabledFeatures = &features;
    }
+   if (needs & NEED_TESS) {
+      VkPhysicalDeviceFeatures2 f2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_tessellation_shader = f2.features.tessellationShader;
+      features.tessellationShader = has_tessellation_shader;
+      dci.pEnabledFeatures = &features;
+   }
    if ((needs & NEED_XFB) && has_device_extension(xfb_ext)) {
       VkPhysicalDeviceTransformFeedbackPropertiesEXT props = {
          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_PROPERTIES_EXT,
@@ -553,6 +586,7 @@ static void start_device(bool dynamic_rendering, unsigned needs)
    step("creating device");
    double t = now_ms();
    VKCHECK("vkCreateDevice", vkCreateDevice(pdev, &dci, NULL, &dev));
+   destroy_device_on_failure = destroy_device;
    jnum("ms_device", now_ms() - t);
 
    const char *missing = NULL;
@@ -877,18 +911,20 @@ static void bind_compute(VkCommandBuffer cb, const struct compute *c)
 }
 
 struct graphics {
-   VkShaderModule vs, gs, fs;
+   VkShaderModule vs, tcs, tes, gs, fs;
    VkPipelineLayout layout;
    VkPipeline pipeline;
 };
 
 /* A graphics pipeline for dynamic rendering into one color attachment, with dynamic viewport and
- * scissor, an optional geometry shader, optional alpha blending and an optional vertex-stage
- * push-constant block. */
-static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
-                                        const uint32_t *gs_code, size_t gs_size,
-                                        const uint32_t *fs_code, size_t fs_size, VkFormat format,
-                                        bool blend, uint32_t push_size, double *ms)
+ * scissor, optional tessellation shaders (patches of 3 control points), an optional geometry
+ * shader, optional alpha blending and an optional vertex-stage push-constant block. */
+static struct graphics make_graphics_tess(const uint32_t *vs_code, size_t vs_size,
+                                          const uint32_t *tcs_code, size_t tcs_size,
+                                          const uint32_t *tes_code, size_t tes_size,
+                                          const uint32_t *gs_code, size_t gs_size,
+                                          const uint32_t *fs_code, size_t fs_size, VkFormat format,
+                                          bool blend, uint32_t push_size, double *ms)
 {
    struct graphics g = {0};
    VkPushConstantRange push = {VK_SHADER_STAGE_VERTEX_BIT, 0, push_size};
@@ -902,7 +938,7 @@ static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
    double t = now_ms();
    g.vs = make_shader(vs_code, vs_size);
    g.fs = make_shader(fs_code, fs_size);
-   VkPipelineShaderStageCreateInfo stages[3] = {
+   VkPipelineShaderStageCreateInfo stages[5] = {
       {
          .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
          .stage = VK_SHADER_STAGE_VERTEX_BIT,
@@ -917,6 +953,22 @@ static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
       },
    };
    uint32_t stage_count = 2;
+   if (tcs_code) {
+      g.tcs = make_shader(tcs_code, tcs_size);
+      g.tes = make_shader(tes_code, tes_size);
+      stages[stage_count++] = (VkPipelineShaderStageCreateInfo){
+         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+         .stage = VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+         .module = g.tcs,
+         .pName = "main",
+      };
+      stages[stage_count++] = (VkPipelineShaderStageCreateInfo){
+         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+         .stage = VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+         .module = g.tes,
+         .pName = "main",
+      };
+   }
    if (gs_code) {
       g.gs = make_shader(gs_code, gs_size);
       stages[stage_count++] = (VkPipelineShaderStageCreateInfo){
@@ -931,7 +983,11 @@ static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
    };
    VkPipelineInputAssemblyStateCreateInfo input_assembly = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+      .topology = tcs_code ? VK_PRIMITIVE_TOPOLOGY_PATCH_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+   };
+   VkPipelineTessellationStateCreateInfo tessellation = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+      .patchControlPoints = 3,
    };
    VkPipelineViewportStateCreateInfo viewport_state = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
@@ -982,6 +1038,7 @@ static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
       .pStages = stages,
       .pVertexInputState = &vertex_input,
       .pInputAssemblyState = &input_assembly,
+      .pTessellationState = tcs_code ? &tessellation : NULL,
       .pViewportState = &viewport_state,
       .pRasterizationState = &raster,
       .pMultisampleState = &multisample,
@@ -993,6 +1050,15 @@ static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
            vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpci, NULL, &g.pipeline));
    *ms = now_ms() - t;
    return g;
+}
+
+static struct graphics make_graphics_gs(const uint32_t *vs_code, size_t vs_size,
+                                        const uint32_t *gs_code, size_t gs_size,
+                                        const uint32_t *fs_code, size_t fs_size, VkFormat format,
+                                        bool blend, uint32_t push_size, double *ms)
+{
+   return make_graphics_tess(vs_code, vs_size, NULL, 0, NULL, 0, gs_code, gs_size, fs_code, fs_size,
+                             format, blend, push_size, ms);
 }
 
 static struct graphics make_graphics(const uint32_t *vs_code, size_t vs_size,
@@ -1008,6 +1074,8 @@ static void free_graphics(struct graphics *g)
    vkDestroyPipeline(dev, g->pipeline, NULL);
    vkDestroyPipelineLayout(dev, g->layout, NULL);
    vkDestroyShaderModule(dev, g->vs, NULL);
+   vkDestroyShaderModule(dev, g->tcs, NULL);
+   vkDestroyShaderModule(dev, g->tes, NULL);
    vkDestroyShaderModule(dev, g->gs, NULL);
    vkDestroyShaderModule(dev, g->fs, NULL);
 }
@@ -1111,7 +1179,7 @@ static void run_submit(void)
 
 /* ---- compute: a dispatch that writes a pattern the host checks element by element ---- */
 
-static void run_compute(void)
+static void dispatch_fill(const uint32_t *code, size_t size)
 {
    enum { N = 65536 };
    struct buffer b = make_buffer(N * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
@@ -1119,7 +1187,7 @@ static void run_compute(void)
 
    double ms;
    step("creating compute pipeline");
-   struct compute c = make_compute(fill_comp, sizeof(fill_comp), &b.buf, 1, 0, NULL, &ms);
+   struct compute c = make_compute(code, size, &b.buf, 1, 0, NULL, &ms);
    jnum("ms_pipeline", ms);
 
    VkCommandBuffer cb = begin_cmd();
@@ -1151,6 +1219,17 @@ static void run_compute(void)
    free_buffer(&b);
 }
 
+static void run_compute(void)
+{
+   dispatch_fill(fill_comp, sizeof(fill_comp));
+}
+
+/* The same pattern, with every value passing through scratch memory on its way out. */
+static void run_scratch_cs(void)
+{
+   dispatch_fill(fill_scratch_comp, sizeof(fill_scratch_comp));
+}
+
 /* ---- render: one triangle offscreen, read back and checked pixel by pixel ---- */
 
 static void save_ppm(const uint8_t *rgba, int w, int h, const char *name)
@@ -1178,22 +1257,23 @@ static bool near(const uint8_t *px, int r, int g, int b, int a)
    return true;
 }
 
-static void run_render(void)
+enum { PIC_W = 128, PIC_H = 128 };
+
+/* Draws VERTICES vertices with g into a PIC_W x PIC_H target cleared to dark blue, saves the
+ * picture as NAME and returns it (RGBA8, for the caller to free). The GPU time goes in MS_KEY
+ * unless that's NULL. */
+static uint8_t *draw_picture(struct graphics *g, uint32_t vertices, const char *name,
+                             const char *ms_key)
 {
-   enum { W = 128, H = 128 };
+   enum { W = PIC_W, H = PIC_H };
    struct target t = make_target(W, H);
    struct buffer readback = make_buffer(W * H * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
-   double ms;
-   step("creating graphics pipeline");
-   struct graphics g = make_graphics(tri_vert, sizeof(tri_vert), tri_frag, sizeof(tri_frag),
-                                     VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
-   jnum("ms_pipeline", ms);
 
    VkCommandBuffer cb = begin_cmd();
    const float clear[4] = {0.0f, 0.0f, 0.25f, 1.0f};
    begin_target(cb, &t, clear);
-   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline);
-   vkCmdDraw(cb, 3, 1, 0, 0);
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g->pipeline);
+   vkCmdDraw(cb, vertices, 1, 0, 0);
    vkCmdEndRendering(cb);
    VkImageMemoryBarrier to_transfer = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1222,11 +1302,24 @@ static void run_render(void)
    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1,
                         &to_host, 0, NULL, 0, NULL);
    VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
-   jnum("ms_gpu", submit_and_wait(cb, "triangle draw"));
+   const double ms = submit_and_wait(cb, name);
+   if (ms_key)
+      jnum(ms_key, ms);
 
-   /* Every pixel should be exactly the triangle's orange or the clear color. */
-   const uint8_t *px = readback.map;
-   save_ppm(px, W, H, "render");
+   uint8_t *px = malloc(W * H * 4);
+   if (!px)
+      finish("fail", "out of memory");
+   memcpy(px, readback.map, W * H * 4);
+   save_ppm(px, W, H, name);
+   free_buffer(&readback);
+   free_target(&t);
+   return px;
+}
+
+/* Checks a picture of tri.vert's triangle: every pixel is its orange or the clear color. */
+static void check_triangle(const uint8_t *px)
+{
+   enum { W = PIC_W, H = PIC_H };
    int covered = 0, cleared = 0, other = 0;
    for (int i = 0; i < W * H; i++) {
       if (near(px + i * 4, 255, 128, 0, 255))
@@ -1246,10 +1339,71 @@ static void run_render(void)
              "wrong pixels: center %u,%u,%u,%u corner %u,%u,%u,%u, %d pixels neither color",
              center[0], center[1], center[2], center[3], corner[0], corner[1], corner[2],
              corner[3], other);
+}
 
+static void run_render(void)
+{
+   double ms;
+   step("creating graphics pipeline");
+   struct graphics g = make_graphics(tri_vert, sizeof(tri_vert), tri_frag, sizeof(tri_frag),
+                                     VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+   jnum("ms_pipeline", ms);
+   uint8_t *px = draw_picture(&g, 3, "render", "ms_gpu");
+   check_triangle(px);
+   free(px);
    free_graphics(&g);
-   free_buffer(&readback);
-   free_target(&t);
+}
+
+/* The same triangle as one tessellated patch. The hull shader reads the tess factor and off-chip
+ * ring descriptors from a table the driver points the shader's first two SGPRs at, and the domain
+ * shader reads the off-chip ring through its own pointer. */
+static void run_tess(void)
+{
+   if (!has_tessellation_shader)
+      finish("skip", "no tessellationShader");
+   double ms;
+   step("creating tessellation pipeline");
+   struct graphics g = make_graphics_tess(tri_vert, sizeof(tri_vert), tess_tesc, sizeof(tess_tesc),
+                                          tess_tese, sizeof(tess_tese), NULL, 0, tri_frag,
+                                          sizeof(tri_frag), VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+   jnum("ms_pipeline", ms);
+   uint8_t *px = draw_picture(&g, 3, "tess", "ms_gpu");
+   check_triangle(px);
+   free(px);
+   free_graphics(&g);
+}
+
+/* grid.vert's 4096 small triangles, drawn by a vertex shader that passes every position through
+ * scratch memory, against the same grid drawn without it. Many waves use scratch at once, so
+ * waves that share scratch space move triangles. */
+static void run_scratch(void)
+{
+   enum { VERTICES = 3 * 4096 };
+   double ms;
+   step("creating graphics pipelines");
+   struct graphics ref = make_graphics(grid_vert, sizeof(grid_vert), tri_frag, sizeof(tri_frag),
+                                       VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+   struct graphics g = make_graphics(scratch_vert, sizeof(scratch_vert), tri_frag,
+                                     sizeof(tri_frag), VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+   jnum("ms_pipeline", ms);
+   uint8_t *want = draw_picture(&ref, VERTICES, "scratch_reference", NULL);
+   uint8_t *got = draw_picture(&g, VERTICES, "scratch", "ms_gpu");
+   int covered = 0, different = 0;
+   for (int i = 0; i < PIC_W * PIC_H; i++) {
+      covered += near(want + i * 4, 255, 128, 0, 255);
+      different += memcmp(want + i * 4, got + i * 4, 4) != 0;
+   }
+   jint("pixels_triangles", covered);
+   jint("pixels_different", different);
+   if (!covered)
+      finish("fail", "the grid drawn without scratch has no triangles");
+   if (different)
+      finish("fail", "%d of %d pixels differ from the grid drawn without scratch", different,
+             PIC_W * PIC_H);
+   free(want);
+   free(got);
+   free_graphics(&g);
+   free_graphics(&ref);
 }
 
 /* ---- queries: pipeline statistics as D3D11 uses them (through DXVK), and primitives generated ----
@@ -2040,8 +2194,8 @@ int main(int argc, char **argv)
    }
    if (!driver || !test) {
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
-                      "  correctness: info device submit compute render queries xfb xfbmany\n"
-                      "               xfbmanygs\n"
+                      "  correctness: info device submit compute render tess scratch scratchcs\n"
+                      "               queries xfb xfbmany xfbmanygs\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -2056,6 +2210,8 @@ int main(int argc, char **argv)
    } tests[] = {
       {"device", NULL, false, 0},           {"submit", run_submit, false, 0},
       {"compute", run_compute, false, 0},   {"render", run_render, true, 0},
+      {"tess", run_tess, true, NEED_TESS},  {"scratch", run_scratch, true, 0},
+      {"scratchcs", run_scratch_cs, false, 0},
       {"queries", run_queries, true, NEED_QUERIES}, {"xfb", run_xfb, true, NEED_XFB},
       {"xfbmany", run_xfb_many, true, NEED_XFB},
       {"xfbmanygs", run_xfb_many_gs, true, NEED_XFB | NEED_GS},

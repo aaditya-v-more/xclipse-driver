@@ -1,0 +1,20 @@
+#version 450
+// fill.comp's pattern, with each value stored to and loaded from a 1 KiB local array at indices
+// only known at run time. An array that size, indexed that way, has to live in scratch memory.
+// (Every element is a whole uint that gets read, so the compiler can't shrink the array to fit in
+// registers, as it can with a vector array that only has one component read.)
+layout(local_size_x = 64) in;
+layout(std430, binding = 0) buffer Buf { uint data[]; };
+
+void main()
+{
+   uint i = gl_GlobalInvocationID.x;
+   uint v[256];
+   for (int k = 0; k < 256; k++)
+      v[k] = i + uint(k);
+   int slot = int(i * 7u + 3u) & 255;
+   v[slot] = i * 3u + 7u;
+   // The buffer starts out as 0xeeeeeeee, so this is 0, but the compiler can't know that.
+   uint zero = (data[i] >> 31) ^ 1u;
+   data[i] = v[(slot + int(zero)) & 255];
+}

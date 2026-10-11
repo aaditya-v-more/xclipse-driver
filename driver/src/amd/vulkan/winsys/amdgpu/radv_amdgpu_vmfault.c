@@ -112,6 +112,10 @@ radv_xclipse_vmfault_finish(struct radv_amdgpu_winsys *ws)
    if (!vf)
       return;
 
+   /* Faults in the last submission, as in a test that submits once: the GPU runs it after the
+    * poll that follows the submission. */
+   radv_xclipse_vmfault_poll(ws);
+
    ws->vmfault = NULL;
    ws->base.buffer_set_owner = NULL;
    simple_mtx_destroy(&vf->lock);
