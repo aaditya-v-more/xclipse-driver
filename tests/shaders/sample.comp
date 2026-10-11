@@ -1,0 +1,13 @@
+#version 450
+// Reads every texel of an 8x8 texture exactly (texelFetch), and samples halfway between each texel
+// and its right and lower neighbors, which a linear filter averages, for the host to check against
+// the values it uploaded.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D tex;
+layout(std430, binding = 1) buffer Out { vec4 fetched[64]; vec4 filtered[64]; };
+void main()
+{
+   ivec2 p = ivec2(gl_LocalInvocationID.xy);
+   fetched[p.y * 8 + p.x] = texelFetch(tex, p, 0);
+   filtered[p.y * 8 + p.x] = textureLod(tex, (vec2(p) + 1.0) / 8.0, 0.0);
+}

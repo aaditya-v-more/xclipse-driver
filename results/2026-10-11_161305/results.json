@@ -1,0 +1,294 @@
+{
+  "meta": {
+    "started": "2026-10-11T16:13:05",
+    "driver": {
+      "commit": "fc066b9",
+      "so_sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "39.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 87 temperature: 349"
+    },
+    "tests": [
+      "vertex",
+      "mrt"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "39.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 87 temperature: 349"
+    }
+  },
+  "results": [
+    {
+      "test": "vertex",
+      "driver": "stock",
+      "gpu_temp_c_before": "38.0",
+      "ms_load": 46.494,
+      "ms_instance": 65.875,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 2.45,
+      "vertex_input_dynamic_state": true,
+      "ms_gpu": 0.399,
+      "paths": [
+        {
+          "path": "pipeline",
+          "wrong_formats": []
+        },
+        {
+          "path": "bind_stride",
+          "wrong_formats": []
+        },
+        {
+          "path": "dynamic",
+          "wrong_formats": []
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating pipelines",
+        "[xdtest] vertex",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "vertex",
+      "driver": "radv",
+      "gpu_temp_c_before": "39.0",
+      "ms_load": 20.957,
+      "ms_instance": 3.173,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 7.392,
+      "vertex_input_dynamic_state": true,
+      "ms_gpu": 1.392,
+      "paths": [
+        {
+          "path": "pipeline",
+          "wrong_formats": []
+        },
+        {
+          "path": "bind_stride",
+          "wrong_formats": []
+        },
+        {
+          "path": "dynamic",
+          "wrong_formats": []
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating pipelines",
+        "[xdtest] vertex",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "mrt",
+      "driver": "stock",
+      "gpu_temp_c_before": "39.0",
+      "ms_load": 13.494,
+      "ms_instance": 27.215,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 0.958,
+      "attachments": 8,
+      "ms_gpu": 1.047,
+      "targets": [
+        {
+          "format": "RGBA8",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RGBA16F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RGB10A2",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RG16F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "R32F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "BGRA8",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating pipelines",
+        "[xdtest] mrt",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "mrt",
+      "driver": "radv",
+      "gpu_temp_c_before": "39.0",
+      "ms_load": 15.907,
+      "ms_instance": 2.853,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.621,
+      "attachments": 8,
+      "ms_gpu": 1.057,
+      "targets": [
+        {
+          "format": "RGBA8",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RGBA16F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RGB10A2",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RG16F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "R32F",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "BGRA8",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "wrong_drawn": 0,
+          "wrong_drawn_added": 0,
+          "wrong_cleared": 0,
+          "wrong_cleared_added": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating pipelines",
+        "[xdtest] mrt",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

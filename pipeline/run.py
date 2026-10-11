@@ -43,7 +43,7 @@ RESULTS = ROOT / "results"
 ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / f"adb{EXE}")
 PHONE_DIR = "/data/local/tmp/xd"
 CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "tess", "scratch", "scratchcs",
-                     "queries", "xfb", "xfbmany", "xfbmanygs"]
+                     "queries", "xfb", "xfbmany", "xfbmanygs", "textures", "mrt", "vertex"]
 PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
 # Tests that hang our driver's GPU today. They run last, because after a hang the run stops testing
 # our driver.
@@ -56,7 +56,9 @@ SHADERS = {
     "tri.geom": "tri_geom", "xfb.vert": "xfb_vert", "xfb_many.vert": "xfb_many_vert",
     "grid.vert": "grid_vert", "xfb_many.geom": "xfb_many_geom", "inputs.frag": "inputs_frag",
     "tess.tesc": "tess_tesc", "tess.tese": "tess_tese", "scratch.vert": "scratch_vert",
-    "fill_scratch.comp": "fill_scratch_comp",
+    "fill_scratch.comp": "fill_scratch_comp", "sample.comp": "sample_comp",
+    "mrt.frag": "mrt_frag", "mrt_add.frag": "mrt_add_frag", "mrt_read.comp": "mrt_read_comp",
+    "vertex.vert": "vertex_vert",
 }
 # Performance metrics per test: (result key, label, higher is better).
 PERF_METRICS = {
@@ -162,7 +164,7 @@ def build_tests() -> None:
              "-I", str(ROOT / "driver" / "include"),
              "-I", str(ROOT / "driver" / "include" / "android_stub"),
              "-I", str(TEST_BUILD), "-o", str(TEST_BUILD / "xdtest"), str(TEST_SRC / "xdtest.c"),
-             "-ldl"])
+             "-ldl", "-lm"])
     if r.returncode:
         sys.exit(f"xdtest build failed:\n{r.stdout}{r.stderr}")
     if r.stderr.strip():

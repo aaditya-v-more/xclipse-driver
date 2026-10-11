@@ -8,11 +8,12 @@
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
  *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
- *                xfbmanygs
+ *                xfbmanygs textures mrt vertex
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
 #include <dlfcn.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -32,6 +33,7 @@
 #include "fill_scratch_comp.h"
 #include "flat_frag.h"
 #include "grid_vert.h"
+#include "sample_comp.h"
 #include "scratch_vert.h"
 #include "screen_vert.h"
 #include "tess_tesc.h"
@@ -40,8 +42,12 @@
 #include "tri_frag.h"
 #include "tri_geom.h"
 #include "tri_vert.h"
+#include "vertex_vert.h"
 #include "xfb_many_geom.h"
 #include "inputs_frag.h"
+#include "mrt_add_frag.h"
+#include "mrt_frag.h"
+#include "mrt_read_comp.h"
 #include "xfb_many_vert.h"
 #include "xfb_vert.h"
 
@@ -208,7 +214,8 @@ static double median(const double *v, int n)
    X(vkCmdEndRendering) X(vkCmdSetViewport) X(vkCmdSetScissor) X(vkCmdDraw)                         \
    X(vkCmdCopyImageToBuffer) X(vkCreateQueryPool) X(vkDestroyQueryPool) X(vkCmdResetQueryPool)      \
    X(vkCmdWriteTimestamp) X(vkGetQueryPoolResults) X(vkCmdCopyBuffer) X(vkCmdPushConstants)         \
-   X(vkCmdFillBuffer) X(vkCmdBeginQuery) X(vkCmdEndQuery)
+   X(vkCmdFillBuffer) X(vkCmdBeginQuery) X(vkCmdEndQuery) X(vkCmdCopyBufferToImage)                \
+   X(vkCreateSampler) X(vkDestroySampler) X(vkCmdBindVertexBuffers) X(vkCmdBindVertexBuffers2)
 
 #define DECLARE(fn) static PFN_##fn fn;
 INSTANCE_FUNCS(DECLARE)
@@ -459,11 +466,11 @@ static void run_info(void)
 /* ---- device, commands and resources ---- */
 
 /* What a test needs enabled beyond the basics. */
-enum { NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8 };
+enum { NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8, NEED_BC = 16, NEED_VERTEX = 32 };
 
-/* Set by start_device for the queries and xfb tests: what the driver has of what they use. */
+/* Set by start_device for the tests with needs: what the driver has of what they use. */
 static bool has_geometry_shader, has_tessellation_shader, has_stats_query, has_pg_query, has_xfb,
-   has_xfb_queries;
+   has_xfb_queries, has_bc, has_vertex_stores, has_vertex_input_dynamic;
 
 static bool has_device_extension(const char *name)
 {
@@ -516,8 +523,12 @@ static void start_device(bool dynamic_rendering, unsigned needs)
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT,
    };
    const char *pgq_ext = VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME;
+   VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vid = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
+   };
    const char *xfb_ext = VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME;
-   const char *exts[2];
+   const char *vid_ext = VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME;
+   const char *exts[3];
    void **chain = &f13.pNext; /* where the next enabled feature struct goes */
    if (needs & NEED_QUERIES) {
       bool pgq_listed = has_device_extension(pgq_ext);
@@ -555,6 +566,34 @@ static void start_device(bool dynamic_rendering, unsigned needs)
       has_tessellation_shader = f2.features.tessellationShader;
       features.tessellationShader = has_tessellation_shader;
       dci.pEnabledFeatures = &features;
+   }
+   if (needs & NEED_BC) {
+      VkPhysicalDeviceFeatures2 f2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_bc = f2.features.textureCompressionBC;
+      features.textureCompressionBC = has_bc;
+      dci.pEnabledFeatures = &features;
+   }
+   if (needs & NEED_VERTEX) {
+      bool vid_listed = has_device_extension(vid_ext);
+      VkPhysicalDeviceFeatures2 f2 = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+         .pNext = vid_listed ? &vid : NULL,
+      };
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_vertex_stores = f2.features.vertexPipelineStoresAndAtomics;
+      has_vertex_input_dynamic = vid_listed && vid.vertexInputDynamicState;
+      features.vertexPipelineStoresAndAtomics = has_vertex_stores;
+      dci.pEnabledFeatures = &features;
+      if (has_vertex_input_dynamic) {
+         vid = (VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT){
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
+            .vertexInputDynamicState = VK_TRUE,
+         };
+         *chain = &vid;
+         chain = &vid.pNext;
+         exts[dci.enabledExtensionCount++] = vid_ext;
+      }
    }
    if ((needs & NEED_XFB) && has_device_extension(xfb_ext)) {
       VkPhysicalDeviceTransformFeedbackPropertiesEXT props = {
@@ -785,6 +824,20 @@ static void free_buffer(struct buffer *b)
 {
    vkDestroyBuffer(dev, b->buf, NULL);
    vkFreeMemory(dev, b->mem, NULL);
+}
+
+/* Appends one problem to a comma-separated list of them. */
+static void add_problem(char *list, size_t size, const char *fmt, ...)
+{
+   size_t len = strlen(list);
+   if (len && len + 2 < size) {
+      strcpy(list + len, ", ");
+      len += 2;
+   }
+   va_list ap;
+   va_start(ap, fmt);
+   vsnprintf(list + len, size - len, fmt, ap);
+   va_end(ap);
 }
 
 static VkShaderModule make_shader(const uint32_t *code, size_t size)
@@ -1555,6 +1608,1409 @@ static void run_queries(void)
    free_target(&t);
 }
 
+/* ---- textures: sampling the formats DXVK uses for D3D11 games ---- */
+
+/* Writes an 8x8 texture's upload data and the RGBA each texel must read as. */
+typedef void (*texel_fill_fn)(uint8_t *data, float want[64][4]);
+
+static uint8_t pattern8(int i, int c) { return (uint8_t)((i % 8) * 32 + (i / 8) * 4 + c * 67); }
+
+static float srgb_to_linear(float c)
+{
+   return c <= 0.04045f ? c / 12.92f : powf((c + 0.055f) / 1.055f, 2.4f);
+}
+
+static void fill_rgba8(uint8_t *d, float want[64][4], bool bgra, bool srgb)
+{
+   for (int i = 0; i < 64; i++) {
+      for (int c = 0; c < 4; c++) {
+         const uint8_t v = pattern8(i, c);
+         d[i * 4 + (bgra && c < 3 ? 2 - c : c)] = v;
+         want[i][c] = srgb && c < 3 ? srgb_to_linear(v / 255.0f) : v / 255.0f;
+      }
+   }
+}
+
+static void fill_rgba8_unorm(uint8_t *d, float want[64][4]) { fill_rgba8(d, want, false, false); }
+static void fill_bgra8_unorm(uint8_t *d, float want[64][4]) { fill_rgba8(d, want, true, false); }
+static void fill_rgba8_srgb(uint8_t *d, float want[64][4]) { fill_rgba8(d, want, false, true); }
+
+/* Half floats and their values, also used by the vertex test. */
+static const struct {
+   uint16_t bits;
+   float value;
+} halfs[] = {
+   {0x0000, 0.0f},    {0x3400, 0.25f},    {0x3800, 0.5f},
+   {0x3c00, 1.0f},    {0x4000, 2.0f},     {0x4940, 10.5f},
+   {0x63d0, 1000.0f}, {0xbc00, -1.0f},    {0xb000, -0.125f},
+   {0x7bff, 65504.0f}, {0x0400, 6.103515625e-05f}, {0x3555, 0.333251953125f},
+};
+enum { HALFS = sizeof(halfs) / sizeof(halfs[0]) };
+
+static void fill_rgba16f(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      for (int c = 0; c < 4; c++) {
+         const int k = (i * 4 + c * 5 + i / 8) % HALFS;
+         d[(i * 4 + c) * 2] = halfs[k].bits & 0xff;
+         d[(i * 4 + c) * 2 + 1] = halfs[k].bits >> 8;
+         want[i][c] = halfs[k].value;
+      }
+   }
+}
+
+static void fill_r11g11b10f(uint8_t *d, float want[64][4])
+{
+   /* 5-bit exponent, and whether the top mantissa bit is set: 0, 0.25, 0.5, 1, 1.5, 2, 3, 6. */
+   static const struct {
+      uint32_t exp, half;
+      float value;
+   } vals[] = {{0, 0, 0.0f},  {13, 0, 0.25f}, {14, 0, 0.5f}, {15, 0, 1.0f},
+               {15, 1, 1.5f}, {16, 0, 2.0f},  {16, 1, 3.0f}, {17, 1, 6.0f}};
+   for (int i = 0; i < 64; i++) {
+      const int r = i % 8, g = (i / 8) % 8, b = (i + i / 8) % 8;
+      const uint32_t word = (vals[r].exp << 6 | vals[r].half << 5) |
+                            (vals[g].exp << 6 | vals[g].half << 5) << 11 |
+                            (vals[b].exp << 5 | vals[b].half << 4) << 22;
+      memcpy(d + i * 4, &word, 4);
+      want[i][0] = vals[r].value;
+      want[i][1] = vals[g].value;
+      want[i][2] = vals[b].value;
+      want[i][3] = 1.0f;
+   }
+}
+
+static void fill_rgb10a2(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const uint32_t x = i % 8, y = i / 8;
+      const uint32_t r = (x * 130 + y * 7) % 1024, g = (y * 130 + x * 11) % 1024,
+                     b = ((x + y) * 60 + 3) % 1024, a = (x + 2 * y) % 4;
+      const uint32_t word = r | g << 10 | b << 20 | a << 30;
+      memcpy(d + i * 4, &word, 4);
+      want[i][0] = r / 1023.0f;
+      want[i][1] = g / 1023.0f;
+      want[i][2] = b / 1023.0f;
+      want[i][3] = a / 3.0f;
+   }
+}
+
+static void fill_r32f(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const float v = (i % 8) * 1.5f - (i / 8) * 0.25f + 0.125f;
+      memcpy(d + i * 4, &v, 4);
+      want[i][0] = v;
+      want[i][1] = want[i][2] = 0.0f;
+      want[i][3] = 1.0f;
+   }
+}
+
+/* Depth reads back in red only; the other channels aren't defined. */
+static void fill_d16(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const uint16_t v = (uint16_t)(i * 1000 + 17);
+      memcpy(d + i * 2, &v, 2);
+      want[i][0] = v / 65535.0f;
+   }
+}
+
+/* D24's depth aspect copies as 32-bit words with the depth in the low 24 bits. */
+static void fill_d24(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const uint32_t v = (uint32_t)i * 250000u + 99u;
+      memcpy(d + i * 4, &v, 4);
+      want[i][0] = v / 16777215.0f;
+   }
+}
+
+static void fill_d32f(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const float v = i / 64.0f + 0.001f;
+      memcpy(d + i * 4, &v, 4);
+      want[i][0] = v;
+   }
+}
+
+/* Block-compressed textures: 2x2 blocks of 4x4 texels, each block with its own endpoints and code
+ * pattern, so that both modes of each block type are covered. */
+static const uint16_t bc1_colors[4][2] = {
+   {0xf800, 0x001f}, {0x001f, 0xf800}, {0xffff, 0x07e0}, {0x8408, 0x279c}};
+static const uint8_t bc4_ends[4][2] = {{255, 0}, {0, 255}, {200, 40}, {40, 200}};
+
+static unsigned bc1_code(int b, int t)
+{
+   const unsigned codes[4] = {t % 4, 3 - t % 4, (t / 4) % 4, (t * 3) % 4};
+   return codes[b];
+}
+
+static unsigned bc4_code(int b, int t)
+{
+   const unsigned codes[4] = {t % 8, (t + 3) % 8, (t * 3) % 8, 7 - t % 8};
+   return codes[b];
+}
+
+static unsigned bc2_alpha(int b, int t) { return (t + 5 * b) % 16; }
+
+static void rgb565(uint16_t c, float rgb[3])
+{
+   const unsigned r = c >> 11, g = (c >> 5) & 63, b = c & 31;
+   rgb[0] = ((r << 3) | (r >> 2)) / 255.0f;
+   rgb[1] = ((g << 2) | (g >> 4)) / 255.0f;
+   rgb[2] = ((b << 3) | (b >> 2)) / 255.0f;
+}
+
+/* A BC1 color block: two RGB565 endpoints and a 2-bit code per texel. */
+static void put_bc1(uint8_t *d, int b)
+{
+   uint32_t bits = 0;
+   for (int t = 0; t < 16; t++)
+      bits |= bc1_code(b, t) << (2 * t);
+   d[0] = bc1_colors[b][0] & 0xff, d[1] = bc1_colors[b][0] >> 8;
+   d[2] = bc1_colors[b][1] & 0xff, d[3] = bc1_colors[b][1] >> 8;
+   memcpy(d + 4, &bits, 4);
+}
+
+/* What texel t of BC1 color block b reads as. BC1 has a three-color mode, with transparent black,
+ * when the first endpoint isn't the larger one; BC2 and BC3 always use four colors. */
+static void bc1_texel(int b, int t, bool always_four, float out[4])
+{
+   float e0[3], e1[3];
+   rgb565(bc1_colors[b][0], e0);
+   rgb565(bc1_colors[b][1], e1);
+   const bool four = always_four || bc1_colors[b][0] > bc1_colors[b][1];
+   const unsigned code = bc1_code(b, t);
+   for (int k = 0; k < 3; k++) {
+      if (code < 2)
+         out[k] = code ? e1[k] : e0[k];
+      else if (four)
+         out[k] = code == 2 ? (2 * e0[k] + e1[k]) / 3 : (e0[k] + 2 * e1[k]) / 3;
+      else
+         out[k] = code == 2 ? (e0[k] + e1[k]) / 2 : 0.0f;
+   }
+   out[3] = !four && code == 3 ? 0.0f : 1.0f;
+}
+
+/* A BC4 block (also BC3's alpha and each half of BC5): two 8-bit endpoints and a 3-bit code per
+ * texel. Block b uses endpoint pair e. */
+static void put_bc4(uint8_t *d, int b, int e)
+{
+   uint64_t bits = 0;
+   for (int t = 0; t < 16; t++)
+      bits |= (uint64_t)bc4_code(b, t) << (3 * t);
+   d[0] = bc4_ends[e][0], d[1] = bc4_ends[e][1];
+   for (int k = 0; k < 6; k++)
+      d[2 + k] = (uint8_t)(bits >> (8 * k));
+}
+
+static float bc4_texel(int b, int e, int t)
+{
+   const unsigned code = bc4_code(b, t), e0 = bc4_ends[e][0], e1 = bc4_ends[e][1];
+   if (code < 2)
+      return (code ? e1 : e0) / 255.0f;
+   if (e0 > e1)
+      return ((8 - code) * e0 + (code - 1) * e1) / (7 * 255.0f);
+   if (code >= 6)
+      return code == 6 ? 0.0f : 1.0f;
+   return ((6 - code) * e0 + (code - 1) * e1) / (5 * 255.0f);
+}
+
+enum bc_kind { BC1, BC2, BC3, BC4, BC5 };
+
+static void fill_bc(uint8_t *d, float want[64][4], enum bc_kind kind)
+{
+   const unsigned size = kind == BC1 || kind == BC4 ? 8 : 16;
+   for (int b = 0; b < 4; b++) {
+      uint8_t *blk = d + b * size;
+      if (kind == BC2)
+         for (int t = 0; t < 16; t += 2)
+            blk[t / 2] = (uint8_t)(bc2_alpha(b, t) | bc2_alpha(b, t + 1) << 4);
+      if (kind == BC3 || kind == BC4 || kind == BC5)
+         put_bc4(blk, b, b);
+      if (kind == BC5)
+         put_bc4(blk + 8, (b + 1) % 4, (b + 1) % 4);
+      if (kind == BC1)
+         put_bc1(blk, b);
+      else if (kind == BC2 || kind == BC3)
+         put_bc1(blk + 8, b);
+   }
+   for (int i = 0; i < 64; i++) {
+      const int x = i % 8, y = i / 8, b = (y / 4) * 2 + x / 4, t = (y % 4) * 4 + x % 4;
+      float *w = want[i];
+      if (kind <= BC3)
+         bc1_texel(b, t, kind != BC1, w);
+      if (kind == BC2)
+         w[3] = bc2_alpha(b, t) / 15.0f;
+      if (kind == BC3)
+         w[3] = bc4_texel(b, b, t);
+      if (kind >= BC4) {
+         w[0] = bc4_texel(b, b, t);
+         w[1] = kind == BC5 ? bc4_texel((b + 1) % 4, (b + 1) % 4, t) : 0.0f;
+         w[2] = 0.0f;
+         w[3] = 1.0f;
+      }
+   }
+}
+
+static void fill_bc1(uint8_t *d, float want[64][4]) { fill_bc(d, want, BC1); }
+static void fill_bc2(uint8_t *d, float want[64][4]) { fill_bc(d, want, BC2); }
+static void fill_bc3(uint8_t *d, float want[64][4]) { fill_bc(d, want, BC3); }
+static void fill_bc4(uint8_t *d, float want[64][4]) { fill_bc(d, want, BC4); }
+static void fill_bc5(uint8_t *d, float want[64][4]) { fill_bc(d, want, BC5); }
+
+static void put_bits(uint8_t *d, unsigned *pos, uint32_t v, unsigned n)
+{
+   for (unsigned k = 0; k < n; k++, (*pos)++)
+      if (v >> k & 1)
+         d[*pos / 8] |= (uint8_t)(1u << (*pos % 8));
+}
+
+/* BC7 in mode 6: one subset, RGBA endpoints of 7 bits plus a p-bit each, and a 4-bit index per
+ * texel (3 bits for the first). Texel t gets index t, so every weight is used. */
+static void fill_bc7(uint8_t *d, float want[64][4])
+{
+   static const uint8_t ends[4][2][4] = {
+      {{0, 64, 128, 254}, {255, 191, 127, 1}},
+      {{17, 33, 99, 255}, {200, 10, 60, 0}},
+      {{255, 255, 255, 255}, {1, 1, 1, 1}},
+      {{120, 40, 200, 100}, {121, 41, 201, 101}},
+   };
+   static const uint8_t weights[16] = {0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64};
+   memset(d, 0, 64);
+   for (int b = 0; b < 4; b++) {
+      uint8_t *blk = d + b * 16;
+      unsigned pos = 0;
+      put_bits(blk, &pos, 1u << 6, 7);
+      for (int c = 0; c < 4; c++) {
+         put_bits(blk, &pos, ends[b][0][c] >> 1, 7);
+         put_bits(blk, &pos, ends[b][1][c] >> 1, 7);
+      }
+      put_bits(blk, &pos, ends[b][0][0] & 1, 1);
+      put_bits(blk, &pos, ends[b][1][0] & 1, 1);
+      for (unsigned t = 0; t < 16; t++)
+         put_bits(blk, &pos, t, t ? 4 : 3);
+   }
+   for (int i = 0; i < 64; i++) {
+      const int x = i % 8, y = i / 8, b = (y / 4) * 2 + x / 4, t = (y % 4) * 4 + x % 4;
+      for (int c = 0; c < 4; c++)
+         want[i][c] =
+            (((64 - weights[t]) * ends[b][0][c] + weights[t] * ends[b][1][c] + 32) >> 6) / 255.0f;
+   }
+}
+
+static const struct texture_format {
+   const char *name;
+   VkFormat format;
+   VkImageAspectFlags aspect;
+   int channels;    /* channels checked */
+   float tolerance; /* absolute up to 1, relative above */
+   texel_fill_fn fill;
+} texture_formats[] = {
+   {"RGBA8", VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.006f, fill_rgba8_unorm},
+   {"BGRA8", VK_FORMAT_B8G8R8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.006f, fill_bgra8_unorm},
+   {"RGBA8_SRGB", VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.006f, fill_rgba8_srgb},
+   {"RGBA16F", VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.002f, fill_rgba16f},
+   {"R11G11B10F", VK_FORMAT_B10G11R11_UFLOAT_PACK32, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.002f,
+    fill_r11g11b10f},
+   {"RGB10A2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.002f,
+    fill_rgb10a2},
+   {"R32F", VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 1e-5f, fill_r32f},
+   {"D16", VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 0.0002f, fill_d16},
+   {"D24S8", VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d24},
+   {"D32F", VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d32f},
+   {"D32FS8", VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d32f},
+   {"BC1", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.01f, fill_bc1},
+   {"BC2", VK_FORMAT_BC2_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.01f, fill_bc2},
+   {"BC3", VK_FORMAT_BC3_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.01f, fill_bc3},
+   {"BC4", VK_FORMAT_BC4_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.01f, fill_bc4},
+   /* RADV on Xclipse re-encodes BC5 as EAC RG11 and BC7 as BC3 for the texture unit
+    * (radv_bc_emulation_format), losing a few steps of 255 on BC5 and tens on BC7 by design. */
+   {"BC5", VK_FORMAT_BC5_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.04f, fill_bc5},
+   {"BC7", VK_FORMAT_BC7_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.2f, fill_bc7},
+};
+
+static bool texel_close(const float *got, const float *want, int channels, float tolerance)
+{
+   for (int c = 0; c < channels; c++) {
+      const float scale = fabsf(want[c]) > 1.0f ? fabsf(want[c]) : 1.0f;
+      if (!(fabsf(got[c] - want[c]) <= tolerance * scale)) /* NaN, from a texel never written, fails */
+         return false;
+   }
+   return true;
+}
+
+/* 64 RGBA texels, with null for what isn't a number. */
+static void jtexels(const char *k, const float (*v)[4])
+{
+   jopen(k, '[');
+   for (int i = 0; i < 64; i++) {
+      for (int c = 0; c < 4; c++) {
+         if (isfinite(v[i][c])) {
+            jnum(NULL, v[i][c]);
+         } else {
+            jkey(NULL);
+            fputs("null", stdout);
+         }
+      }
+   }
+   jclose();
+}
+
+/* Uploads an 8x8 texture in each format both drivers list as sampled, reads every texel back in a
+ * compute shader, exactly and through a linear filter where the format has one, and compares
+ * with the values the uploads encode. */
+static void run_textures(void)
+{
+   enum { N = 64 };
+   jbool("has_bc", has_bc);
+   struct buffer upload = make_buffer(N * 16, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, true);
+   struct buffer out =
+      make_buffer(2 * N * sizeof(float[4]), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+
+   VkSamplerCreateInfo sci = {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .magFilter = VK_FILTER_LINEAR,
+      .minFilter = VK_FILTER_LINEAR,
+      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+      .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+   };
+   VkSampler linear, nearest;
+   VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &linear));
+   sci.magFilter = sci.minFilter = VK_FILTER_NEAREST;
+   VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &nearest));
+
+   const VkDescriptorSetLayoutBinding bindings[2] = {
+      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+   };
+   VkDescriptorSetLayoutCreateInfo dslci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = 2,
+      .pBindings = bindings,
+   };
+   VkDescriptorSetLayout dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl));
+   VkPipelineLayoutCreateInfo plci = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &dsl,
+   };
+   VkPipelineLayout layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &plci, NULL, &layout));
+   VkShaderModule module = make_shader(sample_comp, sizeof(sample_comp));
+   VkComputePipelineCreateInfo cpci = {
+      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+      .stage =
+         {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = module,
+            .pName = "main",
+         },
+      .layout = layout,
+   };
+   VkPipeline pipeline;
+   VKCHECK("vkCreateComputePipelines",
+           vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &pipeline));
+   const VkDescriptorPoolSize pool_sizes[2] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+                                               {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+   VkDescriptorPoolCreateInfo dpci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .maxSets = 1,
+      .poolSizeCount = 2,
+      .pPoolSizes = pool_sizes,
+   };
+   VkDescriptorPool dpool;
+   VKCHECK("vkCreateDescriptorPool", vkCreateDescriptorPool(dev, &dpci, NULL, &dpool));
+   VkDescriptorSetAllocateInfo dsai = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .descriptorPool = dpool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &dsl,
+   };
+   VkDescriptorSet set;
+   VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, &set));
+
+   char wrong[400] = "";
+   jopen("formats", '[');
+   for (size_t f = 0; f < sizeof(texture_formats) / sizeof(texture_formats[0]); f++) {
+      const struct texture_format *tf = &texture_formats[f];
+      VkFormatProperties fp;
+      vkGetPhysicalDeviceFormatProperties(pdev, tf->format, &fp);
+      const VkFormatFeatureFlags need =
+         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+      const bool supported = (fp.optimalTilingFeatures & need) == need;
+      const bool filters =
+         fp.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+      jopen(NULL, '{');
+      jstr("format", tf->name);
+      jhex("features", fp.optimalTilingFeatures);
+      jbool("supported", supported);
+      if (!supported) {
+         jclose();
+         continue;
+      }
+
+      VkImageCreateInfo ici = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+         .imageType = VK_IMAGE_TYPE_2D,
+         .format = tf->format,
+         .extent = {8, 8, 1},
+         .mipLevels = 1,
+         .arrayLayers = 1,
+         .samples = VK_SAMPLE_COUNT_1_BIT,
+         .tiling = VK_IMAGE_TILING_OPTIMAL,
+         .usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      };
+      VkImage image;
+      VKCHECK("vkCreateImage", vkCreateImage(dev, &ici, NULL, &image));
+      VkMemoryRequirements req;
+      vkGetImageMemoryRequirements(dev, image, &req);
+      VkDeviceMemory mem = alloc_memory(req, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      VKCHECK("vkBindImageMemory", vkBindImageMemory(dev, image, mem, 0));
+      const bool stencil = tf->format == VK_FORMAT_D24_UNORM_S8_UINT ||
+                           tf->format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+      const VkImageSubresourceRange all = {
+         tf->aspect | (stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0), 0, 1, 0, 1};
+      VkImageViewCreateInfo vci = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+         .image = image,
+         .viewType = VK_IMAGE_VIEW_TYPE_2D,
+         .format = tf->format,
+         .subresourceRange = {tf->aspect, 0, 1, 0, 1},
+      };
+      VkImageView view;
+      VKCHECK("vkCreateImageView", vkCreateImageView(dev, &vci, NULL, &view));
+
+      float want[N][4] = {{0}};
+      memset(upload.map, 0, N * 16);
+      tf->fill(upload.map, want);
+      memset(out.map, 0xff, 2 * N * sizeof(float[4])); /* NaN */
+
+      VkDescriptorImageInfo image_info = {filters ? linear : nearest, view,
+                                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+      VkDescriptorBufferInfo buffer_info = {out.buf, 0, VK_WHOLE_SIZE};
+      const VkWriteDescriptorSet writes[2] = {
+         {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = set,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .pImageInfo = &image_info,
+         },
+         {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = set,
+            .dstBinding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .pBufferInfo = &buffer_info,
+         },
+      };
+      vkUpdateDescriptorSets(dev, 2, writes, 0, NULL);
+
+      VkCommandBuffer cb = begin_cmd();
+      VkImageMemoryBarrier barrier = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+         .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .image = image,
+         .subresourceRange = all,
+      };
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                           0, NULL, 0, NULL, 1, &barrier);
+      const VkBufferImageCopy region = {
+         .imageSubresource = {tf->aspect, 0, 0, 1},
+         .imageExtent = {8, 8, 1},
+      };
+      vkCmdCopyBufferToImage(cb, upload.buf, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                             &region);
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+      barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                           0, 0, NULL, 0, NULL, 1, &barrier);
+      vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+      vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &set, 0, NULL);
+      vkCmdDispatch(cb, 1, 1, 1);
+      VkMemoryBarrier to_host = {
+         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+         .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+      };
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0,
+                           1, &to_host, 0, NULL, 0, NULL);
+      VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+      char what[64];
+      snprintf(what, sizeof(what), "sampling %s", tf->name);
+      submit_and_wait(cb, what);
+
+      /* fetched[64], then filtered[64]. The filtered sample sits halfway between a texel and its
+       * right and lower neighbors (clamped at the edges), so it reads as the four's average. */
+      const float(*got)[4] = out.map;
+      int fetch_bad = 0, filter_bad = 0;
+      char first[200] = "";
+      for (int i = 0; i < N; i++) {
+         const int x = i % 8, y = i / 8, x1 = x < 7 ? x + 1 : 7, y1 = y < 7 ? y + 1 : 7;
+         float avg[4];
+         for (int c = 0; c < 4; c++)
+            avg[c] = (want[i][c] + want[y * 8 + x1][c] + want[y1 * 8 + x][c] +
+                      want[y1 * 8 + x1][c]) / 4;
+         const bool fetch_ok = texel_close(got[i], want[i], tf->channels, tf->tolerance);
+         const bool filter_ok =
+            !filters || texel_close(got[N + i], avg, tf->channels, tf->tolerance);
+         const float *g = fetch_ok ? got[N + i] : got[i], *w = fetch_ok ? avg : want[i];
+         if ((!fetch_ok || !filter_ok) && !first[0])
+            snprintf(first, sizeof(first), "%s at (%d,%d): got (%g, %g, %g, %g), want (%g, %g, %g, %g)",
+                     fetch_ok ? "filtered" : "fetched", x, y, g[0], g[1], g[2], g[3], w[0], w[1],
+                     w[2], w[3]);
+         fetch_bad += !fetch_ok;
+         filter_bad += !filter_ok;
+      }
+      jint("fetch_wrong", fetch_bad);
+      if (filters)
+         jint("filter_wrong", filter_bad);
+      if (first[0]) {
+         jstr("first_wrong", first);
+         jtexels("fetched", got);
+         jtexels("want", (const float(*)[4])want);
+         add_problem(wrong, sizeof(wrong), "%s %d fetched/%d filtered", tf->name, fetch_bad,
+                     filter_bad);
+      }
+      jclose();
+      vkDestroyImageView(dev, view, NULL);
+      vkDestroyImage(dev, image, NULL);
+      vkFreeMemory(dev, mem, NULL);
+   }
+   jclose();
+   if (wrong[0])
+      finish("fail", "wrong texels: %s", wrong);
+
+   vkDestroyDescriptorPool(dev, dpool, NULL);
+   vkDestroyPipeline(dev, pipeline, NULL);
+   vkDestroyShaderModule(dev, module, NULL);
+   vkDestroyPipelineLayout(dev, layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
+   vkDestroySampler(dev, nearest, NULL);
+   vkDestroySampler(dev, linear, NULL);
+   free_buffer(&out);
+   free_buffer(&upload);
+}
+
+/* ---- mrt: eight render targets at once, with clears and additive blending, as deferred
+ * renderers use them ---- */
+
+enum mrt_kind { MRT_UNORM8, MRT_SRGB8, MRT_UNORM10_2, MRT_FLOAT };
+
+static const struct mrt_format {
+   const char *name;
+   VkFormat format;
+   int channels; /* stored; the others sample as 0, and alpha as 1 */
+   enum mrt_kind kind;
+   float tolerance; /* absolute up to 1, relative above */
+} mrt_formats[8] = {
+   {"RGBA8", VK_FORMAT_R8G8B8A8_UNORM, 4, MRT_UNORM8, 0.006f},
+   {"RGBA16F", VK_FORMAT_R16G16B16A16_SFLOAT, 4, MRT_FLOAT, 0.002f},
+   {"RGB10A2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, 4, MRT_UNORM10_2, 0.003f},
+   {"R11G11B10F", VK_FORMAT_B10G11R11_UFLOAT_PACK32, 3, MRT_FLOAT, 0.035f},
+   {"RG16F", VK_FORMAT_R16G16_SFLOAT, 2, MRT_FLOAT, 0.002f},
+   {"R32F", VK_FORMAT_R32_SFLOAT, 1, MRT_FLOAT, 1e-5f},
+   {"BGRA8", VK_FORMAT_B8G8R8A8_UNORM, 4, MRT_UNORM8, 0.006f},
+   /* The hardware's sRGB encode can land one 8-bit step off exact rounding, which is up to 0.009
+    * in linear near 1. */
+   {"RGBA8_SRGB", VK_FORMAT_R8G8B8A8_SRGB, 4, MRT_SRGB8, 0.01f},
+};
+
+static float linear_to_srgb(float c)
+{
+   return c <= 0.0031308f ? c * 12.92f : 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+}
+
+/* What channel i of a target in this format keeps of a written v. Float formats round within the
+ * tolerance. */
+static float mrt_store(enum mrt_kind kind, int i, float v)
+{
+   const float c = v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v;
+   switch (kind) {
+   case MRT_UNORM8:
+      return roundf(c * 255.0f) / 255.0f;
+   case MRT_SRGB8:
+      return i == 3 ? roundf(c * 255.0f) / 255.0f
+                    : srgb_to_linear(roundf(linear_to_srgb(c) * 255.0f) / 255.0f);
+   case MRT_UNORM10_2:
+      return i == 3 ? roundf(c * 3.0f) / 3.0f : roundf(c * 1023.0f) / 1023.0f;
+   default:
+      return v;
+   }
+}
+
+/* The clear, the first pass (mrt.frag) over the top half, and the second (mrt_add.frag, added
+ * with blending) over the right half, as the host works them out. */
+static void mrt_clear(int k, float c[4])
+{
+   c[0] = k / 8.0f, c[1] = 1.0f - k / 8.0f, c[2] = 0.375f, c[3] = 0.75f;
+}
+
+static void mrt_expected(int k, int x, int y, float want[4])
+{
+   const struct mrt_format *f = &mrt_formats[k];
+   const float add[3] = {(k + 1) / 16.0f, (8 - k) / 32.0f, 0.0625f};
+   float clear[4];
+   mrt_clear(k, clear);
+   for (int i = 0; i < 4; i++) {
+      if (i >= f->channels) {
+         want[i] = i == 3 ? 1.0f : 0.0f;
+         continue;
+      }
+      float v = y < 128 ? ((x * (k + 1) + y * (2 * k + 3) + 40 * i) & 255) / 255.0f : clear[i];
+      v = mrt_store(f->kind, i, v);
+      if (x >= 128 && i < 3)
+         v = mrt_store(f->kind, i, v + add[i]);
+      want[i] = v;
+   }
+}
+
+/* A pipeline drawing screen.vert's triangle into n attachments, either writing them or adding
+ * to their colors (alpha kept). */
+static VkPipeline make_mrt_pipeline(VkShaderModule vs, VkShaderModule fs, const VkFormat *formats,
+                                    uint32_t n, bool add, VkPipelineLayout layout)
+{
+   const VkPipelineShaderStageCreateInfo stages[2] = {
+      {
+         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+         .stage = VK_SHADER_STAGE_VERTEX_BIT,
+         .module = vs,
+         .pName = "main",
+      },
+      {
+         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+         .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+         .module = fs,
+         .pName = "main",
+      },
+   };
+   VkPipelineVertexInputStateCreateInfo vertex_input = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+   };
+   VkPipelineInputAssemblyStateCreateInfo input_assembly = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+   };
+   VkPipelineViewportStateCreateInfo viewport_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .viewportCount = 1,
+      .scissorCount = 1,
+   };
+   VkPipelineRasterizationStateCreateInfo raster = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_NONE,
+      .lineWidth = 1.0f,
+   };
+   VkPipelineMultisampleStateCreateInfo multisample = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+   };
+   VkPipelineColorBlendAttachmentState attachments[8];
+   for (uint32_t k = 0; k < n; k++) {
+      attachments[k] = (VkPipelineColorBlendAttachmentState){
+         .blendEnable = add,
+         .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+         .dstColorBlendFactor = VK_BLEND_FACTOR_ONE,
+         .colorBlendOp = VK_BLEND_OP_ADD,
+         .srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+         .dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+         .alphaBlendOp = VK_BLEND_OP_ADD,
+         .colorWriteMask = 0xf,
+      };
+   }
+   VkPipelineColorBlendStateCreateInfo blend_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+      .attachmentCount = n,
+      .pAttachments = attachments,
+   };
+   const VkDynamicState dynamic_states[2] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+   VkPipelineDynamicStateCreateInfo dynamic = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+      .dynamicStateCount = 2,
+      .pDynamicStates = dynamic_states,
+   };
+   VkPipelineRenderingCreateInfo rendering_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+      .colorAttachmentCount = n,
+      .pColorAttachmentFormats = formats,
+   };
+   VkGraphicsPipelineCreateInfo gpci = {
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = &rendering_info,
+      .stageCount = 2,
+      .pStages = stages,
+      .pVertexInputState = &vertex_input,
+      .pInputAssemblyState = &input_assembly,
+      .pViewportState = &viewport_state,
+      .pRasterizationState = &raster,
+      .pMultisampleState = &multisample,
+      .pColorBlendState = &blend_state,
+      .pDynamicState = &dynamic,
+      .layout = layout,
+   };
+   VkPipeline pipeline;
+   VKCHECK("vkCreateGraphicsPipelines",
+           vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline));
+   return pipeline;
+}
+
+/* Clears 8 256x256 targets of the formats D3D11 games render to, writes all 8 at once over the
+ * top half, adds to them with blending over the right half, and samples them back in a compute
+ * shader, as a deferred renderer reads its G-buffer. */
+static void run_mrt(void)
+{
+   enum { W = 256, H = 256, N = 8, GRID = 64 };
+   const uint32_t n = props.limits.maxColorAttachments < N ? props.limits.maxColorAttachments : N;
+   jint("attachments", n);
+   VkFormat formats[N];
+   VkImage images[N];
+   VkDeviceMemory mems[N];
+   VkImageView views[N];
+   for (uint32_t k = 0; k < n; k++) {
+      const struct mrt_format *f = &mrt_formats[k];
+      VkFormatProperties fp;
+      vkGetPhysicalDeviceFormatProperties(pdev, f->format, &fp);
+      const VkFormatFeatureFlags need = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT |
+                                        VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT |
+                                        VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
+      if ((fp.optimalTilingFeatures & need) != need)
+         finish("fail", "%s isn't a blendable, sampleable color attachment (features 0x%x)",
+                f->name, fp.optimalTilingFeatures);
+      formats[k] = f->format;
+      VkImageCreateInfo ici = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+         .imageType = VK_IMAGE_TYPE_2D,
+         .format = f->format,
+         .extent = {W, H, 1},
+         .mipLevels = 1,
+         .arrayLayers = 1,
+         .samples = VK_SAMPLE_COUNT_1_BIT,
+         .tiling = VK_IMAGE_TILING_OPTIMAL,
+         .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      };
+      VKCHECK("vkCreateImage", vkCreateImage(dev, &ici, NULL, &images[k]));
+      VkMemoryRequirements req;
+      vkGetImageMemoryRequirements(dev, images[k], &req);
+      mems[k] = alloc_memory(req, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+      VKCHECK("vkBindImageMemory", vkBindImageMemory(dev, images[k], mems[k], 0));
+      VkImageViewCreateInfo vci = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+         .image = images[k],
+         .viewType = VK_IMAGE_VIEW_TYPE_2D,
+         .format = f->format,
+         .subresourceRange = color_range,
+      };
+      VKCHECK("vkCreateImageView", vkCreateImageView(dev, &vci, NULL, &views[k]));
+   }
+
+   step("creating pipelines");
+   VkPipelineLayoutCreateInfo empty_plci = {.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+   VkPipelineLayout draw_layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &empty_plci, NULL, &draw_layout));
+   VkShaderModule vs = make_shader(screen_vert, sizeof(screen_vert));
+   VkShaderModule fs_write = make_shader(mrt_frag, sizeof(mrt_frag));
+   VkShaderModule fs_add = make_shader(mrt_add_frag, sizeof(mrt_add_frag));
+   VkPipeline write_pipe = make_mrt_pipeline(vs, fs_write, formats, n, false, draw_layout);
+   VkPipeline add_pipe = make_mrt_pipeline(vs, fs_add, formats, n, true, draw_layout);
+
+   VkSamplerCreateInfo sci = {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+   };
+   VkSampler sampler;
+   VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &sampler));
+   const VkDescriptorSetLayoutBinding bindings[2] = {
+      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, N, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+   };
+   VkDescriptorSetLayoutCreateInfo dslci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = 2,
+      .pBindings = bindings,
+   };
+   VkDescriptorSetLayout dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl));
+   VkPipelineLayoutCreateInfo plci = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &dsl,
+   };
+   VkPipelineLayout read_layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &plci, NULL, &read_layout));
+   VkShaderModule cs = make_shader(mrt_read_comp, sizeof(mrt_read_comp));
+   VkComputePipelineCreateInfo cpci = {
+      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+      .stage =
+         {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = cs,
+            .pName = "main",
+         },
+      .layout = read_layout,
+   };
+   VkPipeline read_pipe;
+   VKCHECK("vkCreateComputePipelines",
+           vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &read_pipe));
+   const VkDescriptorPoolSize pool_sizes[2] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, N},
+                                               {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+   VkDescriptorPoolCreateInfo dpci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .maxSets = 1,
+      .poolSizeCount = 2,
+      .pPoolSizes = pool_sizes,
+   };
+   VkDescriptorPool dpool;
+   VKCHECK("vkCreateDescriptorPool", vkCreateDescriptorPool(dev, &dpci, NULL, &dpool));
+   VkDescriptorSetAllocateInfo dsai = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .descriptorPool = dpool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &dsl,
+   };
+   VkDescriptorSet set;
+   VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, &set));
+   struct buffer out =
+      make_buffer(N * GRID * GRID * sizeof(float[4]), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+   memset(out.map, 0xff, N * GRID * GRID * sizeof(float[4])); /* NaN */
+   VkDescriptorImageInfo image_infos[N];
+   for (uint32_t k = 0; k < N; k++) /* targets past the device's limit read target 0 */
+      image_infos[k] = (VkDescriptorImageInfo){sampler, views[k < n ? k : 0],
+                                               VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+   VkDescriptorBufferInfo buffer_info = {out.buf, 0, VK_WHOLE_SIZE};
+   const VkWriteDescriptorSet writes[2] = {
+      {
+         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+         .dstSet = set,
+         .dstBinding = 0,
+         .descriptorCount = N,
+         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+         .pImageInfo = image_infos,
+      },
+      {
+         .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+         .dstSet = set,
+         .dstBinding = 1,
+         .descriptorCount = 1,
+         .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+         .pBufferInfo = &buffer_info,
+      },
+   };
+   vkUpdateDescriptorSets(dev, 2, writes, 0, NULL);
+
+   VkCommandBuffer cb = begin_cmd();
+   VkImageMemoryBarrier barriers[N];
+   VkRenderingAttachmentInfo color[N];
+   for (uint32_t k = 0; k < n; k++) {
+      barriers[k] = (VkImageMemoryBarrier){
+         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+         .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .image = images[k],
+         .subresourceRange = color_range,
+      };
+      color[k] = (VkRenderingAttachmentInfo){
+         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+         .imageView = views[k],
+         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      };
+      mrt_clear(k, color[k].clearValue.color.float32);
+   }
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, n,
+                        barriers);
+   VkRenderingInfo ri = {
+      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      .renderArea = {{0, 0}, {W, H}},
+      .layerCount = 1,
+      .colorAttachmentCount = n,
+      .pColorAttachments = color,
+   };
+   vkCmdBeginRendering(cb, &ri);
+   const VkViewport viewport = {0.0f, 0.0f, W, H, 0.0f, 1.0f};
+   vkCmdSetViewport(cb, 0, 1, &viewport);
+   const VkRect2D top = {{0, 0}, {W, H / 2}}, right = {{W / 2, 0}, {W / 2, H}};
+   vkCmdSetScissor(cb, 0, 1, &top);
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, write_pipe);
+   vkCmdDraw(cb, 3, 1, 0, 0);
+   vkCmdSetScissor(cb, 0, 1, &right);
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, add_pipe);
+   vkCmdDraw(cb, 3, 1, 0, 0);
+   vkCmdEndRendering(cb);
+   for (uint32_t k = 0; k < n; k++) {
+      barriers[k].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      barriers[k].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      barriers[k].oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      barriers[k].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+   }
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, n, barriers);
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, read_pipe);
+   vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, read_layout, 0, 1, &set, 0, NULL);
+   vkCmdDispatch(cb, GRID / 8, GRID / 8, 1);
+   VkMemoryBarrier to_host = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+      .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1,
+                        &to_host, 0, NULL, 0, NULL);
+   VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+   jnum("ms_gpu", submit_and_wait(cb, "mrt"));
+
+   /* Regions: drawn (top left), drawn and added to (top right), cleared (bottom left), cleared
+    * and added to (bottom right). */
+   static const char *region_names[4] = {"drawn", "drawn_added", "cleared", "cleared_added"};
+   const float(*got)[4] = out.map;
+   char wrong[400] = "";
+   jopen("targets", '[');
+   for (uint32_t k = 0; k < n; k++) {
+      const struct mrt_format *f = &mrt_formats[k];
+      int bad[4] = {0};
+      char first[4][160] = {""};
+      for (int gy = 0; gy < GRID; gy++) {
+         for (int gx = 0; gx < GRID; gx++) {
+            const int x = gx * 4 + 1, y = gy * 4 + 2, r = (y >= H / 2) * 2 + (x >= W / 2);
+            const float *g = got[(k * GRID + gy) * GRID + gx];
+            float want[4];
+            mrt_expected(k, x, y, want);
+            if (texel_close(g, want, 4, f->tolerance))
+               continue;
+            if (!bad[r]++)
+               snprintf(first[r], sizeof(first[r]),
+                        "(%d,%d): got (%g, %g, %g, %g), want (%g, %g, %g, %g)", x, y, g[0], g[1],
+                        g[2], g[3], want[0], want[1], want[2], want[3]);
+         }
+      }
+      jopen(NULL, '{');
+      jstr("format", f->name);
+      for (int r = 0; r < 4; r++) {
+         char key[40];
+         snprintf(key, sizeof(key), "wrong_%s", region_names[r]);
+         jint(key, bad[r]);
+         if (bad[r]) {
+            snprintf(key, sizeof(key), "first_wrong_%s", region_names[r]);
+            jstr(key, first[r]);
+         }
+      }
+      jclose();
+      if (bad[0] + bad[1] + bad[2] + bad[3])
+         add_problem(wrong, sizeof(wrong), "target %u %s %d/%d/%d/%d", k, f->name, bad[0], bad[1],
+                     bad[2], bad[3]);
+   }
+   jclose();
+   if (wrong[0])
+      finish("fail", "wrong texels (drawn/drawn+added/cleared/cleared+added): %s", wrong);
+
+   free_buffer(&out);
+   vkDestroyDescriptorPool(dev, dpool, NULL);
+   vkDestroyPipeline(dev, read_pipe, NULL);
+   vkDestroyShaderModule(dev, cs, NULL);
+   vkDestroyPipelineLayout(dev, read_layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
+   vkDestroySampler(dev, sampler, NULL);
+   vkDestroyPipeline(dev, add_pipe, NULL);
+   vkDestroyPipeline(dev, write_pipe, NULL);
+   vkDestroyShaderModule(dev, fs_add, NULL);
+   vkDestroyShaderModule(dev, fs_write, NULL);
+   vkDestroyShaderModule(dev, vs, NULL);
+   vkDestroyPipelineLayout(dev, draw_layout, NULL);
+   for (uint32_t k = 0; k < n; k++) {
+      vkDestroyImageView(dev, views[k], NULL);
+      vkDestroyImage(dev, images[k], NULL);
+      vkFreeMemory(dev, mems[k], NULL);
+   }
+}
+
+/* ---- vertex: fetching vertex attributes in the formats D3D11 games use ---- */
+
+enum attr_kind {
+   ATTR_FLOAT, ATTR_HALF, ATTR_UNORM8, ATTR_SNORM8, ATTR_UINT8, ATTR_BGRA8,
+   ATTR_UNORM16, ATTR_SNORM16, ATTR_UINT16, ATTR_SINT16, ATTR_RGB10A2, ATTR_UINT32,
+};
+
+enum { VERTEX_ATTRIBUTES = 16, VERTEX_STRIDE = 96, VERTEX_COUNT = 64 };
+
+/* vertex.vert's inputs, interleaved in one binding, each at its natural alignment. */
+static const struct vertex_format {
+   const char *name;
+   VkFormat format;
+   enum attr_kind kind;
+   int channels;
+   uint32_t offset;
+} vertex_formats[VERTEX_ATTRIBUTES] = {
+   {"R32G32B32_SFLOAT", VK_FORMAT_R32G32B32_SFLOAT, ATTR_FLOAT, 3, 0},
+   {"R32G32_SFLOAT", VK_FORMAT_R32G32_SFLOAT, ATTR_FLOAT, 2, 12},
+   {"R16G16B16A16_SFLOAT", VK_FORMAT_R16G16B16A16_SFLOAT, ATTR_HALF, 4, 20},
+   {"R16G16_SFLOAT", VK_FORMAT_R16G16_SFLOAT, ATTR_HALF, 2, 28},
+   {"R8G8B8A8_UNORM", VK_FORMAT_R8G8B8A8_UNORM, ATTR_UNORM8, 4, 32},
+   {"R8G8B8A8_SNORM", VK_FORMAT_R8G8B8A8_SNORM, ATTR_SNORM8, 4, 36},
+   {"R8G8B8A8_UINT", VK_FORMAT_R8G8B8A8_UINT, ATTR_UINT8, 4, 40},
+   {"B8G8R8A8_UNORM", VK_FORMAT_B8G8R8A8_UNORM, ATTR_BGRA8, 4, 44},
+   {"R16G16B16A16_SNORM", VK_FORMAT_R16G16B16A16_SNORM, ATTR_SNORM16, 4, 48},
+   {"R16G16_SNORM", VK_FORMAT_R16G16_SNORM, ATTR_SNORM16, 2, 56},
+   {"R16G16_UNORM", VK_FORMAT_R16G16_UNORM, ATTR_UNORM16, 2, 60},
+   {"A2B10G10R10_UNORM", VK_FORMAT_A2B10G10R10_UNORM_PACK32, ATTR_RGB10A2, 4, 64},
+   {"R32_UINT", VK_FORMAT_R32_UINT, ATTR_UINT32, 1, 68},
+   {"R16G16B16A16_UINT", VK_FORMAT_R16G16B16A16_UINT, ATTR_UINT16, 4, 72},
+   {"R16G16B16A16_SINT", VK_FORMAT_R16G16B16A16_SINT, ATTR_SINT16, 4, 80},
+   {"R16G16B16A16_UNORM", VK_FORMAT_R16G16B16A16_UNORM, ATTR_UNORM16, 4, 88},
+};
+
+/* Writes attribute a of vertex v (counted across the whole buffer) at d, and works out what the
+ * shader reads: missing channels read as 0, and alpha as 1. Vertices 0 to 3 start with each
+ * format's edge values. */
+static void put_attribute(uint8_t *d, int v, int a, float want[4])
+{
+   static const uint8_t edge8[4] = {0x00, 0x7f, 0x80, 0xff};
+   static const uint16_t edge16[4] = {0x0000, 0x7fff, 0x8000, 0xffff};
+   const struct vertex_format *f = &vertex_formats[a];
+   want[0] = want[1] = want[2] = 0.0f, want[3] = 1.0f;
+   if (f->kind == ATTR_RGB10A2) {
+      const uint32_t r = (v * 37 + a) & 1023, g = (v * 211 + 5) & 1023, b = (v * 419 + 9) & 1023;
+      const uint32_t w = r | g << 10 | b << 20 | (uint32_t)(v & 3) << 30;
+      memcpy(d, &w, 4);
+      want[0] = r / 1023.0f, want[1] = g / 1023.0f, want[2] = b / 1023.0f, want[3] = (v & 3) / 3.0f;
+      return;
+   }
+   for (int j = 0; j < f->channels; j++) {
+      const unsigned h = v * 37 + a * 101 + j * 13 + 7;
+      const uint8_t b8 = v < 4 && j == 0 ? edge8[v] : h & 255;
+      const uint16_t b16 = v < 4 && j == 0 ? edge16[v] : (h * 40503u) & 0xffff;
+      switch (f->kind) {
+      case ATTR_FLOAT: {
+         const float x = (v - 40) * 0.25f + j * 64.0f + a * 1024.0f;
+         memcpy(d + 4 * j, &x, 4);
+         want[j] = x;
+         break;
+      }
+      case ATTR_HALF: {
+         const int k = (v * 4 + j * 5 + a * 3) % HALFS;
+         d[2 * j] = halfs[k].bits & 0xff;
+         d[2 * j + 1] = halfs[k].bits >> 8;
+         want[j] = halfs[k].value;
+         break;
+      }
+      case ATTR_UNORM8:
+         d[j] = b8, want[j] = b8 / 255.0f;
+         break;
+      case ATTR_SNORM8:
+         d[j] = b8, want[j] = fmaxf((int8_t)b8 / 127.0f, -1.0f);
+         break;
+      case ATTR_UINT8:
+         d[j] = b8, want[j] = b8;
+         break;
+      case ATTR_BGRA8: /* bytes B, G, R, A */
+         d[j] = b8, want[j == 3 ? 3 : 2 - j] = b8 / 255.0f;
+         break;
+      case ATTR_UINT32: {
+         const uint32_t u = v * 65537u + 17u; /* exact as a float */
+         memcpy(d, &u, 4);
+         want[j] = (float)u;
+         break;
+      }
+      default: /* 16 bits per channel */
+         d[2 * j] = b16 & 0xff;
+         d[2 * j + 1] = b16 >> 8;
+         want[j] = f->kind == ATTR_UNORM16  ? b16 / 65535.0f
+                   : f->kind == ATTR_SNORM16 ? fmaxf((int16_t)b16 / 32767.0f, -1.0f)
+                   : f->kind == ATTR_UINT16  ? (float)b16
+                                             : (float)(int16_t)b16;
+         break;
+      }
+   }
+}
+
+/* A pipeline that only runs vertex.vert, with vertex_formats in binding 0, rasterizing nothing. */
+static VkPipeline make_vertex_pipeline(VkShaderModule vs, VkPipelineLayout layout,
+                                       const VkDynamicState *dynamic_states, uint32_t dynamic_count)
+{
+   const VkVertexInputBindingDescription binding = {0, VERTEX_STRIDE, VK_VERTEX_INPUT_RATE_VERTEX};
+   VkVertexInputAttributeDescription attributes[VERTEX_ATTRIBUTES];
+   for (uint32_t a = 0; a < VERTEX_ATTRIBUTES; a++)
+      attributes[a] = (VkVertexInputAttributeDescription){a, 0, vertex_formats[a].format,
+                                                          vertex_formats[a].offset};
+   const VkPipelineShaderStageCreateInfo stage = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = vs,
+      .pName = "main",
+   };
+   VkPipelineVertexInputStateCreateInfo vertex_input = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .vertexBindingDescriptionCount = 1,
+      .pVertexBindingDescriptions = &binding,
+      .vertexAttributeDescriptionCount = VERTEX_ATTRIBUTES,
+      .pVertexAttributeDescriptions = attributes,
+   };
+   VkPipelineInputAssemblyStateCreateInfo input_assembly = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+      .topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST,
+   };
+   const VkViewport viewport = {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
+   const VkRect2D scissor = {{0, 0}, {1, 1}};
+   VkPipelineViewportStateCreateInfo viewport_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .viewportCount = 1,
+      .pViewports = &viewport,
+      .scissorCount = 1,
+      .pScissors = &scissor,
+   };
+   VkPipelineRasterizationStateCreateInfo raster = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .rasterizerDiscardEnable = VK_TRUE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_NONE,
+      .lineWidth = 1.0f,
+   };
+   VkPipelineMultisampleStateCreateInfo multisample = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+   };
+   VkPipelineColorBlendStateCreateInfo blend_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+   };
+   VkPipelineDynamicStateCreateInfo dynamic = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+      .dynamicStateCount = dynamic_count,
+      .pDynamicStates = dynamic_states,
+   };
+   VkPipelineRenderingCreateInfo rendering_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
+   };
+   VkGraphicsPipelineCreateInfo gpci = {
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = &rendering_info,
+      .stageCount = 1,
+      .pStages = &stage,
+      .pVertexInputState = &vertex_input,
+      .pInputAssemblyState = &input_assembly,
+      .pViewportState = &viewport_state,
+      .pRasterizationState = &raster,
+      .pMultisampleState = &multisample,
+      .pColorBlendState = &blend_state,
+      .pDynamicState = &dynamic,
+      .layout = layout,
+   };
+   VkPipeline pipeline;
+   VKCHECK("vkCreateGraphicsPipelines",
+           vkCreateGraphicsPipelines(dev, VK_NULL_HANDLE, 1, &gpci, NULL, &pipeline));
+   return pipeline;
+}
+
+/* Reads 16 attribute formats from an interleaved vertex buffer three ways: vertex input in the
+ * pipeline; the same with the stride set at bind time (DXVK sets strides that way); and all of it
+ * set at draw time with VK_EXT_vertex_input_dynamic_state, which RADV compiles into a separate
+ * vertex fetch prolog, as it does for DXVK's pipeline libraries. Each way draws its own instance
+ * from its own part of the buffer, and the vertex shader stores what it read. */
+static void run_vertex(void)
+{
+   enum { PATHS = 3, A = VERTEX_ATTRIBUTES, N = VERTEX_COUNT };
+   static const char *path_names[PATHS] = {"pipeline", "bind_stride", "dynamic"};
+   if (!has_vertex_stores)
+      finish("skip", "no vertexPipelineStoresAndAtomics");
+   jbool("vertex_input_dynamic_state", has_vertex_input_dynamic);
+   PFN_vkCmdSetVertexInputEXT vkCmdSetVertexInputEXT = NULL;
+   if (has_vertex_input_dynamic &&
+       !(vkCmdSetVertexInputEXT =
+            (PFN_vkCmdSetVertexInputEXT)vkGetDeviceProcAddr(dev, "vkCmdSetVertexInputEXT")))
+      finish("fail", "device function vkCmdSetVertexInputEXT missing");
+   const int paths = has_vertex_input_dynamic ? PATHS : PATHS - 1;
+   for (int a = 0; a < A; a++) {
+      VkFormatProperties fp;
+      vkGetPhysicalDeviceFormatProperties(pdev, vertex_formats[a].format, &fp);
+      if (!(fp.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT))
+         finish("fail", "%s isn't a vertex format (buffer features 0x%x)", vertex_formats[a].name,
+                fp.bufferFeatures);
+   }
+
+   struct buffer vb = make_buffer(PATHS * N * VERTEX_STRIDE, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, true);
+   struct buffer out =
+      make_buffer(PATHS * N * A * sizeof(float[4]), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+   memset(vb.map, 0, PATHS * N * VERTEX_STRIDE);
+   memset(out.map, 0xff, PATHS * N * A * sizeof(float[4])); /* NaN */
+   float(*want)[4] = malloc(PATHS * N * A * sizeof(float[4]));
+   for (int v = 0; v < PATHS * N; v++)
+      for (int a = 0; a < A; a++)
+         put_attribute((uint8_t *)vb.map + v * VERTEX_STRIDE + vertex_formats[a].offset, v, a,
+                       want[v * A + a]);
+
+   step("creating pipelines");
+   const VkDescriptorSetLayoutBinding binding = {0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1,
+                                                 VK_SHADER_STAGE_VERTEX_BIT, NULL};
+   VkDescriptorSetLayoutCreateInfo dslci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = 1,
+      .pBindings = &binding,
+   };
+   VkDescriptorSetLayout dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl));
+   VkPipelineLayoutCreateInfo plci = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &dsl,
+   };
+   VkPipelineLayout layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &plci, NULL, &layout));
+   VkShaderModule vs = make_shader(vertex_vert, sizeof(vertex_vert));
+   const VkDynamicState stride_state = VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE;
+   const VkDynamicState input_state = VK_DYNAMIC_STATE_VERTEX_INPUT_EXT;
+   VkPipeline pipes[PATHS] = {
+      make_vertex_pipeline(vs, layout, NULL, 0),
+      make_vertex_pipeline(vs, layout, &stride_state, 1),
+      has_vertex_input_dynamic ? make_vertex_pipeline(vs, layout, &input_state, 1) : VK_NULL_HANDLE,
+   };
+
+   const VkDescriptorPoolSize pool_size = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1};
+   VkDescriptorPoolCreateInfo dpci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .maxSets = 1,
+      .poolSizeCount = 1,
+      .pPoolSizes = &pool_size,
+   };
+   VkDescriptorPool dpool;
+   VKCHECK("vkCreateDescriptorPool", vkCreateDescriptorPool(dev, &dpci, NULL, &dpool));
+   VkDescriptorSetAllocateInfo dsai = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .descriptorPool = dpool,
+      .descriptorSetCount = 1,
+      .pSetLayouts = &dsl,
+   };
+   VkDescriptorSet set;
+   VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, &set));
+   VkDescriptorBufferInfo buffer_info = {out.buf, 0, VK_WHOLE_SIZE};
+   const VkWriteDescriptorSet write = {
+      .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+      .dstSet = set,
+      .dstBinding = 0,
+      .descriptorCount = 1,
+      .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .pBufferInfo = &buffer_info,
+   };
+   vkUpdateDescriptorSets(dev, 1, &write, 0, NULL);
+
+   VkCommandBuffer cb = begin_cmd();
+   VkRenderingInfo ri = {
+      .sType = VK_STRUCTURE_TYPE_RENDERING_INFO,
+      .renderArea = {{0, 0}, {1, 1}},
+      .layerCount = 1,
+   };
+   vkCmdBeginRendering(cb, &ri);
+   vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, layout, 0, 1, &set, 0, NULL);
+   for (int p = 0; p < paths; p++) {
+      const VkDeviceSize offset = (VkDeviceSize)p * N * VERTEX_STRIDE, stride = VERTEX_STRIDE;
+      vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipes[p]);
+      if (p == 1) {
+         vkCmdBindVertexBuffers2(cb, 0, 1, &vb.buf, &offset, NULL, &stride);
+      } else {
+         if (p == 2) {
+            const VkVertexInputBindingDescription2EXT b2 = {
+               .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT,
+               .binding = 0,
+               .stride = VERTEX_STRIDE,
+               .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+               .divisor = 1,
+            };
+            VkVertexInputAttributeDescription2EXT a2[A];
+            for (uint32_t a = 0; a < A; a++)
+               a2[a] = (VkVertexInputAttributeDescription2EXT){
+                  .sType = VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT,
+                  .location = a,
+                  .binding = 0,
+                  .format = vertex_formats[a].format,
+                  .offset = vertex_formats[a].offset,
+               };
+            vkCmdSetVertexInputEXT(cb, 1, &b2, A, a2);
+         }
+         vkCmdBindVertexBuffers(cb, 0, 1, &vb.buf, &offset);
+      }
+      vkCmdDraw(cb, N, 1, 0, p);
+   }
+   vkCmdEndRendering(cb);
+   VkMemoryBarrier to_host = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+      .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1,
+                        &to_host, 0, NULL, 0, NULL);
+   VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+   jnum("ms_gpu", submit_and_wait(cb, "vertex"));
+
+   const float(*got)[4] = out.map;
+   char wrong[1500] = "";
+   jopen("paths", '[');
+   for (int p = 0; p < paths; p++) {
+      jopen(NULL, '{');
+      jstr("path", path_names[p]);
+      jopen("wrong_formats", '[');
+      for (int a = 0; a < A; a++) {
+         int bad = 0;
+         char first[200] = "";
+         for (int v = p * N; v < (p + 1) * N; v++) {
+            const float *g = got[v * A + a], *w = want[v * A + a];
+            bool ok = true;
+            for (int i = 0; i < 4; i++)
+               ok &= fabsf(g[i] - w[i]) <= 1e-6f * fmaxf(1.0f, fabsf(w[i])); /* false for NaN */
+            if (!ok && !bad++)
+               snprintf(first, sizeof(first), "vertex %d: got (%g, %g, %g, %g), want (%g, %g, %g, %g)",
+                        v - p * N, g[0], g[1], g[2], g[3], w[0], w[1], w[2], w[3]);
+         }
+         if (!bad)
+            continue;
+         jopen(NULL, '{');
+         jstr("format", vertex_formats[a].name);
+         jint("wrong", bad);
+         jstr("first_wrong", first);
+         jclose();
+         add_problem(wrong, sizeof(wrong), "%s %s %d/%d", path_names[p], vertex_formats[a].name,
+                     bad, N);
+      }
+      jclose();
+      jclose();
+   }
+   jclose();
+   if (wrong[0])
+      finish("fail", "wrong attributes (way, format, vertices): %s", wrong);
+
+   free(want);
+   vkDestroyDescriptorPool(dev, dpool, NULL);
+   for (int p = 0; p < paths; p++)
+      vkDestroyPipeline(dev, pipes[p], NULL);
+   vkDestroyShaderModule(dev, vs, NULL);
+   vkDestroyPipelineLayout(dev, layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
+   free_buffer(&out);
+   free_buffer(&vb);
+}
+
 /* ---- xfb: transform feedback, which DXVK uses for D3D11 stream output ---- */
 
 static void run_xfb(void)
@@ -1677,20 +3133,6 @@ static void run_xfb(void)
 }
 
 /* ---- xfbmany, xfbmanygs: transform feedback over many workgroups, into two buffers ---- */
-
-/* Appends one problem to a comma-separated list of them. */
-static void add_problem(char *list, size_t size, const char *fmt, ...)
-{
-   size_t len = strlen(list);
-   if (len && len + 2 < size) {
-      strcpy(list + len, ", ");
-      len += 2;
-   }
-   va_list ap;
-   va_start(ap, fmt);
-   vsnprintf(list + len, size - len, fmt, ap);
-   va_end(ap);
-}
 
 /* Whether a buffer 0 record is a vertex: (index, 0, 1, 2) with an index below `verts`. */
 static bool xfb_record_ok(const float *r, unsigned verts)
@@ -2195,7 +3637,7 @@ int main(int argc, char **argv)
    if (!driver || !test) {
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
                       "  correctness: info device submit compute render tess scratch scratchcs\n"
-                      "               queries xfb xfbmany xfbmanygs\n"
+                      "               queries xfb xfbmany xfbmanygs textures mrt vertex\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -2215,6 +3657,8 @@ int main(int argc, char **argv)
       {"queries", run_queries, true, NEED_QUERIES}, {"xfb", run_xfb, true, NEED_XFB},
       {"xfbmany", run_xfb_many, true, NEED_XFB},
       {"xfbmanygs", run_xfb_many_gs, true, NEED_XFB | NEED_GS},
+      {"textures", run_textures, false, NEED_BC}, {"mrt", run_mrt, true, 0},
+      {"vertex", run_vertex, true, NEED_VERTEX},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},

@@ -1,0 +1,21 @@
+#version 450
+// Reads 8 rendered 256x256 targets back as a shader would, on a 64x64 grid of texels: texel
+// (4x + 1, 4y + 2) of target k goes to texels[k][y][x].
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D tex[8];
+layout(std430, binding = 1) buffer Out { vec4 texels[]; };
+
+void main()
+{
+   ivec2 g = ivec2(gl_GlobalInvocationID.xy);
+   ivec2 p = g * 4 + ivec2(1, 2);
+   int i = g.y * 64 + g.x;
+   texels[0 * 4096 + i] = texelFetch(tex[0], p, 0);
+   texels[1 * 4096 + i] = texelFetch(tex[1], p, 0);
+   texels[2 * 4096 + i] = texelFetch(tex[2], p, 0);
+   texels[3 * 4096 + i] = texelFetch(tex[3], p, 0);
+   texels[4 * 4096 + i] = texelFetch(tex[4], p, 0);
+   texels[5 * 4096 + i] = texelFetch(tex[5], p, 0);
+   texels[6 * 4096 + i] = texelFetch(tex[6], p, 0);
+   texels[7 * 4096 + i] = texelFetch(tex[7], p, 0);
+}
