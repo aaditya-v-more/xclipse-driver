@@ -21,9 +21,19 @@ from run import ADB, adb, shell  # noqa: E402
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 
 
-def dump() -> list[dict]:
-    """Every node on screen that has text, a description, or is clickable."""
-    shell("uiautomator dump /sdcard/xd_ui.xml >/dev/null 2>&1", 60)
+def dump(tries: int = 4) -> list[dict]:
+    """Every node on screen that has text, a description, or is clickable.
+
+    uiautomator fails now and then ("could not get idle state" while something animates) and
+    leaves the previous dump in place, so the old file is removed first and a failure is retried.
+    """
+    for _ in range(tries):
+        out = shell("rm -f /sdcard/xd_ui.xml; uiautomator dump /sdcard/xd_ui.xml 2>&1", 60)
+        if "dumped to" in out:
+            break
+        time.sleep(1.5)
+    else:
+        raise RuntimeError(f"uiautomator dump failed {tries} times: {out[-200:]!r}")
     xml = shell("cat /sdcard/xd_ui.xml", 30)
     nodes = []
     for el in ET.fromstring(xml).iter("node"):
