@@ -2,12 +2,15 @@
 
 Open-source Vulkan driver work for the Samsung Xclipse 940 GPU (Galaxy S24 FE, Exynos 2400e): Mesa RADV running on Samsung's `sgpu` kernel driver. The aim is faster Windows games in Winlator-style Android apps, doing for Xclipse what Turnip does for Adreno.
 
-## Status (2026-10-10)
+## Status (2026-10-11)
 
-- The driver builds on Windows, macOS, and Linux, and runs on the S24 FE. The instance, device, submit, compute, and offscreen render tests all pass.
-- It exposes Vulkan 1.4 with 224 extensions, against Samsung's driver at 1.3 with 154. That includes BC texture compression, maintenance5/6, and mutable descriptors, which DXVK 3.x and vkd3d-proton use.
-- Shader pipelines compile much faster than with Samsung's driver: 2.7 ms against 54.6 ms for the compute test.
-- Next: game-level benchmarks in GameNative/Winlator. `docs/PROGRESS.md` has the plan.
+- The driver builds on Windows, macOS, and Linux, and runs on the S24 FE. All 22 on-device tests in `pipeline/run.py` pass on both drivers: instance, device, submit, compute, rendering, textures (BC1–7, cube maps, mip chains), MRT, vertex fetch, depth/stencil, storage images, tessellation, scratch memory, queries, transform feedback, and the BCn layer's own decode shader.
+- Fixed on the Xclipse 940 so far: pipeline-statistics and primitives-generated queries without GDS (the chip has none), transform feedback through NGG with GFX11's streamout counters, a wave64 register-clobbering bug (every wave64 shader now gets at least 16 VGPRs), and the GPU page faults from GFX11-style shader setup registers (merged-stage pointers, graphics and compute scratch bases).
+- It exposes Vulkan 1.4 with 224 extensions, against Samsung's driver at 1.3 with 154. That includes BC texture compression, maintenance5/6, and mutable descriptors, which DXVK 2.x and 3.x and vkd3d-proton use.
+- Speed, driver level: FP32 throughput, fill rate and bandwidth equal Samsung's; pipelines compile 2.5–3.6× faster; tiny draws cost 1.6–2× more CPU; graphics scratch is 3× slower.
+- Speed, game level: Unigine Heaven 4.0 (DX11, 1280×720, Low) in GameNative 0.9.2 runs at a median of 37.2 FPS on our driver against 35.6 FPS on Samsung's, with no GPU faults (3 runs each, `results/2026-10-11_165352-game`). The run-to-run spread is large, and the 60 Hz display caps the frame rate, so treat the ratio as "no slower", not as a measured win yet.
+- Known issue outside the driver: GameNative's BCn compute layer (`bcn_layer`) emulates BC textures for every driver except Qualcomm's and Turnip, and its emulated textures come out black on our driver. Set the container's BCn Emulation to `none`; our driver samples BC textures natively.
+- `docs/HANDOFF.md` has the exact next step; `docs/PROGRESS.md` has the history and numbers.
 
 ## Quick start
 

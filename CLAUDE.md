@@ -20,7 +20,7 @@ Goal: an open-source Vulkan driver for the Samsung Xclipse 940 GPU (Galaxy S24 F
   - `core.autocrlf=false`
   - `core.longpaths=true`
 
-  End each commit message with the Co-Authored-By line.
+  Commit messages carry no attribution or Co-Authored-By trailers.
 
 ## Layout
 

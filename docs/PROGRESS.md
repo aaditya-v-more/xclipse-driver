@@ -6,6 +6,8 @@ Last updated: 2026-10-11
 
 Play Windows games in Winlator (or a better Android PC-emulation app) on the Galaxy S24 FE with measurably higher performance than Samsung's own driver allows. The way to get there is an open-source Vulkan driver for the Xclipse 940, like Turnip for Adreno. Success means a repeatable benchmark A/B test in which our driver beats the best Samsung-driver setup, which is Samsung's driver plus a BCn layer (ExynosTools or Wrapper + bcn_layer).
 
+**Restated by the user on 2026-10-11:** "the best performance for PC game emulation on this device, no matter what we have to do, without root." The driver is one lever. The emulator app and its settings, the DXVK version, the Vulkan wrapper, BCn handling, display pacing and thermals are all in scope, and a GameNative fork is acceptable. Root is the only exclusion.
+
 ## Decisions
 
 - **Driver base:** `driver/`, a git subtree of radv-xclipse branch `xclipse940`. That's JimVulkan's RADV port (Mesa 26.3.0-devel; works on the 920 and 530) plus yoro1836's 940 bring-up from PR #6:
@@ -16,7 +18,7 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
 - **Build:** natively on Windows, macOS, or Linux with the portable `tools/` folder (`driver\build.cmd` or `driver/build.sh`). No WSL is needed.
 - **Why RADV should win:** Samsung's driver lacks BCn, maintenance5/6, mutable descriptors, and float64. That keeps it on DXVK 2.x and forces BCn emulation layers. Details are in `docs/research.md`.
 - **Delivery:** a zip with `meta.json` and `vulkan.radeon.so`, loaded through adrenotools-style custom-driver support. That loader is vendor-agnostic.
-- **Benchmarks:** GravityMark (Vulkan and DX11 modes) and Unigine Heaven 4.0 in Winlator, one fixed game scene with the DXVK HUD, and 3DMark Wild Life Extreme natively as a drift control. Use DXVK 2.7.1 for both drivers, at least 3 runs each, and report the median and 1% lows.
+- **Benchmarks:** GravityMark (Vulkan and DX11 modes) and Unigine Heaven 4.0 in Winlator, one fixed game scene with the DXVK HUD, and 3DMark Wild Life Extreme natively as a drift control. Use DXVK 2.7.1 for both drivers, at least 3 runs each, and report the median and 1% lows. **As of 2026-10-11 the containers still run GameNative 0.9.2's default, DXVK `async-1.10.3` (2022); 2.7.1 is in the same dropdown and hasn't been tried.**
 - **Stay clean-room** (see `docs/research.md`).
 
 ## Done
@@ -258,10 +260,31 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
 
 This PC's internet usually comes from the phone's hotspot. If a GPU hang reboots the phone, the hotspot stays off, and adb can't turn it back on without root. The runner keeps going locally, but the Claude session is offline until someone taps the hotspot on. For fully unattended runs, put the PC on other internet, such as home Wi-Fi or Ethernet.
 
+## Review and direction (2026-10-11, evening)
+
+A read of the whole repo, the Heaven numbers and GameNative 0.9.2's source (`utkarshdalal/GameNative`, tag `v0.9.2`; `GameNative/GameNative` is not a repo), against the restated goal.
+
+**What the Heaven A/B really says.** In `165352-game` the GPU was 50–67% busy on both drivers, 1% lows were under 3 FPS on both, and stock fell 49 → 36 → 25 FPS across its three runs while radv held 42 → 37 → 37. Heaven is 32-bit, so it runs through WoW64 and FEXCore's slowest path, and every frame is paced to 16.7 ms although the panel is in its 120 Hz mode (`dumpsys display` mode 1). So the run is CPU-bound, stall-bound and thermally drifting, and the 1.05× ratio is inside the noise. A GPU driver can't show a GPU-side win on that workload; its CPU cost per draw (1.6–2× Samsung's) is what counts there. The one striking observation, radv at 2.0–2.1 W against stock at 3.3–4.7 W for the same frame rate, is from single overlay samples and unverified.
+
+**Both BC emulators were active in the black runs.** The launch environment of `171504-game` has `ENABLE_BCN_COMPUTE=1` (the `bcn_layer` Vulkan layer) *and* `WRAPPER_EMULATE_BCN=2` (the wrapper's own emulation, which has a GPU transcoder too: `WRAPPER_BCN_GPU`, `WRAPPER_BCN_POLICY`, `WRAPPER_BCN_UPLOAD` in `third_party/gamenative-mesa`). `WRAPPER_NATIVE_BCN=1` is meant to stand the wrapper down, but which decoder produced the RGBA8 images in the log was inferred from its hooks, not proven. In 0.9.2 the layer is enabled for every GPU except Qualcomm's (`XServerScreen.kt`, `getVendorID() != 0x5143`), so stock's working `full` run did go through it. The cheap check: `adb pull` GameNative's APK (`pm path app.gamenative`), unpack `graphics_driver/*.tzst`, and read the wrapper's and layer's strings and log tags. `none` is the right setting for radv either way.
+
+**The wrapper is in the way for radv.** In 0.9.2 every custom driver loads through `wrapper_icd.aarch64.json`; only bundled Turnip gets a direct ICD. The wrapper caps the advertised Vulkan version at `WRAPPER_VK_VERSION=1.3.0` (so DXVK 3.x, which needs 1.4, can't run on radv through it), emulates `VK_EXT_map_memory_placed` with dma-bufs from `/dev/dma_heap/system-uncached` whenever the app enables it, even though RADV has the extension natively, patches SPIR-V, and masks features. Those are the gaps it exists to fill for Samsung's driver, and none of them applies to ours.
+
+**Order of work, by expected payoff per hour:**
+
+1. **Make the measurement mean something** (half a day, `game.py`): sample battery power (`/sys/class/power_supply/battery/current_now` and `voltage_now`), CPU and GPU clocks and the thermal zones once a second; a fixed cooldown between runs and alternating order; five runs; find what paces presentation at 60 Hz when the panel is at 120 (the X server, the wrapper's swapchain or Samsung's game settings) and lift it, or record Heaven's own frame counter from its log instead of SurfaceFlinger. Compare each driver's *best working* setup (stock with the layer on `auto`, radv on `none`), not identical settings. Confirm or refute the 2 W reading; if it holds, it is the headline.
+2. **DXVK 2.7.1 on both containers** (a dropdown in 0.9.2; the plan chose it in `research.md`). It is the first test of the thesis that RADV's extensions pay off; `async-1.10.3` uses none of them.
+3. **Take the wrapper out of radv's path.** First the env A/Bs it allows: `WRAPPER_DMAHEAP_CACHED=1`, `WRAPPER_DISABLE_PLACED=1` (if Wine's WoW64 copes), a 1.4 `vulkanVersion`. Then the real fix, a GameNative fork (base: `utkarshdalal/GameNative`, 1.3.0-prerelease, 2026-10-04) with a "RADV (Xclipse)" graphics-driver option: an ICD file pointing at the imported `vulkan.radeon.so`, no wrapper, BCn `none` by default. That also removes the black-texture problem for users and opens DXVK 3.x and vkd3d-proton (mutable descriptors) on radv only. The fork is the "thing" the user asked for if the measurements favour radv.
+4. **Driver CPU overhead**, once the stack is right: the port's logging checks on the hot path (2%), cache-flush emission (4%) and register remapping (2%) from the simpleperf profile; then an NGG-culling threshold (GPU cost per tiny draw 2×) and graphics scratch (3×). Use `RADV_XCLIPSE_PERF` in a game run to see whether it's CPU- or GPU-bound before each change.
+5. **A 64-bit DX11 benchmark** (Heaven is 32-bit and unrepresentative) and one D3D12 sample through vkd3d-proton, which Samsung's driver can't run well. GravityMark stays out unless `-asteroids` brings its memory under the limit.
+6. **Close the BCn-black question with at most one experiment** (the push-constant diagnostic in `docs/HANDOFF.md`), then stop; the fix lives in GameNative or the layer, and the fork makes it moot.
+7. **Upstream.** PR #6 got its first Winlator-style result from its author on 2026-10-11 (Ludashi 4.1, FurMark, through the wrapper), still open. Our four fixes (queries without GDS, NGG streamout, the wave64 VGPR floor, the GFX11 shader-setup registers) aren't there. Posting needs the user's go-ahead.
+
+**Repo hygiene found in the same review:** `.claude/settings.json` is tracked (it syncs tool settings between the two computers, but it names the model and must go before the repo is made public); 37 commits carry attribution trailers and the subtree import includes one commit authored as "Claude" (upstream's, `fc1d219`), which matter the day this goes public; the local git identity differs between the two computers (no-reply address on the PC, Gmail on the Mac, enforced there by a pre-commit hook); the GravityMark screenshot `results/2026-10-11_105144-game/run1-gravitymark-radv-screen.png` shows the home screen; `results/` holds 87 MB of PNGs and grows with every run.
+
 ## Next steps
 
-1. **Check the fix in Heaven.** Run Heaven on radv once with `--radv-log`, then `vmfault.py`. If faults remain, the log names their buffers.
-2. **Timed game A/B again** (`game.py --runs 3`). The new `GPU faults` column should read 0 for both drivers.
-3. **GravityMark's memory:** Max Device Memory doesn't reach it (`-vk`). Try fewer asteroids (`-asteroids`) in both containers' Exec Arguments, or another native-Vulkan benchmark.
-4. **GPU cost per draw:** decide when NGG culling pays off on this GPU (optimization target 1).
-5. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.
+1. Item 1 above: power, clocks, thermals and cooldown in `game.py`; find the 60 Hz pacing.
+2. Item 2: DXVK 2.7.1 on all four containers, then the Heaven A/B again.
+3. Item 3: the wrapper env A/Bs, then decide on the GameNative fork.
+4. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.
