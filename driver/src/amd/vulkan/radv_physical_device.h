@@ -119,6 +119,10 @@ struct radv_physical_device {
    /* Whether to emulate mesh/task shader queries. */
    bool emulate_mesh_shader_queries;
 
+   /* Samsung's sgpu kernel driver has no GDS (Xclipse). The emulated queries above then count in
+    * the shader query buffer in memory, as GFX11 does, instead of in GDS. */
+   bool no_gds;
+
    /* Whether to inline the compute dispatch size in user sgprs. */
    bool load_grid_size_from_user_sgpr;
 

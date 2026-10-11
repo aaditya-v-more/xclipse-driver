@@ -3089,9 +3089,18 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                             (instance->perftest_flags & RADV_PERFTEST_NGGC)) &&
                            !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
 
-   pdev->emulate_ngg_gs_query_pipeline_stat = pdev->use_ngg && pdev->info.gfx_level < GFX11;
+   /* Samsung's sgpu has no GDS. The first query that needed it made the queue allocate it, and the
+    * refusal failed the whole submission (D3D11 pipeline statistics through DXVK). */
+   pdev->no_gds = pdev->info.xclipse_model != AC_XCLIPSE_NONE;
 
-   pdev->emulate_mesh_shader_queries = pdev->info.gfx_level == GFX10_3;
+   /* Xclipse counts NGG GS primitives in hardware, as GFX11 does. Emulating them as well counted
+    * every primitive twice. */
+   pdev->emulate_ngg_gs_query_pipeline_stat =
+      pdev->use_ngg && pdev->info.gfx_level < GFX11 && pdev->info.xclipse_model == AC_XCLIPSE_NONE;
+
+   /* Without GDS, task shaders would have nowhere to count. Nothing valid needs them: mesh shader
+    * queries aren't exposed (meshShaderQueries). */
+   pdev->emulate_mesh_shader_queries = pdev->info.gfx_level == GFX10_3 && !pdev->no_gds;
 
    /* PKT3_LOAD_SH_REG_INDEX is supported on GFX8+, but it hangs with compute queues until GFX10.3. */
    pdev->load_grid_size_from_user_sgpr = pdev->info.gfx_level >= GFX10_3;

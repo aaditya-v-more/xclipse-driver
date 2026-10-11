@@ -517,7 +517,8 @@ radv_postprocess_nir(const struct radv_compiler_info *compiler_info, const struc
          .use_llvm = use_llvm,
          .load_grid_size_from_user_sgpr = compiler_info->key.load_grid_size_from_user_sgpr,
       });
-   NIR_PASS(_, stage->nir, radv_nir_lower_abi, gfx_level, stage, gfx_state, compiler_info->hw.address32_hi);
+   NIR_PASS(_, stage->nir, radv_nir_lower_abi, gfx_level, stage, gfx_state, compiler_info->hw.address32_hi,
+            compiler_info->hw.no_gds);
 
    if (!stage->key.optimisations_disabled) {
       NIR_PASS(_, stage->nir, nir_opt_dce);

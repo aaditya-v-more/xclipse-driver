@@ -35,6 +35,7 @@ static void radv_query_shader(struct radv_cmd_buffer *cmd_buffer, VkQueryType qu
                               struct radeon_winsys_bo *src_bo, uint64_t src_offset, uint64_t dst_va,
                               uint32_t src_stride, uint32_t dst_stride, uint32_t count, uint32_t flags,
                               uint32_t pipeline_stats_mask, uint32_t avail_offset, bool uses_emulated_queries);
+static void radv_alloc_shader_query_buf(struct radv_cmd_buffer *cmd_buffer);
 
 static void
 gfx10_copy_shader_query(struct radv_cmd_stream *cs, uint32_t src_sel, uint64_t src_va, uint64_t dst_va)
@@ -45,8 +46,15 @@ gfx10_copy_shader_query(struct radv_cmd_stream *cs, uint32_t src_sel, uint64_t s
 static void
 gfx10_copy_shader_query_gfx(struct radv_cmd_buffer *cmd_buffer, bool use_gds, uint32_t src_offset, uint64_t dst_va)
 {
+   const struct radv_physical_device *pdev = radv_device_physical(radv_cmd_buffer_device(cmd_buffer));
    uint32_t src_sel;
    uint64_t src_va;
+
+   /* Without GDS, the shaders count into the shader query buffer, as on GFX11. */
+   if (pdev->no_gds) {
+      radv_alloc_shader_query_buf(cmd_buffer);
+      use_gds = false;
+   }
 
    if (use_gds) {
       /* Make sure GDS is idle before copying the value. */
@@ -71,11 +79,19 @@ gfx10_copy_shader_query_gfx(struct radv_cmd_buffer *cmd_buffer, bool use_gds, ui
 static void
 gfx10_copy_shader_query_ace(struct radv_cmd_buffer *cmd_buffer, uint32_t src_offset, uint64_t dst_va)
 {
+   const struct radv_physical_device *pdev = radv_device_physical(radv_cmd_buffer_device(cmd_buffer));
+
    /* Make sure GDS is idle before copying the value. */
    cmd_buffer->gang.flush_bits |= RADV_CMD_FLAG_CS_PARTIAL_FLUSH | RADV_CMD_FLAG_INV_L2;
    radv_gang_cache_flush(cmd_buffer);
 
-   gfx10_copy_shader_query(cmd_buffer->gang.cs, COPY_DATA_GDS, src_offset, dst_va);
+   if (pdev->no_gds) {
+      radv_alloc_shader_query_buf(cmd_buffer);
+      gfx10_copy_shader_query(cmd_buffer->gang.cs, COPY_DATA_SRC_MEM,
+                              cmd_buffer->state.shader_query_buf_va + src_offset, dst_va);
+   } else {
+      gfx10_copy_shader_query(cmd_buffer->gang.cs, COPY_DATA_GDS, src_offset, dst_va);
+   }
 }
 
 enum radv_event_write {
@@ -651,7 +667,8 @@ radv_begin_pipeline_stat_query(struct radv_cmd_buffer *cmd_buffer, struct radv_q
       }
 
       /* Record that the command buffer needs GDS. */
-      cmd_buffer->queue_state.gds_needed = true;
+      if (!pdev->no_gds)
+         cmd_buffer->queue_state.gds_needed = true;
 
       if (!cmd_buffer->state.active_emulated_pipeline_queries)
          cmd_buffer->state.dirty |= RADV_CMD_DIRTY_SHADER_QUERY;
@@ -677,7 +694,8 @@ radv_begin_pipeline_stat_query(struct radv_cmd_buffer *cmd_buffer, struct radv_q
          ac_emit_cp_write_data_imm(ace_cs->b, V_371_MICRO_ENGINE, va + task_invoc_offset + 4, 0x80000000);
 
          /* Record that the command buffer needs GDS. */
-         cmd_buffer->queue_state.gds_needed = true;
+         if (!pdev->no_gds)
+            cmd_buffer->queue_state.gds_needed = true;
 
          if (!cmd_buffer->state.active_pipeline_ace_queries)
             cmd_buffer->state.dirty |= RADV_CMD_DIRTY_SHADER_QUERY;
@@ -949,7 +967,7 @@ radv_alloc_shader_query_buf(struct radv_cmd_buffer *cmd_buffer)
    unsigned offset;
    void *ptr;
 
-   assert(pdev->info.gfx_level >= GFX11);
+   assert(pdev->info.gfx_level >= GFX11 || pdev->no_gds);
 
    if (cmd_buffer->state.shader_query_buf_va)
       return;
@@ -1185,6 +1203,14 @@ radv_copy_timestamp_query_result(struct radv_cmd_buffer *cmd_buffer, struct radv
 #define RADV_PGQ_STRIDE     32
 #define RADV_PGQ_STRIDE_EMU (RADV_PGQ_STRIDE + 8 * 2)
 
+/* Whether primitives generated queries are counted only by the NGG shaders, as on GFX11+. Xclipse
+ * needs this too: the GFX10.3 path samples the streamout statistics, and that hangs its GPU. */
+static bool
+radv_pg_query_in_shaders(const struct radv_physical_device *pdev)
+{
+   return pdev->info.gfx_level >= GFX11 || pdev->info.xclipse_model != AC_XCLIPSE_NONE;
+}
+
 static nir_shader *
 build_pg_query_shader()
 {
@@ -1339,8 +1365,8 @@ radv_begin_pg_query(struct radv_cmd_buffer *cmd_buffer, struct radv_query_pool *
    const struct radv_physical_device *pdev = radv_device_physical(device);
    struct radv_cmd_stream *cs = cmd_buffer->cs;
 
-   if (pdev->info.gfx_level >= GFX11) {
-      /* On GFX11+, primitives generated query are always emulated. */
+   if (radv_pg_query_in_shaders(pdev)) {
+      /* On GFX11+ and Xclipse, primitives generated query are always emulated. */
       gfx10_copy_shader_query_gfx(cmd_buffer, false, RADV_SHADER_QUERY_PRIM_GEN_OFFSET(index), va);
       ac_emit_cp_write_data_imm(cs->b, V_371_MICRO_ENGINE, va + 4, 0x80000000);
 
@@ -1369,7 +1395,8 @@ radv_begin_pg_query(struct radv_cmd_buffer *cmd_buffer, struct radv_query_pool *
          ac_emit_cp_write_data_imm(cs->b, V_371_MICRO_ENGINE, va + 36, 0x80000000);
 
          /* Record that the command buffer needs GDS. */
-         cmd_buffer->queue_state.gds_needed = true;
+         if (!pdev->no_gds)
+            cmd_buffer->queue_state.gds_needed = true;
 
          if (!cmd_buffer->state.active_emulated_prims_gen_queries)
             cmd_buffer->state.dirty |= RADV_CMD_DIRTY_SHADER_QUERY;
@@ -1388,8 +1415,8 @@ radv_end_pg_query(struct radv_cmd_buffer *cmd_buffer, struct radv_query_pool *po
    const struct radv_physical_device *pdev = radv_device_physical(device);
    struct radv_cmd_stream *cs = cmd_buffer->cs;
 
-   if (pdev->info.gfx_level >= GFX11) {
-      /* On GFX11+, primitives generated query are always emulated. */
+   if (radv_pg_query_in_shaders(pdev)) {
+      /* On GFX11+ and Xclipse, primitives generated query are always emulated. */
       gfx10_copy_shader_query_gfx(cmd_buffer, false, RADV_SHADER_QUERY_PRIM_GEN_OFFSET(index), va + 16);
       ac_emit_cp_write_data_imm(cs->b, V_371_MICRO_ENGINE, va + 20, 0x80000000);
 
@@ -1437,7 +1464,7 @@ radv_copy_pg_query_result(struct radv_cmd_buffer *cmd_buffer, struct radv_query_
    uint64_t va = radv_buffer_get_va(pool->bo);
 
    if (flags & VK_QUERY_RESULT_WAIT_BIT) {
-      const bool uses_emulated_queries = pool->uses_emulated_queries && pdev->info.gfx_level < GFX11;
+      const bool uses_emulated_queries = pool->uses_emulated_queries && !radv_pg_query_in_shaders(pdev);
 
       for (unsigned i = 0; i < query_count; i++) {
          unsigned query = first_query + i;
@@ -1458,7 +1485,7 @@ radv_copy_pg_query_result(struct radv_cmd_buffer *cmd_buffer, struct radv_query_
 
    radv_query_shader(cmd_buffer, VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT, pool->bo, first_query * pool->stride, dst_va,
                      pool->stride, stride, query_count, flags, 0, 0,
-                     pool->uses_emulated_queries && pdev->info.gfx_level < GFX11);
+                     pool->uses_emulated_queries && !radv_pg_query_in_shaders(pdev));
 }
 
 /**
@@ -1596,7 +1623,8 @@ radv_begin_ms_prim_query(struct radv_cmd_buffer *cmd_buffer, uint64_t va)
       ac_emit_cp_write_data_imm(cs->b, V_371_MICRO_ENGINE, va + 4, 0x80000000);
 
       /* Record that the command buffer needs GDS. */
-      cmd_buffer->queue_state.gds_needed = true;
+      if (!pdev->no_gds)
+         cmd_buffer->queue_state.gds_needed = true;
 
       if (!cmd_buffer->state.active_emulated_prims_gen_queries)
          cmd_buffer->state.dirty |= RADV_CMD_DIRTY_SHADER_QUERY;
@@ -1921,8 +1949,8 @@ radv_create_query_pool(struct radv_device *device, const VkQueryPoolCreateInfo *
    pool->uses_ace = (pool->vk.pipeline_statistics & VK_QUERY_PIPELINE_STATISTIC_TASK_SHADER_INVOCATIONS_BIT_EXT);
 
    pool->uses_shader_query_buf =
-      pdev->info.gfx_level >= GFX11 && (pool->vk.query_type == VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT ||
-                                        pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT);
+      (pdev->info.gfx_level >= GFX11 && pool->vk.query_type == VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT) ||
+      (radv_pg_query_in_shaders(pdev) && pool->vk.query_type == VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT);
 
    switch (pCreateInfo->queryType) {
    case VK_QUERY_TYPE_OCCLUSION:
@@ -1948,7 +1976,7 @@ radv_create_query_pool(struct radv_device *device, const VkQueryPoolCreateInfo *
       pool->stride = 32;
       break;
    case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT:
-      if (pool->uses_emulated_queries && pdev->info.gfx_level < GFX11) {
+      if (pool->uses_emulated_queries && !radv_pg_query_in_shaders(pdev)) {
          /* When the hardware can use both the legacy and the NGG paths in the same begin/end pair,
           * allocate 2x64-bit values for the emulated counters.
           */
@@ -2288,7 +2316,7 @@ radv_GetQueryPoolResults(VkDevice _device, VkQueryPool queryPool, uint32_t first
          break;
       }
       case VK_QUERY_TYPE_PRIMITIVES_GENERATED_EXT: {
-         const bool uses_emulated_queries = pool->uses_emulated_queries && pdev->info.gfx_level < GFX11;
+         const bool uses_emulated_queries = pool->uses_emulated_queries && !radv_pg_query_in_shaders(pdev);
          p_atomic_uint64_t const *src64 = (p_atomic_uint64_t const *)src;
          uint64_t primitive_storage_needed;
 

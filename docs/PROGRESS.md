@@ -124,7 +124,7 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
     - Textures are created, then the screen stays black. Wine's log shows `radv/amdgpu: Failed to allocate a buffer: size 256 bytes, alignment 4 bytes, domains 8`. Domain 8 is GDS.
     - The Xclipse 940 runs as GFX10_3, and on GFX10–10.3 RADV counts some query results from NGG shaders with GDS atomics. That covers geometry-shader primitives in pipeline statistics, primitives-generated queries, and mesh-shader queries.
     - D3D11 pipeline-statistics queries through DXVK trigger it, and the queue then allocates the GDS buffer (`radv_queue.c`). Samsung's `sgpu` kernel driver has no GDS, so the allocation and the submission fail.
-    - Fix (next step, written up in `docs/HANDOFF.md`): don't use the GDS-based query emulation on Xclipse. Every D3D11 game that uses pipeline statistics would hit this.
+    - Every D3D11 game that uses pipeline statistics would hit this. Fixed; see the next entry.
   - **`game.py` called the stock run "ran" at 8.8 FPS over 15 s.** Those frames were Wine drawing the error box. A run needs a minimum stretch of steady frames before it counts.
   - **Open question:** on radv, RADV's image log showed `R8G8B8A8_UNORM` images with BC1 view formats (`fmt 37 ... list [133,134]`). That looks like the wrapper still emulating BC1 despite `WRAPPER_NATIVE_BCN=1`. GameNative 0.9.2's wrapper may predate that variable; check the launch settings in the next run's `results.json`.
 - [x] **GameNative's Vulkan wrapper emulated BC textures for RADV too (2026-10-11).**
@@ -132,6 +132,15 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - So the radv runs so far decompressed BC textures that our driver supports. Samsung's driver has no BC support, so it needs emulation regardless.
   - All four containers now set `WRAPPER_NATIVE_BCN=1`. It doesn't change the stock runs, so the containers stay identical apart from the driver.
   - Native BC is one of the main reasons RADV should be faster in DXVK games. It may also bring GravityMark's memory use on radv under the limit.
+
+- [x] **Our driver's queries no longer need GDS, and their counts match Samsung's (2026-10-11, `results/2026-10-11_090345`).**
+  - New `xdtest` case `queries`. It draws 5 triangles twice: plainly, and through a geometry shader that emits each triangle twice. Each draw runs inside a pipeline-statistics query with all 11 statistics and, where the driver has `VK_EXT_primitives_generated_query`, a primitives-generated query. The counts are checked against the expected values.
+  - The first run hung our driver's GPU (the kernel recovered; no reboot). Bisecting with the test's `XD_QUERY_STATS`, `XD_QUERY_PG` and `XD_QUERY_GS` switches found three separate problems:
+    - **GDS.** On Xclipse, NGG shaders now count query results with global atomics into the command buffer's shader query buffer, as on GFX11, and the CP copies from memory instead of GDS. The queue never allocates GDS.
+    - **Geometry-shader primitives counted twice** (20 instead of 10). The 940 counts NGG geometry-shader primitives in hardware, as GFX11 does, and RADV's shader emulation added its own count on top. The emulation is off on Xclipse.
+    - **The primitives-generated query hung the GPU.** RADV's GFX10.3 path enables streamout and samples the streamout statistics (`EVENT_WRITE` `SAMPLE_STREAMOUTSTATS`). With a temporary switch, skipping the sample stopped the hang; enabling streamout (`VGT_STRMOUT_CONFIG`) alone was fine. Xclipse now uses RADV's GFX11 path, which counts in the shaders only.
+  - Result: all 11 statistics are identical to Samsung's driver for both draws (including fragment-shader invocations), and primitives generated is 5 and 10.
+  - **Risk left: transform feedback.** RADV's GFX10.3 transform-feedback queries use the same `SAMPLE_STREAMOUTSTATS` event, so they would hang the GPU too. GFX10.3 transform feedback also runs on the legacy geometry path, which hung with `RADV_DEBUG=nongg`. Both drivers expose `VK_EXT_transform_feedback`, and DXVK uses it for D3D11 stream output. It needs its own `xdtest` case.
 
 ## Optimization targets (from the speed tests)
 

@@ -538,7 +538,9 @@ struct radv_compiler_info {
       uint32_t address_prt_wa_control_bit : 8;
       /* The shader core decodes GFX11 encodings with a GFX10_3 register interface (Xclipse 920). */
       uint32_t gfx11_isa : 1;
-      uint32_t padding : 14;
+      /* No GDS (Xclipse): NGG shaders count query results in memory, as on GFX11. */
+      uint32_t no_gds : 1;
+      uint32_t padding : 13;
    } hw;
 
    /* Misc values included as part of the cache key */

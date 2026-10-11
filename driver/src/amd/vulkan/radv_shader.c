@@ -1039,7 +1039,7 @@ radv_lower_ngg(const struct radv_compiler_info *compiler_info, struct radv_shade
    options.can_cull = info->has_ngg_culling;
    options.disable_streamout = compiler_info->ac->gfx_level < GFX11;
    options.has_xfb_prim_query = info->has_xfb_query;
-   options.has_gs_primitives_query = compiler_info->ac->gfx_level < GFX11;
+   options.has_gs_primitives_query = compiler_info->key.emulate_ngg_gs_query_pipeline_stat;
    options.force_vrs = info->force_vrs_per_vertex;
    options.skip_viewport_state_culling = nir->info.outputs_written & (VARYING_BIT_VIEWPORT | VARYING_BIT_VIEWPORT_MASK);
 
@@ -1063,7 +1063,7 @@ radv_lower_ngg(const struct radv_compiler_info *compiler_info, struct radv_shade
       assert(info->is_ngg);
 
       options.has_gen_prim_query = info->has_prim_query;
-      options.has_ms_gs_invocations_query = compiler_info->ac->gfx_level < GFX11;
+      options.has_ms_gs_invocations_query = compiler_info->key.emulate_ngg_gs_query_pipeline_stat;
 
       NIR_PASS(_, nir, ac_nir_lower_ngg_gs, &options, &ngg_stage->info.ngg_lds_vertex_size,
                &ngg_stage->info.ngg_lds_scratch_size);

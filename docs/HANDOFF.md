@@ -19,19 +19,10 @@ The work moves between the user's Windows PC and Mac. Everything (toolchain, dri
 
 Work through these in order. The phone was left idle: GameNative force-stopped, `stay_on_while_plugged_in` back to 0, `debug.radv_xclipse_log` back to 0.
 
-1. **Fix the GDS hang in our driver.** This blocks every radv run of a D3D11 game that uses pipeline-statistics queries, Heaven included. The diagnosis is in `docs/PROGRESS.md`.
-   - **Cause:** the Xclipse 940 runs as GFX10_3. On GFX10–10.3, RADV counts some query results from NGG shaders with GDS atomics. The first such query makes the queue allocate a 256-byte GDS buffer (`radv_queue.c`, `needs->gds`). Samsung's `sgpu` kernel driver has no GDS, so the allocation fails and the submission with it.
-   - **Fix: on Xclipse (`pdev->info.xclipse_model != AC_XCLIPSE_NONE`), never take those paths:**
-     - `radv_physical_device.c`, where `emulate_ngg_gs_query_pipeline_stat` and `emulate_mesh_shader_queries` are set (about line 3092): false on Xclipse.
-     - `radv_query.c`, `uses_emulated_queries` in `radv_CreateQueryPool` (about line 1912): its `pdev->use_ngg && PRIMITIVES_GENERATED_EXT` term gets the same guard.
-     - `radv_cmd_buffer.c`, `radv_get_ngg_state_query`: an inherited `GEOMETRY_SHADER_PRIMITIVES` statistic also turns on the shaders' GDS counters, so guard that term too.
-     - Optional: in `radv_shader.c` (about lines 1042 and 1060), derive `has_gs_primitives_query` and `has_ms_gs_invocations_query` from `key.emulate_ngg_gs_query_pipeline_stat` instead of `gfx_level < GFX11`. Then no GDS instruction is compiled on Xclipse at all. Other GPUs are unaffected, since NGG shaders imply `use_ngg`.
-   - **Cost:** those statistics then come from the hardware counters, which miss primitives from NGG shaders. Games don't depend on them.
-   - **Test it before GameNative.** Add an `xdtest` case that wraps a draw in a pipeline-statistics query with every statistic bit set and checks that the submission succeeds. Run it with `run.py --build-driver`.
-   - **Install the new build:**
-     - `adb push` the new zip from `driver/dist/` to `/sdcard/Download/xclipse/`. Keep the old zip.
-     - Import it in GameNative's Driver Manager.
-     - Select it as Graphics Driver Version in Heaven-radv and GravityMark-radv.
+1. **Install the query fix.** Our driver no longer touches GDS, and its query counts match Samsung's (fixed and tested 2026-10-11; details in `docs/PROGRESS.md`). This was blocking every radv run of a D3D11 game that uses pipeline-statistics queries, Heaven included.
+   - `adb push` the new zip from `driver/dist/` to `/sdcard/Download/xclipse/`. Keep the old zip.
+   - Import it in GameNative's Driver Manager.
+   - Select it as Graphics Driver Version in Heaven-radv and GravityMark-radv.
 2. **Stock Heaven: Samsung's driver refuses Heaven's textures.**
    - DXVK can't create DXT1/DXT5 (BC1/BC3) or 2048x2048 D24 textures (screenshot in `results/2026-10-11_013033-game`).
    - In `auto` mode the wrapper hands BC1–BC3 to Samsung's driver natively.

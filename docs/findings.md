@@ -52,6 +52,13 @@ Verified facts only. Raw survey output is in `recon/device-gpu-recon.txt` and `r
 - `cmd gpu vkjson` fails with "Failed transaction", probably the binder size limit.
 - `cmd gpu vkprofiles` exists but hasn't been tried yet.
 
+### Queries and streamout (probed with `xdtest`, 2026-10-11)
+
+- **sgpu has no GDS.** RADV's 256-byte GDS allocation (domain 8) fails, and the submission with it.
+- **The GE counts NGG geometry-shader primitives in the pipeline statistics**, as GFX11 does and GFX10.3 doesn't. With hardware counters only, all 11 statistics match Samsung's driver.
+- **`EVENT_WRITE` `SAMPLE_STREAMOUTSTATS` hangs the GPU.** The kernel recovers without a reboot. Writing `VGT_STRMOUT_CONFIG` to enable streamout doesn't hang.
+- **The legacy (non-NGG) geometry path hangs on the first draw batch** (`RADV_DEBUG=nongg`, 2026-10-10).
+
 ## Build PC
 
 - i5-13600 (14 cores / 20 threads), 15.7 GB RAM, about 214 GB free on C:. Hypervisor present.

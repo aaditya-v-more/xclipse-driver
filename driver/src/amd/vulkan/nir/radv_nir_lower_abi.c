@@ -22,6 +22,7 @@ typedef struct {
    const struct radv_shader_info *info;
    const struct radv_graphics_state_key *gfx_state;
    uint32_t address32_hi;
+   bool no_gds;
    nir_def *gsvs_ring[4];
 } lower_abi_state;
 
@@ -354,7 +355,7 @@ lower_abi_instr(nir_builder *b, nir_intrinsic_instr *intrin, void *state)
          }
       }
 
-      if (s->gfx_level >= GFX11) {
+      if (s->gfx_level >= GFX11 || s->no_gds) {
          nir_def *va = nir_pack_64_2x32_split(b, ac_nir_load_arg(b, &s->args->ac, s->args->ngg_query_buf_va),
                                               nir_imm_int(b, s->address32_hi));
 
@@ -500,7 +501,7 @@ load_gsvs_ring(nir_builder *b, lower_abi_state *s, unsigned stream_id)
 
 bool
 radv_nir_lower_abi(nir_shader *shader, enum amd_gfx_level gfx_level, const struct radv_shader_stage *stage,
-                   const struct radv_graphics_state_key *gfx_state, uint32_t address32_hi)
+                   const struct radv_graphics_state_key *gfx_state, uint32_t address32_hi, bool no_gds)
 {
    bool progress = false;
 
@@ -510,6 +511,7 @@ radv_nir_lower_abi(nir_shader *shader, enum amd_gfx_level gfx_level, const struc
       .args = &stage->args,
       .gfx_state = gfx_state,
       .address32_hi = address32_hi,
+      .no_gds = no_gds,
    };
 
    if (shader->info.stage == MESA_SHADER_GEOMETRY && !stage->info.is_ngg) {

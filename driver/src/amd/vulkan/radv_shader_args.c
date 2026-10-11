@@ -478,7 +478,8 @@ declare_unmerged_vs_tcs_args(struct radv_shader_args_state *state, const enum am
 
 static void
 declare_unmerged_vs_tes_gs_args(struct radv_shader_args_state *state, const enum amd_gfx_level gfx_level,
-                                const struct radv_shader_info *info, const struct user_sgpr_info *user_sgpr_info)
+                                bool ngg_query_buf, const struct radv_shader_info *info,
+                                const struct user_sgpr_info *user_sgpr_info)
 {
    /* SGPRs */
    RADV_ADD_UD_ARG(state, 2, AC_ARG_VALUE, prolog_inputs, AC_UD_VS_PROLOG_INPUTS);
@@ -494,7 +495,7 @@ declare_unmerged_vs_tes_gs_args(struct radv_shader_args_state *state, const enum
 
    if (info->is_ngg) {
       RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ngg_state, AC_UD_NGG_STATE);
-      if (gfx_level >= GFX11)
+      if (ngg_query_buf)
          RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ngg_query_buf_va, AC_UD_NGG_QUERY_BUF_VA);
    }
    RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, vgt_esgs_ring_itemsize, AC_UD_VGT_ESGS_RING_ITEMSIZE);
@@ -541,7 +542,7 @@ declare_unmerged_vs_tes_gs_args(struct radv_shader_args_state *state, const enum
    ac_add_preserved(&state->args->ac, &state->args->ac.tcs_offchip_layout);
    if (info->is_ngg) {
       ac_add_preserved(&state->args->ac, &state->args->ngg_state);
-      if (gfx_level >= GFX11)
+      if (ngg_query_buf)
          ac_add_preserved(&state->args->ac, &state->args->ngg_query_buf_va);
    }
    ac_add_preserved(&state->args->ac, &state->args->vgt_esgs_ring_itemsize);
@@ -564,6 +565,8 @@ declare_shader_args(const struct radv_compiler_info *compiler_info, struct radv_
                     mesa_shader_stage stage, mesa_shader_stage previous_stage, struct user_sgpr_info *user_sgpr_info)
 {
    const enum amd_gfx_level gfx_level = compiler_info->ac->gfx_level;
+   /* NGG shaders count query results in a buffer in memory on GFX11+, and without GDS. */
+   const bool ngg_query_buf = gfx_level >= GFX11 || compiler_info->hw.no_gds;
    bool has_shader_query = info->has_prim_query || info->has_xfb_query ||
                            (stage == MESA_SHADER_GEOMETRY && info->gs.has_pipeline_stat_query) ||
                            (stage == MESA_SHADER_MESH && info->ms.has_query) ||
@@ -804,7 +807,7 @@ declare_shader_args(const struct radv_compiler_info *compiler_info, struct radv_
          RADV_ADD_NULL_ARG(state, AC_ARG_SGPR, 1, AC_ARG_VALUE);
 
          if (info->merged_shader_compiled_separately) {
-            declare_unmerged_vs_tes_gs_args(state, gfx_level, info, user_sgpr_info);
+            declare_unmerged_vs_tes_gs_args(state, gfx_level, ngg_query_buf, info, user_sgpr_info);
          } else {
             if (previous_stage == MESA_SHADER_VERTEX) {
                declare_vs_specific_input_sgprs(state, info);
@@ -833,7 +836,7 @@ declare_shader_args(const struct radv_compiler_info *compiler_info, struct radv_
 
                declare_ngg_sgprs(state, info, ngg_needs_state_sgpr);
 
-               if (gfx_level >= GFX11 && has_shader_query)
+               if (ngg_query_buf && has_shader_query)
                   RADV_ADD_UD_ARG(state, 1, AC_ARG_VALUE, ngg_query_buf_va, AC_UD_NGG_QUERY_BUF_VA);
             }
 
