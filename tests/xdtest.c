@@ -2305,7 +2305,9 @@ static void mip_texel(const struct mip_case *c, uint32_t x, uint32_t y, int leve
 }
 
 /* Uploads each case's whole mip chain (and six faces for a cube) with one copy region per level,
- * and reads back a grid of every level and layer in a compute shader. On Xclipse, RADV keeps BC4,
+ * and reads back a grid of every level and layer in a compute shader, textureGrad included: the
+ * Xclipse 920 can't decode GFX11's partial NSA address encoding that it takes (see gfx10_nsa in
+ * ACO). On Xclipse, RADV keeps BC4,
  * BC5 and BC7 as a second, re-encoded plane that a compute pass fills after each copy, so those
  * show whether that pass covers every level. */
 static void run_mips(void)
@@ -2380,7 +2382,7 @@ static void run_mips(void)
    };
    VkDescriptorSet set;
    VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, &set));
-   const size_t out_size = (size_t)MAX_LAYERS * MAX_LEVELS * GRID * GRID * 3 * sizeof(float[4]);
+   const size_t out_size = (size_t)MAX_LAYERS * MAX_LEVELS * GRID * GRID * 4 * sizeof(float[4]);
    struct buffer out = make_buffer(out_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
 
    char wrong[800] = "";
@@ -2523,9 +2525,9 @@ static void run_mips(void)
       submit_and_wait(cb, c->name);
 
       /* Wrong texels per way of reading, and which levels have any. */
-      static const char *read_names[3] = {"fetch", "sample", "cube"};
+      static const char *read_names[4] = {"fetch", "sample", "grad", "cube"};
       const float(*got)[4] = out.map;
-      int bad[3] = {0};
+      int bad[4] = {0};
       uint32_t bad_levels = 0;
       char first[200] = "";
       for (uint32_t a = 0; a < layers; a++) {
@@ -2537,8 +2539,8 @@ static void run_mips(void)
                   const uint32_t x = gx * w / nx + w / nx / 2, y = gy * h / ny + h / ny / 2;
                   float want[4];
                   mip_texel(c, x, y, l, a, want);
-                  const size_t i = (((size_t)a * levels + l) * GRID * GRID + gy * GRID + gx) * 3;
-                  for (int r = 0; r < (c->cube ? 3 : 2); r++) {
+                  const size_t i = (((size_t)a * levels + l) * GRID * GRID + gy * GRID + gx) * 4;
+                  for (int r = 0; r < (c->cube ? 4 : 3); r++) {
                      if (texel_close(got[i + r], want, 4, c->tolerance))
                         continue;
                      bad_levels |= 1u << l;
@@ -2553,7 +2555,7 @@ static void run_mips(void)
             }
          }
       }
-      for (int r = 0; r < 3; r++) {
+      for (int r = 0; r < 4; r++) {
          char key[40];
          snprintf(key, sizeof(key), "wrong_%s", read_names[r]);
          jint(key, bad[r]);
@@ -2566,8 +2568,9 @@ static void run_mips(void)
       if (first[0])
          jstr("first_wrong", first);
       jclose();
-      if (bad[0] + bad[1] + bad[2])
-         add_problem(wrong, sizeof(wrong), "%s %d/%d/%d", c->name, bad[0], bad[1], bad[2]);
+      if (bad[0] + bad[1] + bad[2] + bad[3])
+         add_problem(wrong, sizeof(wrong), "%s %d/%d/%d/%d", c->name, bad[0], bad[1], bad[2],
+                     bad[3]);
 
       free_buffer(&upload);
       for (int i = 0; i < 2; i++) {
@@ -2580,7 +2583,7 @@ static void run_mips(void)
    }
    jclose();
    if (wrong[0])
-      finish("fail", "wrong texels (fetch/sample/cube): %s", wrong);
+      finish("fail", "wrong texels (fetch/sample/grad/cube): %s", wrong);
 
    free_buffer(&out);
    vkDestroyDescriptorPool(dev, dpool, NULL);

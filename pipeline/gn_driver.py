@@ -17,12 +17,18 @@ put back afterwards.
 usage: python pipeline/gn_driver.py install ZIP GAME [GAME...]
        python pipeline/gn_driver.py select ENTRY GAME [GAME...]
        python pipeline/gn_driver.py show GAME [GAME...]
+       python pipeline/gn_driver.py args GAME [GAME...]
+       python pipeline/gn_driver.py options GAME LABEL
+       python pipeline/gn_driver.py set GAME LABEL VALUE
 
 install copies ZIP (a build from driver/dist) to the phone's Download/xclipse folder, imports it in
 Driver Manager unless it's there already, and makes it the Graphics Driver Version of each GAME (a
 custom game's name in the library, such as Heaven-radv). select does the last step for an entry
 that's already installed, named as the dropdown shows it ("RADV Xclipse (Mesa ...)", "System").
-show prints each GAME's Graphics Driver Version and changes nothing.
+show prints each GAME's Graphics Driver Version and changes nothing. args sets each GAME's Exec
+Arguments to game.py's EXEC_ARGS for it (GAME is <bench>-<driver>, such as GravityMark-radv).
+options prints the choices of the dropdown under LABEL on GAME's Graphics tab (such as "BCn
+Emulation") and changes nothing; set picks VALUE there, saves, and reads it back.
 """
 
 from __future__ import annotations
@@ -34,7 +40,8 @@ import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from phone_ui import dump, tap  # noqa: E402
+from game import EXEC_ARGS  # noqa: E402
+from phone_ui import clear, dump, tap, type_text  # noqa: E402
 from run import adb, shell  # noqa: E402
 
 APP = "app.gamenative"
@@ -140,21 +147,68 @@ def title_buttons(nodes: list[dict]) -> tuple[dict, dict]:
     return top[0], top[1]
 
 
-def driver_field(nodes: list[dict]) -> str:
-    """The value shown under the Graphics Driver Version label."""
-    lab = find(nodes, "Graphics Driver Version")
+def field_value(nodes: list[dict], text: str) -> str:
+    """The value shown under the label `text`."""
+    lab = find(nodes, text)
+    if not lab:
+        sys.exit(f"no {text!r} on screen")
     below = [n for n in nodes if n["text"] and 0 < n["y"] - lab["y"] < 120 and n is not lab]
     return min(below, key=lambda n: n["y"])["text"] if below else ""
 
 
-def open_graphics(game: str, from_library: bool = True) -> list[dict]:
-    """Opens GAME's container settings on the Graphics tab."""
+def driver_field(nodes: list[dict]) -> str:
+    """The value shown under the Graphics Driver Version label."""
+    return field_value(nodes, "Graphics Driver Version")
+
+
+def open_container(game: str, from_library: bool = True) -> list[dict]:
+    """Opens GAME's container settings, on the General tab."""
     if from_library:
         open_library()
         go(game, "Game Information")
     go("Options", "Quick Actions")
-    go("Edit container", f"{game} Config")
+    return go("Edit container", "Exec Arguments")
+
+
+def open_graphics(game: str, from_library: bool = True) -> list[dict]:
+    """Opens GAME's container settings on the Graphics tab."""
+    open_container(game, from_library)
     return go("Graphics", "Graphics Driver Version")
+
+
+def args_field(nodes: list[dict]) -> dict:
+    """The Exec Arguments text field (its label sits just above it)."""
+    lab = find(nodes, "Exec Arguments")
+    below = [n for n in nodes if n["cls"] == "EditText" and 0 < n["y"] - lab["y"] < 150]
+    if not below:
+        sys.exit("no Exec Arguments field on screen")
+    return min(below, key=lambda n: n["y"])
+
+
+def set_args(game: str, text: str) -> None:
+    """Sets GAME's Exec Arguments (General tab) to `text`, saves, and reads it back."""
+    nodes = open_container(game)
+    before = args_field(nodes)["text"]
+    if before == text:
+        print(f"{game}: Exec Arguments already set")
+        close_container(nodes)
+        return
+    tap_node(args_field(nodes), nodes)
+    time.sleep(1)
+    if clear():
+        sys.exit(f"{game}: couldn't empty the Exec Arguments field")
+    typed = type_text(text)
+    if typed != text:
+        sys.exit(f"{game}: the field reads {typed!r}, not {text!r}; not saved")
+    _, _, nodes = wait_for(f"{game} Config*")
+    tap_node(title_buttons(nodes)[1], nodes)  # save
+    wait_for("Game Information")
+    nodes = open_container(game, from_library=False)
+    after = args_field(nodes)["text"]
+    close_container(nodes)
+    if after != text:
+        sys.exit(f"{game}: saved, but it reads {after!r} when reopened")
+    print(f"{game}: Exec Arguments set and read back:\n  was {before}\n  now {after}")
 
 
 def close_container(nodes: list[dict]) -> None:
@@ -163,6 +217,75 @@ def close_container(nodes: list[dict]) -> None:
         sys.exit("refusing to close: the container has unsaved changes")
     tap_node(title_buttons(nodes)[0], nodes)
     wait_for("Game Information")
+
+
+def graphics_field(game: str, text: str, from_library: bool = True) -> tuple[dict, list[dict]]:
+    """Opens GAME's Graphics tab scrolled so the label `text` is on screen: (node, dump)."""
+    open_graphics(game, from_library)
+    h = screen_height()
+    found = scroll_to(text, 640, h - 500, h - 1300, h)
+    if not found:
+        sys.exit(f"{game}: no {text!r} on the Graphics tab")
+    return found
+
+
+def open_dropdown(lab: dict, nodes: list[dict]) -> list[dict]:
+    """Taps the label `lab` to open its dropdown and returns the dropdown's entries: the nodes that
+    weren't on screen before (the page behind it stays in the dump, with the same texts)."""
+    page = {(label(n), tuple(n["box"])) for n in nodes}
+    tap_node(lab, nodes)
+    time.sleep(1.5)
+    entries = [n for n in dump() if label(n) and (label(n), tuple(n["box"])) not in page]
+    if not entries:
+        sys.exit(f"tapping {label(lab)!r} opened no dropdown")
+    return entries
+
+
+def close_dropdown(nodes: list[dict]) -> None:
+    """Dismisses an open dropdown by tapping the screen title behind it."""
+    title = next((n for n in nodes if label(n).endswith(" Config") or label(n).endswith(" Config*")),
+                 None)
+    if not title:
+        sys.exit("no container title on screen to dismiss the dropdown with")
+    tap_node(title, nodes)
+    time.sleep(1)
+
+
+def options(game: str, text: str) -> list[str]:
+    lab, nodes = graphics_field(game, text)
+    entries = open_dropdown(lab, nodes)
+    close_dropdown(nodes)
+    close_container(dump())
+    return [label(n) for n in entries]
+
+
+def set_option(game: str, text: str, value: str) -> None:
+    """Picks `value` in the dropdown under the label `text` on GAME's Graphics tab, saves, and reads
+    it back."""
+    lab, nodes = graphics_field(game, text)
+    before = field_value(nodes, text)
+    if before == value:
+        print(f"{game}: {text} already {value}")
+        close_container(nodes)
+        return
+    entries = open_dropdown(lab, nodes)
+    pick = next((n for n in entries if value in (n["text"], n["desc"])), None)
+    if not pick:
+        close_dropdown(nodes)
+        close_container(dump())
+        sys.exit(f"{game}: {value!r} isn't a choice for {text}: {[label(n) for n in entries]}")
+    tap_node(pick, entries)
+    _, _, nodes = wait_for(text)
+    if field_value(nodes, text) != value or not find(nodes, f"{game} Config*"):
+        sys.exit(f"{game}: {text} reads {field_value(nodes, text)!r} after picking {value!r}")
+    tap_node(title_buttons(nodes)[1], nodes)  # save
+    wait_for("Game Information")
+    _, nodes = graphics_field(game, text, from_library=False)
+    after = field_value(nodes, text)
+    close_container(nodes)
+    if after != value:
+        sys.exit(f"{game}: saved, but {text} reads {after!r} when reopened")
+    print(f"{game}: {text} {before} -> {after} (read back after saving)")
 
 
 def show(game: str) -> str:
@@ -252,9 +375,16 @@ def wait_awake_unlocked(limit_s: float = 300) -> None:
 
 def main() -> None:
     args = sys.argv[1:]
-    if len(args) < 2 or args[0] not in ("install", "select", "show") or (
-            args[0] != "show" and len(args) < 3):
+    needed = {"install": 3, "select": 3, "show": 2, "args": 2, "options": 3, "set": 4}
+    if not args or args[0] not in needed or len(args) < needed[args[0]]:
         sys.exit(__doc__)
+    if args[0] == "args":
+        texts = {}
+        for game in args[1:]:
+            bench, _, driver = game.lower().partition("-")
+            if bench not in EXEC_ARGS or not driver:
+                sys.exit(f"{game}: not a <bench>-<driver> name for one of {sorted(EXEC_ARGS)}")
+            texts[game] = EXEC_ARGS[bench].format(driver=driver)
     stay_on = shell("settings get global stay_on_while_plugged_in")
     shell("svc power stayon usb")
     try:
@@ -264,6 +394,13 @@ def main() -> None:
         elif args[0] == "select":
             for game in args[2:]:
                 select(args[1], game)
+        elif args[0] == "args":
+            for game, text in texts.items():
+                set_args(game, text)
+        elif args[0] == "options":
+            print(f"{args[1]}: {args[2]}: {options(args[1], args[2])}")
+        elif args[0] == "set":
+            set_option(args[1], args[2], args[3])
         else:
             for game in args[1:]:
                 print(f"{game}: {show(game)}")
