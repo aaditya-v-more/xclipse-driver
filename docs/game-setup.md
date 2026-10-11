@@ -18,14 +18,14 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
   | `Heaven-radv` | 2000940202 |
 
 - These files are in `/sdcard/Download/xclipse/` (`D:\xclipse\` inside containers):
-  - the driver zip, `radv-xclipse-26.3.0-devel-xd-c8fed77.zip`
+  - the driver zips, `radv-xclipse-26.3.0-devel-xd-<sha>.zip`. The newest is `xd-3e88e3e`.
   - `EXEC-ARGS.txt`
   - `vc_redist.x64.exe`, in case GravityMark needs the Visual C++ runtime
   - `out/`, where the benchmarks write their results
 
 ## One-time steps in GameNative
 
-1. **Settings → Emulation → Driver Manager → Import ZIP from device.** Pick `Download/xclipse/radv-xclipse-26.3.0-devel-xd-c8fed77.zip`.
+1. **Menu (top right of the library) → Settings → Emulation → Driver Manager → Import ZIP from device.** Pick the newest `Download/xclipse/radv-xclipse-26.3.0-devel-xd-<sha>.zip`.
 2. **Settings:** turn off "Auto-apply known config" if it's there. Otherwise GameNative may silently apply its own recommended settings to new containers.
 3. **Library:** the four games appear by folder name. For each one, open the game menu and choose **Edit container**:
    - **General:**
@@ -33,7 +33,7 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
      - Exec Arguments: the line for that game from `EXEC-ARGS.txt`. Print them with `python pipeline/game.py --print-args` (the toolchain's Python, see `README.md`).
    - **Graphics:**
      - Graphics Driver: the same Wrapper on all four (Wrapper-gamenative if offered).
-     - Graphics Driver Version: `System` for `*-stock`, and `RADV Xclipse (Mesa 26.3.0-devel-xd-c8fed77)` for `*-radv`.
+     - Graphics Driver Version: `System` for `*-stock`, and `RADV Xclipse (Mesa 26.3.0-devel-xd-<sha>)`, the newest, for `*-radv`.
      - DX Wrapper: DXVK, same version on all four.
    - Save.
 
