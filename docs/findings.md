@@ -72,6 +72,28 @@ Verified facts only. Raw survey output is in `recon/device-gpu-recon.txt` and `r
   - Not seen with a wave32 pixel shader, with 12 or 16 VGPRs allocated, or with 16 VGPRs and 8 input VGPRs.
   - The mechanism isn't known. Our driver gives every wave64 shader at least 16 VGPRs (`radv_postprocess_binary_config` in `radv_shader.c`). That costs no occupancy for shaders that small, since the SIMD's limit of 16 waves comes first.
 
+### GPU faults, resets and load (GPL kernel source and sysfs, 2026-10-11)
+
+- **Every GPU page fault ends in a full GPU reset.**
+  - The fault interrupt (`gmc_v10_0_process_interrupt`, `gmc_v10_0.c`) records the fault, remembers the faulting VMID, and queues `page_fault_work` 100 ms later.
+  - That work, `sgpu_page_fault_recovery` (`amdgpu_device.c`), calls `amdgpu_device_gpu_recover`. It resets the GPU, cancels the faulting VMID's pending jobs (`-ECANCELED`) and resubmits the others.
+  - So a game that faults once a frame stalls for a reset every frame, and that frame's work is dropped.
+- **`/sys/kernel/gpu/gpu_info` counts them:**
+  - `GPF_S`: page faults.
+  - `GHG_S`: `gpu_reset_counter`, every reset.
+  - `GTO_S`: job timeouts.
+  - Throughout 2026-10-11, GHG_S = GPF_S + GTO_S: every reset followed a page fault or a timeout.
+- **The kernel keeps the faulting addresses for the process that faulted.**
+  - It's an `AMDGPU_INFO` query, `SGPU_INFO_GPU_PAGE_FAULTS` (0x101, `include/uapi/drm/sgpu_drm.h`). It returns `struct drm_sgpu_query_gpu_page_faults { __u32 num_faults; __u64 fault_addr[4]; }`.
+  - The records are per DRM file, so only the driver inside the faulting process can read them. Reading consumes them, and the kernel holds at most 4.
+  - The addresses are 4 KiB page starts, 48-bit GPU VAs.
+  - dmesg has the full fault status, but the shell can't read it without root.
+- **GPU load:**
+  - `/sys/kernel/gpu/gpu_busy` is the busy percentage over the kernel's last 8 ms DVFS window (`sgpu_devfreq_polling_ms`). Busy time is counted while jobs are in flight (`sgpu_utilization.c`).
+  - `/sys/kernel/gpu/gpu_clock` is the clock in kHz, 0 while the GPU is idle or power-gated.
+  - Both are world-readable.
+- **`/sys/kernel/gpu/mem_info` misses imported memory.** Its per-process numbers count the process's GEM buffers, but skip imported and exported dma-bufs (`amdgpu_gem_bo_size`). GameNative's wrapper imports dma-bufs for host-visible memory in 32-bit games, so those don't show up.
+
 ## Build PC
 
 - i5-13600 (14 cores / 20 threads), 15.7 GB RAM, about 214 GB free on C:. Hypervisor present.

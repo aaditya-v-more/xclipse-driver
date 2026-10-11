@@ -188,6 +188,26 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - **Why it matters beyond transform feedback.** The overwritten registers are other waves' first inputs: NGG primitives and vertex indices, compute thread IDs, pixel barycentrics.
     - Any game that draws with a tiny pixel shader (constant colors, or a dummy color output on a depth pass) could get broken triangles, wrong compute results or GPU hangs.
     - The radv game runs so far, Heaven's 2 FPS included, used drivers without this fix.
+- [x] **Heaven's 2 FPS on radv: a GPU page fault, and so a full GPU reset, about every frame (2026-10-11, `results/2026-10-11_104551-game`, `results/2026-10-11_105144-game`).**
+  - **Driver `xd-3e88e3e` loads in GameNative.** Smoke run `104551`: Heaven on radv at 2.1 FPS, median frame 41.7 ms, 177 s of steady frames. The register fix didn't change Heaven.
+  - **The timed A/B `105144` stopped after its first round,** when work moved to the Windows PC. `game.py` wrote its results only at the end, so only `progress.log` and the screenshots survive. It now keeps finished runs on Ctrl+C.
+    - Heaven: **stock 40.0 FPS over 296 s, radv 2.0 FPS over 283 s.** Stock Heaven ran this time, with no D24 fatal error.
+    - GravityMark: lmkd killed both runs again; radv rendered 17.9 FPS for 1 s first. **Max Device Memory 2048 MB has no effect** on it: GravityMark runs with `-vk`, native Vulkan, so DXVK's `maxDeviceMemory` doesn't apply.
+  - **Cause of the stalls.** While Heaven runs on radv, the kernel's page-fault count (`gpu_info` GPF_S) rises by 1–1.5 a second, and the reset count with it.
+    - The counts: 430 before the smoke run, 1283 after the A/B; mid-run, 1016 → 1032 in 10 s.
+    - On this kernel every page fault queues a full GPU reset and cancels the faulting job (`docs/findings.md`). That's the 1 s stall after every frame or two.
+    - The faulting buffer is unknown. The kernel gives the addresses only to the process that faulted, through an `AMDGPU_INFO` query, so the driver has to log them.
+  - **New measurements in `game.py`:**
+    - GPU busy % and clock once a second (`/sys/kernel/gpu/gpu_busy`, `gpu_clock`). The summary shows the mean busy share after warm-up.
+    - The present timestamps, in `results.json`.
+    - GPU page faults and resets per run, read from `gpu_info` before and after. They're a new summary column.
+  - **Driver `xd-6563904` logs every fence or semaphore wait of 20 ms or more**: `[WAIT]` lines, tag `RADV_WAIT`, with the caller's offset in the library for `llvm-addr2line`. It's built but not on the phone. The faults explain the stalls, so it's a second-line tool now.
+  - **GameNative's wrapper** (source: GameNative/mesa, branch `wrapper-25`, `src/vulkan/wrapper`; read, not verified on the phone):
+    - Wine needs placed memory maps for 32-bit (WoW64) games like Heaven. The wrapper always advertises `VK_EXT_map_memory_placed`, unless `WRAPPER_DISABLE_PLACED=1`.
+    - It backs host-visible memory with dma-bufs from `/dev/dma_heap/system-uncached` and imports them into the driver. `WRAPPER_DMAHEAP_CACHED=1` switches to the cached heap; `WRAPPER_RESOURCE_TYPE` picks dma-buf, AHB or opaque fd.
+    - That's why `mem_info` shows Heaven with only about 60 MB of GPU memory.
+    - GameNative 0.9.2 bundles four wrappers (`wrapper`, `wrapper-v2`, `wrapper-legacy`, `wrapper-leegao`); which one the containers use isn't known.
+    - Heaven-radv's launch environment includes `WRAPPER_RESOURCE_TYPE=auto`, `WRAPPER_EMULATE_BCN=3`, `WRAPPER_NATIVE_BCN=1`, `WRAPPER_VK_VERSION=1.3.0`, `WRAPPER_MAX_IMAGE_COUNT=0`, `WRAPPER_DISABLE_PRESENT_WAIT=0`, `MESA_VK_WSI_PRESENT_MODE=mailbox`, `MESA_SHADER_CACHE_DISABLE=false` and `DXVK_ASYNC=1`.
 
 ## Optimization targets (from the speed tests)
 
@@ -204,7 +224,8 @@ This PC's internet usually comes from the phone's hotspot. If a GPU hang reboots
 
 ## Next steps
 
-1. **Timed game A/B:** `game.py --runs 3` with driver `xd-3e88e3e`, the first with the register fix.
-2. **Heaven's 2 FPS on radv,** if the new driver doesn't change it: measure GPU busy time during a run, to tell GPU-bound from waiting.
-3. **GPU cost per draw:** decide when NGG culling pays off on this GPU (optimization target 1).
-4. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.
+1. **Find Heaven's page fault on radv.** Log the faulting addresses from the driver and match them to its buffers; the design is in `docs/HANDOFF.md`. Then fix the cause.
+2. **Timed game A/B again** (`game.py --runs 3`). The new `GPU faults` column should read 0 for both drivers.
+3. **GravityMark's memory:** Max Device Memory doesn't reach it (`-vk`). Try fewer asteroids (`-asteroids`) in both containers' Exec Arguments, or another native-Vulkan benchmark.
+4. **GPU cost per draw:** decide when NGG culling pays off on this GPU (optimization target 1).
+5. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.

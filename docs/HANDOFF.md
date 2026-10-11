@@ -1,4 +1,4 @@
-# Handoff: continue on any computer (written 2026-10-10, updated 2026-10-11)
+# Handoff: continue on any computer (written 2026-10-10, updated 2026-10-11 11:20)
 
 The work moves between the user's Windows PC and Mac. Everything (toolchain, driver build, phone tests, game runs) works on both; the commands below give both forms. The phone stays the same: Galaxy S24 FE, SM-S721B, serial `RZCY90ZYQXZ`. Read this first, then `docs/PROGRESS.md` for the full history and numbers.
 
@@ -13,19 +13,51 @@ The work moves between the user's Windows PC and Mac. Everything (toolchain, dri
   - Queries no longer need GDS, which the kernel doesn't have. That hung Heaven on radv.
   - Transform feedback (D3D11 stream output) works instead of hanging the GPU.
   - Small wave64 pixel shaders overwrote registers of other waves. That could break geometry or compute, or hang the GPU, in any game, so **every radv game result before `xd-3e88e3e` is suspect.**
-- **The game-level A/B test runs, but no timed benchmark has finished yet.**
-  - Heaven ran to the end on radv (driver `xd-ea7b521`), at 2 FPS with stalls of about a second.
-  - Stock Heaven stops at Unigine's fatal error on a 2048x2048 D24 depth texture, even with BCn Emulation `full`.
-  - GravityMark ran out of memory on both drivers. Both GravityMark containers now cap Max Device Memory at 2048 MB; not tested yet.
+- **Game A/B, first round only** (`results/2026-10-11_105144-game/progress.log`; stopped when work moved to Windows):
+  - Heaven: **stock 40.0 FPS, radv 2.0 FPS.** Stock Heaven ran to the end this time, without the D24 fatal error seen before.
+  - **Why radv is slow:** Heaven on radv makes the GPU page-fault about once a second, and this kernel answers every page fault with a full GPU reset (`docs/findings.md`, "GPU faults, resets and load"). Finding the faulting buffer is the next step.
+  - GravityMark: lmkd kills it on both drivers. Max Device Memory doesn't apply, because GravityMark runs native Vulkan (`-vk`), not DXVK.
 
-## Resume here (updated 2026-10-11 11:00)
+## Resume here (updated 2026-10-11 11:20, moving to the Windows PC)
 
-Steps 1–4 of the earlier list are done (query fix installed, stock Heaven tried with BCn `full`, `game.py`'s 30 s rule, one rerun). Wine debug logs are off. Next:
+The Mac stopped the A/B between runs and left the phone clean: GameNative closed, `stay_on_while_plugged_in` back to 0, `debug.radv_xclipse_log` 0. The phone still runs driver `xd-3e88e3e` in the radv containers. Nothing is uncommitted. On the Windows PC (cmd, from the repo root):
 
-1. **Check that driver `xd-3e88e3e` loads:** `game.py --bench heaven --runs 1 --radv-log`. `Driver seen` should show Mesa, and Heaven's FPS shows whether the register fix changed the 2 FPS.
-2. **The timed A/B:** `game.py --runs 3`, without `--radv-log`. Commit and push the results.
-3. **If Heaven is still about 2 FPS on radv:** find a GPU busy-time source (sysfs has a `devfreq` node for the GPU) and sample it during a run, to tell GPU-bound from waiting.
-4. **Stock Heaven:** the D24 failure blocks the stock side. Neither driver supports `D24_UNORM_S8_UINT`, so DXVK falls back to `D32_SFLOAT_S8_UINT`, which Samsung reports without linear filtering. Unconfirmed; a small `xdtest` image-creation case would settle it.
+1. **Sync and check.** `git pull`, then `adb devices` should list `RZCY90ZYQXZ`. The toolchain is already set up on that PC; if `tools\` is missing, run `tools\setup.ps1` first.
+2. **Write the fault logger.** It belongs in the driver, Xclipse only, and is on with `debug.radv_xclipse_log` ≥ 1.
+   - **Query.** In `radv_amdgpu_cs_submit` (`driver/src/amd/vulkan/winsys/amdgpu/radv_amdgpu_cs.c`), after `ac_drm_cs_submit_raw2` succeeds:
+     - Call `ac_drm_query_info(ws->dev, 0x101, sizeof(r), &r)` with `struct { uint32_t num_faults; uint64_t fault_addr[4]; } r`. That's 40 bytes, the layout of `drm_sgpu_query_gpu_page_faults` in `sgpu_drm.h`.
+     - Repeat while it returns 4.
+     - After the first error, stop asking (kernels without the query).
+   - **Buffer map.** In `radv_amdgpu_bo.c`, record every buffer where `radv_amdgpu_log_bo()` is called: create, `from_ptr`, `from_fd` and destroy.
+     - Record its VA, size, flags, domain, priority, create and destroy times, and `__builtin_return_address(0)`.
+     - Keep the last few thousand destroyed ones in a ring.
+     - The IB cache parks command buffers instead of destroying them (`radv_xclipse_ibcache_park`), so parked ones stay live.
+   - **Owner names.** `radv_bo_create`, `radv_bo_from_fd` and `radv_bo_from_ptr` (`radv_buffer.c`) know the owning Vulkan object.
+     - Pass its type (`vk_ObjectType_to_str`) and their caller (`__builtin_return_address(0)`) down to the winsys.
+     - Use a new optional `radeon_winsys` hook, left NULL in the null winsys.
+   - **Log one `[VMFAULT]` line per fault**, with the page and the CLOCK_MONOTONIC time, then:
+     - the buffer containing the page, with the offset;
+     - or, if none does, how far the page is past the end of the nearest buffer below it, and the nearest buffer above;
+     - and any destroyed buffer that covered it (use after free).
+     - Compare 48-bit addresses: RADV may hold sign-extended VAs.
+3. **Build and install it.**
+   - Commit first, so the package name `xd-<sha>` matches. Then `call tools\env.cmd && driver\build.cmd`.
+   - `adb push driver\dist\radv-xclipse-26.3.0-devel-xd-<sha>.zip /sdcard/Download/xclipse/`.
+   - Import it in Driver Manager and select it in Heaven-radv; the tap paths are under "Open work".
+4. **Catch the fault.**
+   - Run `tools\python\python.exe pipeline\game.py --bench heaven --drivers radv --runs 1 --radv-log`, then `adb logcat -d | findstr VMFAULT`.
+   - Map caller offsets with `tools\android-ndk-r29\toolchains\llvm\prebuilt\windows-x86_64\bin\llvm-addr2line.exe -f -e driver\build-android\src\amd\vulkan\libvulkan_radeon.so 0x<offset>`. That's the unstripped library, and it has to be from the same build.
+5. **Fix it, then rerun the timed A/B:** `game.py --runs 3`. The `GPU faults` column should read 0 for both drivers. Commit and push the results.
+
+**Suspects** to compare with the faulting buffer (from reading the code, not verified):
+
+- Heaven leans on tessellation. The tessellation factor and off-chip rings are sized from the shader-engine and CU counts.
+- Occlusion queries: `ZPASS_DONE` writes one result per render backend, so a wrong RB count writes past a query's slot.
+- The scratch ring, for shaders that spill.
+- Scalar loads past a buffer's end. `radv_bo_create` pads application buffers with an extra VM page only when `mitigate_smem_oob` or `has_smem_partial_oob_access_bug` is set.
+- The wrapper's dma-buf imports for 32-bit placed maps (`radv_bo_from_fd`; see `docs/PROGRESS.md`).
+
+**Bisecting without the logger.** Each game run now records its GPU faults, and Heaven faults about once a second. So one Heaven run per setting shows whether a switch stops them: for example, set `adb shell setprop debug.radv_debug nonggc` (or `nodcc`, `nohiz`) before the run, and clear it afterwards.
 
 **Phone UI work goes to a Sonnet subagent** (see `CLAUDE.md`). Container edits, Driver Manager imports, and settings changes are slow, mechanical taps.
 
@@ -96,8 +128,9 @@ Leave DX Wrapper at its default (DXVK `async-1.10.3` in GameNative 0.9.2) on all
 Graphics-tab settings that differ from the defaults, or that were checked:
 
 - **Heaven-stock: BCn Emulation `full`** (was `auto`). It fixed the BC1/BC3 errors but not the D24 one. The other three containers have `auto`, type `compute`.
-- **GravityMark-stock and GravityMark-radv: Max Device Memory 2048 MB** (was 0 MB, no limit). Path: the game's card → Options (754,655) → Edit container (521,405) → Graphics tab (383,247) → Max Device Memory row (540,1431) → 2048 MB (840,1172) → save (1001,89). Whether this is DXVK's `maxDeviceMemory` or a wrapper setting is unknown; the next GravityMark run's GPU memory peak will tell.
+- **GravityMark-stock and GravityMark-radv: Max Device Memory 2048 MB** (was 0 MB, no limit). Path: the game's card → Options (754,655) → Edit container (521,405) → Graphics tab (383,247) → Max Device Memory row (540,1431) → 2048 MB (840,1172) → save (1001,89). It's DXVK's `maxDeviceMemory`, so it does nothing for GravityMark, which runs native Vulkan (`-vk`); lmkd still killed both runs.
 - Seen in GravityMark-stock and both radv containers: "Use Adrenotools Turnip" on, present mode mailbox, Memory Resource Type auto, DXVK `async-1.10.3`. GravityMark-stock also has Wine Video Memory Size 2048 MB.
+- Heaven-radv's launch environment, from logcat: `WRAPPER_RESOURCE_TYPE=auto`, `WRAPPER_EMULATE_BCN=3`, `WRAPPER_NATIVE_BCN=1`, `WRAPPER_VK_VERSION=1.3.0`, `MESA_VK_WSI_PRESENT_MODE=mailbox`, `DXVK_ASYNC=1`, and `VK_ICD_FILENAMES` pointing at GameNative's wrapper, which loads our driver through adrenotools. The wrapper's switches are in `docs/PROGRESS.md`.
 
 Environment tab, added on top of GameNative's defaults:
 
@@ -132,7 +165,10 @@ Don't try these shortcuts; we checked them in the v0.9.2 source:
 - **Smoke test:** `python pipeline/game.py --bench heaven,gravitymark --runs 1 --radv-log`.
   - `--radv-log` makes RADV log `[BUILD] Mesa 26.3.0-devel`, which proves the radv runs loaded our driver. The `Driver seen` column shows it.
   - Leave it off for timed runs.
-- **Before every run** `game.py` closes background apps with `am kill-all` and keeps the screen on. It also samples free memory, GameNative's memory, and its GPU memory every 5 s. It records low-memory kills as `killed-low-memory`.
+- **Before every run** `game.py` closes background apps with `am kill-all` and keeps the screen on. It records low-memory kills as `killed-low-memory`.
+  - It samples free memory, GameNative's memory, and its GPU memory every 5 s, and the GPU's busy share and clock every second.
+  - It counts the GPU page faults and resets of each run, from `gpu_info`.
+  - Ctrl+C stops it between or during runs and still saves the finished runs.
 - **Nobody may touch the phone during runs.** Rotating it made GameNative recreate its surface, and lmkd killed it.
 - **The real A/B:** `python pipeline/game.py --runs 3`.
   - Results go to `results/<time>-game/summary.md` and `results.json`. `results.json` includes the settings GameNative launched each container with.
@@ -149,7 +185,8 @@ Set them as environment variables in `xdtest` runs, or as `debug.*` properties f
 
 ## Open work after that
 
-- **Heaven's 2 FPS on radv,** if the new driver doesn't fix it (see "Resume here").
+- **Heaven's 2 FPS on radv:** a GPU page fault about once a second, each followed by a GPU reset (see "Resume here").
+- **Driver `xd-6563904`** logs every fence or semaphore wait of 20 ms or more (`[WAIT]`, logcat tag `RADV_WAIT`). It's not on the phone; rebuild it from that commit if a stall remains once the faults are gone.
 - **Per-draw cost.**
   - NGG culling: compare in games with `adb shell setprop debug.radv_debug nonggc`.
   - Port-specific CPU overhead: about 4% from cache-flush emission, 2% from logging checks on the hot path, and 2% from register remapping. See `docs/PROGRESS.md`.

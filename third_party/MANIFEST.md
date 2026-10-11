@@ -10,6 +10,7 @@ These are separate git repos, kept out of this project's history. The driver its
 | `mesa-unified-drivers` | https://github.com/JimVulkan/mesa-unified-drivers | `main` | `a5010bb` (2026-09-30) |
 | `ExynosTools` | https://github.com/WearyConcern1165/ExynosTools | `main` | `3dcdbcb` (2026-05-21) |
 | `kernel-r12s` | https://github.com/Elchanz3/android_kernel_samsung_r12s | `OS-16` | `9526364` (2026-07-02) |
+| `gamenative-mesa` (added 2026-10-11) | https://github.com/GameNative/mesa | `wrapper-25` | `8a01bd8` (2026-10-10) |
 
 To re-create them, run this from `third_party/` in Git Bash:
 
@@ -27,6 +28,9 @@ $C https://github.com/WearyConcern1165/ExynosTools.git
 $C --depth 1 --filter=blob:none --sparse --no-checkout --branch OS-16 https://github.com/Elchanz3/android_kernel_samsung_r12s.git kernel-r12s
 git -C kernel-r12s sparse-checkout set --cone --sparse-index drivers/gpu/drm/samsung include/uapi/drm arch/arm64/configs
 git -C kernel-r12s checkout
+# GameNative's Vulkan wrapper and its WSI only.
+$C --depth 1 --filter=blob:none --sparse --branch wrapper-25 https://github.com/GameNative/mesa.git gamenative-mesa
+git -C gamenative-mesa sparse-checkout set src/vulkan/wrapper src/vulkan/wsi
 ```
 
 Licensing:
@@ -34,4 +38,5 @@ Licensing:
 - The RADV ports and `mesa-unified-drivers` are MIT, plus Mesa's own licenses.
 - The kernel is GPL-2.0.
 - ExynosTools states no license, so treat it as reference only and don't copy code from it.
+- GameNative's wrapper files carry no license header; read them as reference only.
 - We deliberately don't clone `avavo/XclipseDecomp` or `avavo/MdiEx`. `docs/research.md` explains why.
