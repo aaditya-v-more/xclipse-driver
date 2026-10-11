@@ -8,7 +8,7 @@
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
  *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
- *                xfbmanygs textures mips mrt vertex depth storage
+ *                xfbmanygs textures mips mrt vertex depth storage bcn
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -207,7 +207,7 @@ static double median(const double *v, int n)
 #define DEVICE_FUNCS(X)                                                                            \
    X(vkDestroyDevice) X(vkDeviceWaitIdle) X(vkGetDeviceQueue) X(vkQueueSubmit) X(vkCreateFence)     \
    X(vkDestroyFence) X(vkWaitForFences) X(vkCreateCommandPool) X(vkDestroyCommandPool)             \
-   X(vkAllocateCommandBuffers)                                                                     \
+   X(vkAllocateCommandBuffers) X(vkFreeCommandBuffers)                                            \
    X(vkBeginCommandBuffer) X(vkEndCommandBuffer) X(vkCreateBuffer) X(vkDestroyBuffer)               \
    X(vkGetBufferMemoryRequirements) X(vkAllocateMemory) X(vkFreeMemory) X(vkBindBufferMemory)       \
    X(vkMapMemory) X(vkCreateShaderModule) X(vkDestroyShaderModule) X(vkCreateDescriptorSetLayout)   \
@@ -701,6 +701,8 @@ static double submit_and_wait(VkCommandBuffer cb, const char *what)
    if (r != VK_SUCCESS)
       finish("fail", "%s: vkWaitForFences returned %d", what, r);
    vkDestroyFence(dev, fence, NULL);
+   if (cb)  /* one-time buffers; the speed tests record hundreds of them */
+      vkFreeCommandBuffers(dev, pool, 1, &cb);
    return ms;
 }
 
@@ -5365,7 +5367,9 @@ static void run_bcn(void)
    vkDestroyShaderModule(dev, cs, NULL);
    vkDestroyPipelineLayout(dev, layout, NULL);
    vkDestroyDescriptorSetLayout(dev, dsl, NULL);
-   finish("pass", "%d formats x %d levels decode like the CPU", NFORMATS, LEVELS);
+   char note[96];
+   snprintf(note, sizeof note, "%d formats x %d levels decode like the CPU", NFORMATS, LEVELS);
+   jstr("note", note);  /* main() reports the pass and tears the device down */
 }
 
 
@@ -5386,7 +5390,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
                       "  correctness: info device submit compute render tess scratch scratchcs\n"
                       "               queries xfb xfbmany xfbmanygs textures mips mrt vertex depth\n"
-                      "               storage\n"
+                      "               storage bcn\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }

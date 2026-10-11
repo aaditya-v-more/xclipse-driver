@@ -98,20 +98,25 @@ def game_layers() -> list[str]:
     return names
 
 
-def present_times(layer: str) -> list[int]:
-    """Actual present timestamps (ns) of the layer's last ~128 frames."""
+RING = 128  # frame records SurfaceFlinger keeps per layer
+
+
+def present_times(layer: str) -> tuple[list[int], bool, int]:
+    """Actual present timestamps (ns) of the layer's last frames; whether SurfaceFlinger's ring of
+    RING records was full, so frames older than its oldest may be gone; and the compositor's
+    refresh period in ns (its first output line)."""
     out = shell(f"dumpsys SurfaceFlinger --latency '{layer}'", 30).splitlines()
-    times = []
-    for line in out[1:]:
-        parts = line.split()
-        if len(parts) >= 2 and parts[1].isdigit():
-            t = int(parts[1])
-            if 0 < t < (1 << 62):
-                times.append(t)
-    return times
+    period = int(out[0]) if out and out[0].strip().isdigit() else 0
+    rows = [line.split() for line in out[1:]]
+    rows = [p for p in rows if len(p) >= 2 and p[1].isdigit()]
+    times = [int(p[1]) for p in rows if 0 < int(p[1]) < (1 << 62)]
+    return times, len(rows) >= RING, period
 
 
-def frame_stats(times_ns: list[int]) -> dict:
+def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = ()) -> dict:
+    """Frame statistics from present timestamps. `holes` are (last seen, first seen again) pairs
+    where SurfaceFlinger's ring overflowed between two reads: frames were presented in between but
+    their times are gone, so those intervals count for nothing rather than as one long frame."""
     ts = sorted(set(times_ns))
     # GameNative's SurfaceView exists from its "Booting..." screen on and presents a frame now and
     # then while Wine starts. The game is rendering once 10 frames land within 2 s.
@@ -121,20 +126,28 @@ def frame_stats(times_ns: list[int]) -> dict:
     ts = [t for t in ts if t >= rendering + WARMUP_S * 1_000_000_000]
     if len(ts) < 10:
         return {"frames": len(ts)}
-    intervals = [(b - a) / 1e6 for a, b in zip(ts, ts[1:])]
+    def lost(a: int, b: int) -> bool:
+        return any(a <= h0 and h1 <= b for h0, h1 in holes)
+    pairs = list(zip(ts, ts[1:]))
+    intervals = [(b - a) / 1e6 for a, b in pairs if not lost(a, b)]
+    if not intervals:
+        return {"frames": len(ts)}
     worst = sorted(intervals)[int(len(intervals) * 0.99):]
     steady, start = 0, ts[0]
-    for a, b in zip(ts, ts[1:]):
-        if b - a > STALL_S * 1_000_000_000:
+    for a, b in pairs:
+        if b - a > STALL_S * 1_000_000_000 and not lost(a, b):
             start = b
         steady = max(steady, b - start)
+    covered_s = sum(intervals) / 1e3
     return {
         "frames": len(ts),
         "seconds": (ts[-1] - ts[0]) / 1e9,
         "steady_seconds": steady / 1e9,
-        "fps_avg": (len(ts) - 1) / ((ts[-1] - ts[0]) / 1e9),
+        "fps_avg": len(intervals) / covered_s,
         "frametime_median_ms": statistics.median(intervals),
         "fps_1pct_low": 1000.0 / statistics.mean(worst) if worst else None,
+        "sampling_gaps": sum(1 for a, b in pairs if lost(a, b)),
+        "covered_share": covered_s / ((ts[-1] - ts[0]) / 1e9),
     }
 
 
@@ -184,11 +197,46 @@ def free_memory(user: str) -> int:
     return memory_sample(user)["available_mb"]
 
 
+LOGCAT: dict = {}  # the run's log capture: "path", and "proc" and "file" while it runs
+
+
+def logcat_start(path: Path) -> None:
+    """Streams the phone log into `path` from now on. Reading the ring buffer after a five-minute
+    Wine session loses its start, and with it the lines that say which driver loaded."""
+    logcat_stop()
+    LOGCAT["path"] = path
+    LOGCAT["file"] = open(path, "wb")
+    LOGCAT["proc"] = subprocess.Popen([ADB, "logcat", "-v", "threadtime", "-b", "main,system",
+                                       "-T", "1"], stdout=LOGCAT["file"], stderr=subprocess.DEVNULL)
+
+
+def logcat_stop() -> None:
+    proc = LOGCAT.pop("proc", None)
+    if proc:
+        time.sleep(1)  # let the last lines arrive
+        proc.terminate()
+        try:
+            proc.wait(10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    f = LOGCAT.pop("file", None)
+    if f:
+        f.close()
+
+
 def logcat_since(since: str, pattern: str) -> list[str]:
-    """Log lines since `since` (the phone's 'MM-DD hh:mm:ss.mmm') that match an extended regex."""
-    out = shell(f"logcat -d -b main,system -T '{since}' | grep -E \"{pattern}\"", 60)
+    """Log lines since `since` (the phone's 'MM-DD hh:mm:ss.mmm') that match an extended regex;
+    from the run's capture file when there is one."""
+    path = LOGCAT.get("path")
+    if path and Path(path).exists():
+        rx = re.compile(pattern)
+        lines = [ln for ln in Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
+                 if rx.search(ln)]
+    else:
+        out = shell(f"logcat -d -b main,system -T '{since}' | grep -E \"{pattern}\"", 60)
+        lines = out.splitlines()
     # adbd logs each shell command it runs, this grep included, so its lines would always match.
-    return [line for line in out.splitlines() if line.strip() and "service requested" not in line]
+    return [line for line in lines if line.strip() and "service requested" not in line]
 
 
 def drivers_seen(since: str, processes: dict[str, str]) -> list[str]:
@@ -248,14 +296,35 @@ def message_box() -> list[int] | None:
     return find_box(w, h, raw[len(raw) - w * h * 4:])  # after a 12- or 16-byte header
 
 
-def gpu_sample() -> tuple[int, int] | None:
-    """How busy the GPU was over the kernel's last DVFS window (8 ms), in percent, and its clock in
-    kHz. Sampled once a second, the busy share averages out to the share of time the GPU had work."""
+CPU_POLICIES = (0, 4, 7, 9)  # the Exynos 2400e's clusters: 4x A520, 3x A720, 2x A720, 1x X4
+
+
+def gpu_sample() -> tuple | None:
+    """How busy the GPU was over the kernel's last DVFS window (8 ms), in percent; its clock in kHz;
+    its temperature in C; then each CPU cluster's clock in kHz. Sampled every loop turn, the busy
+    share averages out to the share of time the GPU had work."""
+    cpu = " ".join(f"/sys/devices/system/cpu/cpufreq/policy{p}/scaling_cur_freq" for p in CPU_POLICIES)
     try:
-        busy, clock = shell("cat /sys/kernel/gpu/gpu_busy /sys/kernel/gpu/gpu_clock", 15).split()
-        return int(busy), int(clock)
-    except ValueError:
+        v = shell(f"cat /sys/kernel/gpu/gpu_busy /sys/kernel/gpu/gpu_clock /sys/kernel/gpu/gpu_tmu {cpu}",
+                  15).split()
+        return (int(v[0]), int(v[1]), float(v[2]), *(int(x) for x in v[3:3 + len(CPU_POLICIES)]))
+    except (ValueError, IndexError):
         return None
+
+
+def battery_sample() -> dict:
+    """Battery level, voltage (mV), charge counter (uAh) and temperature (C) from the battery
+    service. The phone charges over USB during runs, so the counter's slope is net charging, not the
+    system's draw; the temperature is a second thermal reading next to the GPU's."""
+    out = shell("dumpsys battery", 15)
+    keys = {"level": "level", "voltage": "voltage_mv", "Charge counter": "charge_uah",
+            "temperature": "temperature_dc"}
+    sample = {}
+    for line in out.splitlines():
+        k, _, v = line.strip().partition(": ")
+        if k in keys and v.strip().lstrip("-").isdigit():
+            sample["battery_" + keys[k]] = int(v)
+    return sample
 
 
 def gpu_faults() -> dict[str, int]:
@@ -296,17 +365,21 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
               "available_mb_before": free_memory(user)}
     faults_before = gpu_faults()
     since = shell("date '+%m-%d %H:%M:%S.000'")
+    logcat_start(run_dir / f"{tag}-{bench}-{driver}-logcat.txt")
+    result["logcat_file"] = f"{tag}-{bench}-{driver}-logcat.txt"
     memory, processes, gpu = [], {}, []
     started = time.monotonic()
     shell(f"am start -n {APP}/.MainActivity -a {APP}.LAUNCH_GAME --ei app_id {app_id} "
           f"--es game_source CUSTOM_GAME")
 
     frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
+    holes, last_seen, periods = [], 0, Counter()  # lost-frame windows; newest frame; refresh periods
     exe_seen = exe_gone = 0
     history, last_new, checked = [], 0.0, 0.0  # (seconds, frames so far); when the count last grew
     shots_left = sorted(shots)
+    exe = cfg["exe"].lower()
     while time.monotonic() - started < (seconds or cfg["seconds"]):
-        time.sleep(1)
+        time.sleep(0.5)  # the adb calls below take the rest of the second; the ring holds ~1-2 s
         if phone_state() != "device":
             result["status"] = "phone-lost"
             break
@@ -320,12 +393,14 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             gpu.append((round(elapsed, 1), *sample))
         if elapsed - sampled >= MEMORY_EVERY_S:
             now = {}
-            memory.append({"t": round(elapsed), **memory_sample(user, now)})
+            memory.append({"t": round(elapsed), **memory_sample(user, now), **battery_sample()})
             processes.update(now)
             sampled = elapsed
             # GameNative keeps showing Wine's desktop after the game exits, so the game's own
             # process tells when it's over.
-            if any(cfg["exe"].lower() in name.lower() for name in now.values()):
+            # ps truncates names to 15 characters, so match on that prefix.
+            if any(exe.startswith(name.lower()) and len(name) >= min(15, len(exe))
+                   for name in now.values()):
                 exe_seen, exe_gone = exe_seen or round(elapsed), 0
             elif exe_seen:
                 exe_gone += 1
@@ -351,15 +426,24 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
                 break
             continue
         gone_for = 0
-        new = present_times(layer) if layer in layers else []
+        new, full, period = present_times(layer) if layer in layers else ([], False, 0)
         if not new:
             for name in layers:
-                new = present_times(name)
+                new, full, period = present_times(name)
                 if new:
                     layer = name
                     break
-        if new and seen_at is None:
-            seen_at = time.monotonic() - started
+        if new:
+            if seen_at is None:
+                seen_at = time.monotonic() - started
+            if period:
+                periods[period] += 1
+            lo, hi = min(new), max(new)
+            # A full ring whose oldest frame is newer than the newest one seen means frames were
+            # presented in between and their times are gone.
+            if full and frames and lo > last_seen:
+                holes.append((last_seen, lo))
+            last_seen = max(last_seen, hi)
         frames.update(new)
         if len(frames) > (history[-1][1] if history else 0):
             last_new = elapsed
@@ -367,13 +451,18 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     result["seconds_to_game_process"] = exe_seen or None
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
-    stats = result["surfaceflinger"] = frame_stats(list(frames))
+    stats = result["surfaceflinger"] = frame_stats(list(frames), holes)
+    result["refresh_period_ns"] = periods.most_common(1)[0][0] if periods else None
     result["memory"] = memory
-    result["gpu"] = gpu  # [seconds since launch, busy %, clock kHz]
+    result["gpu"] = gpu  # [seconds since launch, busy %, clock kHz, temp C, CPU cluster kHz...]
     result["present_ns"] = sorted(frames)  # CLOCK_MONOTONIC, as RADV's [WAIT] log lines
-    busy = [b for t, b, _ in gpu if seen_at is not None and t >= seen_at + WARMUP_S]
-    if busy:
-        result["gpu_busy_pct"] = statistics.mean(busy)
+    after_warmup = [s for s in gpu if seen_at is not None and s[0] >= seen_at + WARMUP_S]
+    if after_warmup:
+        result["gpu_busy_pct"] = statistics.mean(s[1] for s in after_warmup)
+        result["gpu_clock_mhz"] = statistics.mean(s[2] for s in after_warmup) / 1000
+        result["gpu_temp_c_mean"] = statistics.mean(s[3] for s in after_warmup)
+        result["cpu_clock_mhz"] = [statistics.mean(s[4 + i] for s in after_warmup) / 1000
+                                   for i in range(len(CPU_POLICIES))]
     counts = stats.get("steady_seconds", 0) >= MIN_STEADY_S
     # A run that stopped early or without enough frames has usually stopped at a message box, from
     # the game or from Wine.
@@ -382,6 +471,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         if screenshot(shot):
             result["screenshot"] = shot.name
     shell(f"am force-stop {APP}")
+    logcat_stop()
     killed = logcat_since(since, LOW_MEMORY_KILL)
     if killed:
         result["status"] = "killed-low-memory"
@@ -390,6 +480,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     result["launch_settings"] = [line.split(": I: ", 1)[-1] for line in
                                  logcat_since(since, LAUNCH_SETTINGS)]
     result["processes"] = sorted(set(processes.values()))
+    LOGCAT.pop("path", None)
 
     if "times" in cfg:
         name = cfg["times"].format(driver=driver)
@@ -417,11 +508,15 @@ def summarize(meta: dict, results: list[dict]) -> str:
     out += [
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
            f"first {WARMUP_S} s after the first frame. A run counts (`ran`) only with {MIN_STEADY_S} s "
-           f"of frames in a row, none more than {STALL_S} s apart; the medians use only those.", "",
+           f"of frames in a row, none more than {STALL_S} s apart; the medians use only those. "
+           "\"Lost windows\" counts gaps where SurfaceFlinger's 128-frame ring overflowed between two "
+           "reads; those intervals are left out of every figure. Hz is the compositor's refresh rate "
+           "during the run. GPU MHz, GPU C and X4 MHz (the big core's clock) are means after warm-up.",
+           "",
            "| Benchmark | Driver | Run | Status | Avg FPS | 1% low FPS | Median frame time (ms) "
-           "| Steady (s) | GPU busy (%) | GPU faults | Driver seen | Least free memory (MB) "
-           "| GameNative peak (MB) | Its GPU memory peak (MB) |",
-           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+           "| Steady (s) | Hz | Lost windows | GPU busy (%) | GPU MHz | GPU C | X4 MHz | GPU faults "
+           "| Driver seen | Least free memory (MB) | GameNative peak (MB) | Its GPU memory peak (MB) |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         s = r.get("surfaceflinger", {})
         fmt = lambda v: f"{v:.1f}" if isinstance(v, (int, float)) else ""  # noqa: E731
@@ -429,10 +524,15 @@ def summarize(meta: dict, results: list[dict]) -> str:
         least = min((m.get("available_mb", 0) for m in mem), default=0)
         peak = max((m.get("app_rss_mb", 0) + m.get("app_swap_mb", 0) for m in mem), default=0)
         gpu_peak = max((m.get("app_gpu_mb", 0) for m in mem), default=0)
+        hz = round(1e9 / r["refresh_period_ns"]) if r.get("refresh_period_ns") else ""
+        cpu = r.get("cpu_clock_mhz") or []
         out.append(f"| {r['bench']} | {r['driver']} | {r['run']} | {r['status']} | "
                    f"{fmt(s.get('fps_avg'))} | {fmt(s.get('fps_1pct_low'))} | "
-                   f"{fmt(s.get('frametime_median_ms'))} | {fmt(s.get('steady_seconds'))} | "
-                   f"{fmt(r.get('gpu_busy_pct'))} | {r.get('gpu_page_faults', '')} | {', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} | "
+                   f"{fmt(s.get('frametime_median_ms'))} | {fmt(s.get('steady_seconds'))} | {hz} | "
+                   f"{s.get('sampling_gaps', '')} | {fmt(r.get('gpu_busy_pct'))} | "
+                   f"{fmt(r.get('gpu_clock_mhz'))} | {fmt(r.get('gpu_temp_c_mean'))} | "
+                   f"{fmt(cpu[-1]) if cpu else ''} | {r.get('gpu_page_faults', '')} | "
+                   f"{', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} | "
                    f"{gpu_peak} |")
     out += ["", "## Medians", ""]
     for bench in dict.fromkeys(r["bench"] for r in results):
@@ -478,8 +578,13 @@ def main() -> None:
                     help="Android property to set for the session and clear afterwards")
     ap.add_argument("--print-args", action="store_true",
                     help="print the Exec Arguments for each container and exit")
+    ap.add_argument("--hz", type=int, default=120,
+                    help="pin the display to this refresh rate for the session (0 leaves it alone); "
+                         "GameNative presents with vsync, so the panel's rate caps the FPS")
     args = ap.parse_args()
     benches, drivers = args.bench.split(","), args.drivers.split(",")
+    if any("=" not in p for p in args.prop):
+        ap.error("--prop takes NAME=VALUE")
     props = dict(p.split("=", 1) for p in args.prop)
 
     if args.print_args:
@@ -492,8 +597,15 @@ def main() -> None:
 
     # The screen must stay on between runs (the timeout is 30 s), and a game can't start on a
     # locked phone. The setting is restored at the end.
-    stay_on = shell("settings get global stay_on_while_plugged_in")
+    stay_on = shell("settings get global stay_on_while_plugged_in").strip()
     shell("svc power stayon usb")
+    # The panel idles at 60 Hz and SurfaceFlinger paces GameNative to it; min/peak_refresh_rate
+    # pin it (verified: the compositor period goes from 16.67 to 8.33 ms). Both are restored.
+    refresh = {name: shell(f"settings get system {name}").strip()
+               for name in ("min_refresh_rate", "peak_refresh_rate")}
+    if args.hz:
+        for name in refresh:
+            shell(f"settings put system {name} {args.hz}.0")
     try:
         shell("input keyevent KEYCODE_WAKEUP")  # handled by the system, not passed to apps
         if not wait_unlocked(600):
@@ -505,7 +617,8 @@ def main() -> None:
         baseline = cool_down(target=45.0)
         meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
                 "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline,
-                "props": props}
+                "props": props, "display_hz": args.hz or None,
+                "battery_start": battery_sample()}
         shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
         for name, value in props.items():
             shell(f"setprop {name} '{value}'")
@@ -513,7 +626,15 @@ def main() -> None:
                 sys.exit(f"couldn't set {name}")
         results = run_all(args, benches, drivers, run_dir, app_user(), baseline)
     finally:
-        shell(f"settings put global stay_on_while_plugged_in {stay_on}")
+        if stay_on.isdigit():  # "null" when unset, "" when adb hiccuped: then leave it alone
+            shell(f"settings put global stay_on_while_plugged_in {stay_on}")
+        else:
+            print(f"warning: stay_on_while_plugged_in read back as {stay_on!r}; not restored")
+        for name, value in refresh.items():
+            if args.hz:
+                shell(f"settings delete system {name}" if value in ("", "null")
+                      else f"settings put system {name} {value}")
+        logcat_stop()
         shell("setprop debug.radv_xclipse_log 0")
         for name in props:
             shell(f"setprop {name} ''")

@@ -60,7 +60,15 @@ def bit_names(prefix: str) -> dict[int, str]:
     return names
 
 
-FLAGS, DOMAINS = bit_names("RADEON_FLAG_"), bit_names("RADEON_DOMAIN_")
+_NAMES: dict[str, dict[int, str]] = {}
+
+
+def names(prefix: str) -> dict[int, str]:
+    """The driver header's bit names for a prefix, read on first use (so a checkout without
+    `driver/src` can still import this module)."""
+    if prefix not in _NAMES:
+        _NAMES[prefix] = bit_names(prefix)
+    return _NAMES[prefix]
 
 
 def decode(bits: int, names: dict[int, str]) -> str:
@@ -151,8 +159,8 @@ def what(f: dict) -> tuple[str, dict | None]:
 def describe(d: dict, names: dict[int, str]) -> list[str]:
     va, end = int(d["va"], 16), int(d["end"], 16)
     return [f"BO va 0x{va:012x}-0x{end:012x} (size 0x{int(d['size'], 16):x}, {d['kind']}, "
-            f"dom {decode(int(d['dom']), DOMAINS)}, prio {d['prio']})",
-            f"flags {decode(int(d['flags'], 16), FLAGS)}",
+            f"dom {decode(int(d['dom']), names("RADEON_DOMAIN_"))}, prio {d['prio']})",
+            f"flags {decode(int(d['flags'], 16), names("RADEON_FLAG_"))}",
             f"owner {d['owner']}{d['internal'] or ''} 0x{d['handle']}",
             f"made by {names.get(int(d['by'], 16), '-')}",
             f"winsys call from {names.get(int(d['ws'], 16), '-')}"]

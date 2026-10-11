@@ -75,7 +75,7 @@ else
    rm -f "$tgz"
    echo "Python 3.13.16: installed (SHA-256 matches GitHub's)"
 fi
-"$PY" -m pip install --disable-pip-version-check --quiet meson ninja mako packaging pyyaml pymsi
+"$PY" -m pip install --disable-pip-version-check --quiet meson==1.12.1 ninja==1.13.2 mako==1.4.3 packaging==26.3 pyyaml==6.0.3 pymsi==0.0.0rc1
 echo "Python packages: meson, ninja, mako, packaging, pyyaml, pymsi"
 
 # glslang 16.6.0. Mesa's build calls it glslangValidator.

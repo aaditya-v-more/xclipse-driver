@@ -51,10 +51,11 @@ def dump(tries: int = 4) -> list[dict]:
     return nodes
 
 
-def find(nodes: list[dict], text: str) -> dict | None:
-    """First node whose text or description equals `text`, else the first that contains it."""
+def find(nodes: list[dict], text: str, contains: bool = True) -> dict | None:
+    """First node whose text or description equals `text`; with `contains`, else the first that
+    contains it."""
     t = text.lower()
-    for exact in (True, False):
+    for exact in ((True, False) if contains else (True,)):
         for n in nodes:
             for value in (n["text"], n["desc"]):
                 v = value.lower()
@@ -139,7 +140,10 @@ def main() -> None:
     elif cmd == "tap":
         tap(int(rest[0]), int(rest[1]))
     elif cmd == "tap-text":
-        n = find(dump(), " ".join(rest))
+        # Exact labels only, so "Import" can't land on "Import config"; --contains opts in.
+        contains = "--contains" in rest
+        rest = [r for r in rest if r != "--contains"]
+        n = find(dump(), " ".join(rest), contains=contains)
         if not n:
             sys.exit(f"not on screen: {' '.join(rest)!r}")
         tap(n["x"], n["y"])

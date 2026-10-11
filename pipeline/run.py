@@ -48,8 +48,7 @@ CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "tess", "s
 PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
 # Tests that hang our driver's GPU today. They run last, because after a hang the run stops testing
 # our driver.
-HANG_TESTS = []
-ALL_TESTS = CORRECTNESS_TESTS + PERF_TESTS + HANG_TESTS
+ALL_TESTS = CORRECTNESS_TESTS + PERF_TESTS
 SHADERS = {
     "fill.comp": "fill_comp", "tri.vert": "tri_vert", "tri.frag": "tri_frag",
     "alu.comp": "alu_comp", "copy.comp": "copy_comp", "complex.comp": "complex_comp",
@@ -144,7 +143,7 @@ def build_driver() -> None:
     dirty = run(["git", "-C", str(ROOT), "status", "--porcelain", "--", "driver"]).stdout.strip()
     env = dict(os.environ, PACKAGE_TAG=f"xd-{head}{'-dirty' if dirty else ''}")
     if WINDOWS:
-        cmd = ["cmd.exe", "/c", f"call {TOOLS / 'env.cmd'} && {ROOT / 'driver' / 'build.cmd'}"]
+        cmd = ["cmd.exe", "/c", f'call "{TOOLS / "env.cmd"}" && "{ROOT / "driver" / "build.cmd"}"']
     else:
         env["ANDROID_NDK_HOME"] = str(TOOLS / "android-ndk-r29")
         env["PATH"] = os.pathsep.join([str(TOOLS / "python" / "bin"), str(TOOLS / "glslang" / "bin"),
@@ -260,8 +259,9 @@ def run_test(driver: str, test: str, run_dir: Path, known_records: set[str],
             result["crash_records"] = pull_crash_records(new, run_dir)
     else:
         counters_after = gpu_event_counters()
-        events = {GPU_EVENT_COUNTERS.get(k, k): counters_after[k] - counters_before.get(k, 0)
-                  for k in counters_after if counters_after[k] != counters_before.get(k, 0)}
+        # Without a snapshot from before the test, every counter would look like an event.
+        events = {GPU_EVENT_COUNTERS.get(k, k): counters_after[k] - counters_before[k]
+                  for k in counters_after if counters_after[k] != counters_before.get(k, counters_after[k])}
         if events:
             result["gpu_events"] = events
             if result["status"] != "pass" and ("hang" in events or "timeout" in events):
@@ -359,8 +359,9 @@ def summarize(meta: dict, results: list[dict]) -> str:
             if all(v is None for v in values):
                 continue
             row = f"| {label} | " + " | ".join("" if v is None else f"{v:.3g}" for v in values)
-            if len(drivers) == 2 and None not in values and min(values) > 0:
-                stock, ours = values
+            if len(drivers) == 2 and "stock" in drivers and None not in values and min(values) > 0:
+                stock = values[drivers.index("stock")]
+                ours = values[1 - drivers.index("stock")]
                 ratio = ours / stock if higher_better else stock / ours
                 row += f" | {ratio:.2f}x {'better' if ratio >= 1 else 'worse'}"
             perf_rows.append(row + " |")
@@ -376,7 +377,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
         if temps:
             out += ["", f"GPU temperature before each test: {min(temps):.0f}-{max(temps):.0f} °C."]
 
-    problems = [r for r in results if r["status"] != "pass"]
+    problems = [r for r in results if r["status"] not in ("pass", "skip")]
     if problems:
         out += ["", "## Problems", ""]
         for r in problems:
@@ -422,10 +423,12 @@ def main() -> None:
     meta = {"started": started.isoformat(timespec="seconds"), "driver": driver_identity(),
             "phone": phone_context(), "tests": tests, "drivers": drivers, "env": args.env}
 
-    # Test by test, alternating drivers, so phone heat builds up evenly for both.
+    # Test by test, and the driver order flips every test, so neither driver always runs on the
+    # warmer GPU. The report is written even when a test or Ctrl+C ends the run early.
     results, stopped = [], set()
-    for test in tests:
-        for driver in drivers:
+    try:
+      for i, test in enumerate(tests):
+        for driver in (drivers if i % 2 == 0 else drivers[::-1]):
             if driver in stopped:
                 continue
             print(f"{driver:>6} {test:<9}", end=" ", flush=True)
@@ -444,14 +447,14 @@ def main() -> None:
                     if health["status"] != "pass":
                         print("the GPU didn't recover; stopping. Reboot the phone before more tests.")
                         stopped.update(drivers)
-
-    if phone_state() == "device":
-        pull_images(run_dir)
-        meta["phone_after"] = phone_context()
-    (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
-                                          encoding="utf-8", newline="\n")
-    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
-    print(f"report: {run_dir / 'summary.md'}")
+    finally:
+        if phone_state() == "device":
+            pull_images(run_dir)
+            meta["phone_after"] = phone_context()
+        (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
+                                              encoding="utf-8", newline="\n")
+        (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
+        print(f"report: {run_dir / 'summary.md'}")
 
 
 if __name__ == "__main__":

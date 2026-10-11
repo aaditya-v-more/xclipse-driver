@@ -353,7 +353,8 @@ def install(zip_path: Path, games: list[str]) -> None:
     entry = json.loads(zipfile.ZipFile(zip_path).read("meta.json"))["name"]
     remote = f"{PHONE_DIR}/{zip_path.name}"
     if shell(f"stat -c %s {remote} 2>/dev/null") != str(zip_path.stat().st_size):
-        adb("push", str(zip_path), remote, timeout=300)
+        if adb("push", str(zip_path), remote, timeout=300).returncode != 0:
+            sys.exit(f"couldn't copy {zip_path.name} to {PHONE_DIR}")
         print(f"copied {zip_path.name} to {PHONE_DIR}")
     import_zip(zip_path.name, entry)
     for game in games:
@@ -385,7 +386,7 @@ def main() -> None:
             if bench not in EXEC_ARGS or not driver:
                 sys.exit(f"{game}: not a <bench>-<driver> name for one of {sorted(EXEC_ARGS)}")
             texts[game] = EXEC_ARGS[bench].format(driver=driver)
-    stay_on = shell("settings get global stay_on_while_plugged_in")
+    stay_on = shell("settings get global stay_on_while_plugged_in").strip()
     shell("svc power stayon usb")
     try:
         wait_awake_unlocked()
@@ -405,7 +406,10 @@ def main() -> None:
             for game in args[1:]:
                 print(f"{game}: {show(game)}")
     finally:
-        shell(f"settings put global stay_on_while_plugged_in {stay_on}")
+        if stay_on.isdigit():  # "null" when unset, "" when adb hiccuped: then leave it alone
+            shell(f"settings put global stay_on_while_plugged_in {stay_on}")
+        else:
+            print(f"warning: stay_on_while_plugged_in read back as {stay_on!r}; not restored")
 
 
 if __name__ == "__main__":

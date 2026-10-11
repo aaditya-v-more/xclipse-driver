@@ -54,7 +54,7 @@ if (Test-Path $py) {
    Move-Item -LiteralPath (Join-Path $x 'tools') -Destination (Join-Path $Tools 'python')
    'Python 3.13.16: installed (signed by the Python Software Foundation)'
 }
-& $py -m pip install --disable-pip-version-check --no-warn-script-location --quiet meson ninja mako packaging pyyaml pymsi
+& $py -m pip install --disable-pip-version-check --no-warn-script-location --quiet meson==1.12.1 ninja==1.13.2 mako==1.4.3 packaging==26.3 pyyaml==6.0.3 pymsi==0.0.0rc1
 if ($LASTEXITCODE -ne 0) { throw 'pip install failed' }
 'Python packages: meson, ninja, mako, packaging, pyyaml, pymsi'
 

@@ -13,3 +13,8 @@
 /driver/build-log.txt
 /tests/build/
 __pycache__/
+# Of each run only the summary and the data stay in git; screenshots and logs stay on the computer
+# that made them (user decision, 2026-10-11).
+/results/*/*
+!/results/*/summary.md
+!/results/*/results.json
