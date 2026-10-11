@@ -44,7 +44,7 @@ ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / f"adb{EXE}")
 PHONE_DIR = "/data/local/tmp/xd"
 CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "tess", "scratch", "scratchcs",
                      "queries", "xfb", "xfbmany", "xfbmanygs", "textures", "mips", "mrt", "vertex", "depth",
-                     "storage"]
+                     "storage", "bcn"]
 PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
 # Tests that hang our driver's GPU today. They run last, because after a hang the run stops testing
 # our driver.
@@ -62,6 +62,7 @@ SHADERS = {
     "vertex.vert": "vertex_vert", "depth.vert": "depth_vert", "depth_read.comp": "depth_read_comp",
     "mips_read.comp": "mips_read_comp", "storage_write.comp": "storage_write_comp",
     "storage_read.comp": "storage_read_comp",
+    "bcn_s3tc.comp": "bcn_s3tc_comp",
 }
 # Performance metrics per test: (result key, label, higher is better).
 PERF_METRICS = {

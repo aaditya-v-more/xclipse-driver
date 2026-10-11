@@ -52,6 +52,7 @@
 #include "mips_read_comp.h"
 #include "storage_write_comp.h"
 #include "storage_read_comp.h"
+#include "bcn_s3tc_comp.h"
 #include "mrt_read_comp.h"
 #include "xfb_many_vert.h"
 #include "xfb_vert.h"
@@ -5053,6 +5054,321 @@ static void run_storage(void)
    vkDestroyDescriptorSetLayout(dev, dsl, NULL);
 }
 
+/* ---- bcn: GameNative's BCn layer's decode, run the way the layer runs it: its own BC1-3 shader
+ * (MIT, Hans-Kristian Arntzen) writes one mip per dispatch through a storage view of that level,
+ * reading the blocks from the upload buffer bound as a storage buffer at that level's offset,
+ * between the layer's own barriers, each set from a pool that holds one. The levels are copied
+ * out and compared with a CPU decode of the same blocks. ---- */
+
+struct bcn_push {
+   int32_t format, width, height, offset, row_length, x, y;
+};
+
+static uint32_t bcn_rand(uint32_t *s)
+{
+   *s ^= *s << 13;
+   *s ^= *s >> 17;
+   *s ^= *s << 5;
+   return *s;
+}
+
+static float bcn_mix(float a, float b, float t) { return a * (1.0f - t) + b * t; }
+
+/* The shader's colour decode: RGB565 endpoints, four colours when the first endpoint is the
+ * larger (always, past BC1), else three and transparent black. */
+static void bcn_color(const uint32_t w[2], bool always_four, int t, float out[4])
+{
+   const uint32_t c[2] = {w[0] & 0xffff, w[0] >> 16};
+   float e[2][3];
+   for (int i = 0; i < 2; i++) {
+      e[i][0] = (float)(c[i] >> 11 & 31) / 31.0f;
+      e[i][1] = (float)(c[i] >> 5 & 63) / 63.0f;
+      e[i][2] = (float)(c[i] & 31) / 31.0f;
+   }
+   const unsigned bits = w[1] >> (2 * t) & 3;
+   out[3] = 1.0f;
+   if (always_four || c[0] > c[1]) {
+      for (int k = 0; k < 3; k++)
+         out[k] = bits < 2 ? e[bits][k] : bcn_mix(e[0][k], e[1][k], (1.0f / 3.0f) * (float)(bits - 1));
+   } else if (bits == 3) {
+      out[0] = out[1] = out[2] = out[3] = 0.0f;
+   } else {
+      for (int k = 0; k < 3; k++)
+         out[k] = bits < 2 ? e[bits][k] : 0.5f * (e[0][k] + e[1][k]);
+   }
+}
+
+/* The shader's BC3 alpha decode, bit for bit. */
+static float bcn_alpha(const uint32_t w[2], int t)
+{
+   const float e0 = (float)(w[0] & 0xff) / 255.0f, e1 = (float)(w[0] >> 8 & 0xff) / 255.0f;
+   const int off = 16 + t * 3;
+   unsigned bits;
+   if (off <= 29)
+      bits = w[0] >> off & 7;
+   else if (off >= 32)
+      bits = w[1] >> (off - 32) & 7;
+   else
+      bits = (w[0] >> 31 & 1) | (w[1] & 3) << 1;
+   if (bits < 2)
+      return bits ? e1 : e0;
+   if (e0 > e1)
+      return bcn_mix(e0, e1, (1.0f / 7.0f) * (float)(bits - 1));
+   if (bits > 5)
+      return (float)(bits & 1);
+   return bcn_mix(e0, e1, (1.0f / 5.0f) * (float)(bits - 1));
+}
+
+static void run_bcn(void)
+{
+   enum { SIZE = 512, LEVELS = 10, NFORMATS = 2, PAD = 4096 };
+   static const struct {
+      const char *name;
+      VkFormat format;
+      int words;
+   } formats[NFORMATS] = {{"BC1_RGBA_UNORM", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 2},
+                          {"BC3_UNORM", VK_FORMAT_BC3_UNORM_BLOCK, 4}};
+   jbool("write_without_format", has_storage_nofmt);
+   if (!has_storage_nofmt)
+      finish("skip", "no shaderStorageImageWriteWithoutFormat");
+
+   step("creating pipeline");
+   const VkDescriptorSetLayoutBinding bindings[2] = {
+      {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+   };
+   const VkDescriptorSetLayoutCreateInfo dslci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = 2,
+      .pBindings = bindings,
+   };
+   VkDescriptorSetLayout dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl));
+   const VkPushConstantRange range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(struct bcn_push)};
+   const VkPipelineLayoutCreateInfo plci = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &dsl,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &range,
+   };
+   VkPipelineLayout layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &plci, NULL, &layout));
+   VkShaderModule cs = make_shader(bcn_s3tc_comp, sizeof(bcn_s3tc_comp));
+   const VkComputePipelineCreateInfo cpci = {
+      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+      .stage =
+         {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = cs,
+            .pName = "main",
+         },
+      .layout = layout,
+   };
+   VkPipeline pipe;
+   VKCHECK("vkCreateComputePipelines",
+           vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &pipe));
+
+   /* Every level's blocks at a 256-byte aligned offset after a page of padding, in a buffer with
+    * the storage usage the layer adds to every buffer it sees. */
+   VkDeviceSize offsets[LEVELS], rb_offsets[LEVELS], total = PAD, rb_total = 0;
+   for (int l = 0; l < LEVELS; l++) {
+      const uint32_t w = SIZE >> l, nb = ((w + 3) / 4) * ((w + 3) / 4);
+      offsets[l] = total;
+      total = (total + nb * 16 + 255) & ~(VkDeviceSize)255;
+      rb_offsets[l] = rb_total;
+      rb_total += (VkDeviceSize)w * w * 4;
+   }
+   struct buffer src = make_buffer(
+      total, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+   struct buffer readback = make_buffer(rb_total, VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
+   uint8_t *expected = malloc(rb_total);
+   char wrong[400] = "";
+
+   for (int fi = 0; fi < NFORMATS; fi++) {
+      const int words = formats[fi].words;
+      jopen(formats[fi].name, '{');
+      step(formats[fi].name);
+
+      /* Random blocks, and what the shader should make of them. */
+      uint32_t seed = 0x9E3779B1u + fi;
+      for (int l = 0; l < LEVELS; l++) {
+         const uint32_t w = SIZE >> l, bpr = (w + 3) / 4;
+         uint32_t *blocks = (uint32_t *)((uint8_t *)src.map + offsets[l]);
+         for (uint32_t i = 0; i < bpr * bpr * words; i++)
+            blocks[i] = bcn_rand(&seed);
+         uint8_t *out = expected + rb_offsets[l];
+         for (uint32_t y = 0; y < w; y++) {
+            for (uint32_t x = 0; x < w; x++) {
+               const uint32_t *b = blocks + ((y / 4) * bpr + x / 4) * words;
+               const int t = (y % 4) * 4 + x % 4;
+               float v[4];
+               bcn_color(words == 4 ? b + 2 : b, words == 4, t, v);
+               if (words == 4)
+                  v[3] = bcn_alpha(b, t);
+               for (int k = 0; k < 4; k++)
+                  out[(y * w + x) * 4 + k] = (uint8_t)(v[k] * 255.0f + 0.5f);
+            }
+         }
+      }
+
+      VkDeviceMemory mem;
+      VkImage image = make_storage_image(VK_FORMAT_R8G8B8A8_UNORM, SIZE, LEVELS, &mem);
+      VkImageView views[LEVELS];
+      VkDescriptorPool pools[LEVELS];
+      VkDescriptorSet sets[LEVELS];
+      for (int l = 0; l < LEVELS; l++) {
+         /* The layer's pool: room for 32 sets but descriptors for one, so one set per pool. */
+         const VkDescriptorPoolSize pool_sizes[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+                                                     {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+         const VkDescriptorPoolCreateInfo dpci = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+            .maxSets = 32,
+            .poolSizeCount = 2,
+            .pPoolSizes = pool_sizes,
+         };
+         VKCHECK("vkCreateDescriptorPool", vkCreateDescriptorPool(dev, &dpci, NULL, &pools[l]));
+         const VkDescriptorSetAllocateInfo dsai = {
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = pools[l],
+            .descriptorSetCount = 1,
+            .pSetLayouts = &dsl,
+         };
+         VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, &sets[l]));
+         views[l] = make_level_view(image, VK_FORMAT_R8G8B8A8_UNORM, l, 1);
+         const VkDescriptorImageInfo img_info = {VK_NULL_HANDLE, views[l], VK_IMAGE_LAYOUT_GENERAL};
+         const VkDescriptorBufferInfo buf_info = {src.buf, offsets[l], VK_WHOLE_SIZE};
+         const VkWriteDescriptorSet writes[2] = {
+            {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .dstSet = sets[l],
+             .dstBinding = 1,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+             .pBufferInfo = &buf_info},
+            {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .dstSet = sets[l],
+             .dstBinding = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+             .pImageInfo = &img_info},
+         };
+         vkUpdateDescriptorSets(dev, 2, writes, 0, NULL);
+      }
+
+      memset(readback.map, 0xaa, rb_total);
+      VkCommandBuffer cb = begin_cmd();
+      /* DXVK's image waits in TRANSFER_DST for the upload the layer replaces. */
+      VkImageMemoryBarrier start =
+         storage_barrier(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                         VK_ACCESS_TRANSFER_WRITE_BIT, 0, LEVELS);
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                           0, NULL, 0, NULL, 1, &start);
+      for (int l = 0; l < LEVELS; l++) {
+         const uint32_t w = SIZE >> l;
+         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+         VkImageMemoryBarrier to_general =
+            storage_barrier(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                            VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT, l, 1);
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
+                              &to_general);
+         const struct bcn_push pc = {formats[fi].format, w, w, (int32_t)offsets[l], 0, 0, 0};
+         vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &sets[l], 0,
+                                 NULL);
+         vkCmdDispatch(cb, (w + 7) / 8, (w + 7) / 8, 1);
+         VkImageMemoryBarrier back = storage_barrier(
+            image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            VK_ACCESS_SHADER_WRITE_BIT,
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT |
+               VK_ACCESS_TRANSFER_READ_BIT,
+            l, 1);
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              0, 0, NULL, 0, NULL, 1, &back);
+      }
+      VkImageMemoryBarrier to_copy = storage_barrier(
+         image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+         VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, 0, LEVELS);
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                           NULL, 0, NULL, 1, &to_copy);
+      VkBufferImageCopy regions[LEVELS];
+      for (int l = 0; l < LEVELS; l++)
+         regions[l] = (VkBufferImageCopy){
+            .bufferOffset = rb_offsets[l],
+            .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, l, 0, 1},
+            .imageExtent = {SIZE >> l, SIZE >> l, 1},
+         };
+      vkCmdCopyImageToBuffer(cb, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buf, LEVELS,
+                             regions);
+      const VkMemoryBarrier to_host = {
+         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+         .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+         .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+      };
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1,
+                           &to_host, 0, NULL, 0, NULL);
+      VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+      submit_and_wait(cb, formats[fi].name);
+
+      /* Within two steps of the CPU decode, since the GPU rounds the floats its own way. */
+      int bad = 0, black = 0;
+      uint32_t bad_levels = 0;
+      char first[160] = "";
+      const uint8_t *got = readback.map;
+      for (int l = 0; l < LEVELS; l++) {
+         const uint32_t w = SIZE >> l;
+         for (uint32_t i = 0; i < w * w; i++) {
+            const uint8_t *g = got + rb_offsets[l] + i * 4, *e = expected + rb_offsets[l] + i * 4;
+            bool ok = true;
+            for (int k = 0; k < 4; k++)
+               ok = ok && abs((int)g[k] - (int)e[k]) <= 2;
+            if (ok)
+               continue;
+            bad++;
+            bad_levels |= 1u << l;
+            if (!(g[0] | g[1] | g[2] | g[3]))
+               black++;
+            if (!first[0])
+               snprintf(first, sizeof(first),
+                        "level %d (%u,%u): got %02x%02x%02x%02x, want %02x%02x%02x%02x", l, i % w,
+                        i / w, g[0], g[1], g[2], g[3], e[0], e[1], e[2], e[3]);
+         }
+      }
+      jint("wrong", bad);
+      jint("wrong_black", black);
+      jhex("wrong_levels", bad_levels);
+      jstr("first_wrong", first);
+      jclose();
+      if (bad)
+         add_problem(wrong, sizeof(wrong), "%s %d", formats[fi].name, bad);
+
+      for (int l = 0; l < LEVELS; l++) {
+         vkDestroyImageView(dev, views[l], NULL);
+         vkDestroyDescriptorPool(dev, pools[l], NULL);
+      }
+      vkDestroyImage(dev, image, NULL);
+      vkFreeMemory(dev, mem, NULL);
+   }
+   if (wrong[0])
+      finish("fail", "wrong texels after the layer's decode: %s", wrong);
+
+   free(expected);
+   free_buffer(&src);
+   free_buffer(&readback);
+   vkDestroyPipeline(dev, pipe, NULL);
+   vkDestroyShaderModule(dev, cs, NULL);
+   vkDestroyPipelineLayout(dev, layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
+   finish("pass", "%d formats x %d levels decode like the CPU", NFORMATS, LEVELS);
+}
+
+
 int main(int argc, char **argv)
 {
    const char *driver = NULL, *test = NULL;
@@ -5094,6 +5410,7 @@ int main(int argc, char **argv)
       {"mrt", run_mrt, true, 0},
       {"vertex", run_vertex, true, NEED_VERTEX}, {"depth", run_depth, true, 0},
       {"storage", run_storage, false, NEED_STORAGE},
+      {"bcn", run_bcn, false, NEED_STORAGE},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},
