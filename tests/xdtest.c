@@ -7,7 +7,7 @@
  * drives both drivers, so every result is an A/B pair.
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
- *   correctness: info device submit compute render queries xfb
+ *   correctness: info device submit compute render queries xfb xfbmany xfbmanygs
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -29,11 +29,15 @@
 #include "copy_comp.h"
 #include "fill_comp.h"
 #include "flat_frag.h"
+#include "grid_vert.h"
 #include "screen_vert.h"
 #include "tiny_vert.h"
 #include "tri_frag.h"
 #include "tri_geom.h"
 #include "tri_vert.h"
+#include "xfb_many_geom.h"
+#include "inputs_frag.h"
+#include "xfb_many_vert.h"
 #include "xfb_vert.h"
 
 /* A fence that hasn't signaled after this long means the GPU stopped responding. */
@@ -439,7 +443,7 @@ static void run_info(void)
 /* ---- device, commands and resources ---- */
 
 /* What a test needs enabled beyond the basics. */
-enum { NEED_QUERIES = 1, NEED_XFB = 2 };
+enum { NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4 };
 
 /* Set by start_device for the queries and xfb tests: what the driver has of what they use. */
 static bool has_geometry_shader, has_stats_query, has_pg_query, has_xfb, has_xfb_queries;
@@ -511,6 +515,13 @@ static void start_device(bool dynamic_rendering, unsigned needs)
          chain = &pgq.pNext;
          exts[dci.enabledExtensionCount++] = pgq_ext;
       }
+   }
+   if (needs & NEED_GS) {
+      VkPhysicalDeviceFeatures2 f2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_geometry_shader = f2.features.geometryShader;
+      features.geometryShader = has_geometry_shader;
+      dci.pEnabledFeatures = &features;
    }
    if ((needs & NEED_XFB) && has_device_extension(xfb_ext)) {
       VkPhysicalDeviceTransformFeedbackPropertiesEXT props = {
@@ -1511,6 +1522,280 @@ static void run_xfb(void)
    free_target(&t);
 }
 
+/* ---- xfbmany, xfbmanygs: transform feedback over many workgroups, into two buffers ---- */
+
+/* Appends one problem to a comma-separated list of them. */
+static void add_problem(char *list, size_t size, const char *fmt, ...)
+{
+   size_t len = strlen(list);
+   if (len && len + 2 < size) {
+      strcpy(list + len, ", ");
+      len += 2;
+   }
+   va_list ap;
+   va_start(ap, fmt);
+   vsnprintf(list + len, size - len, fmt, ap);
+   va_end(ap);
+}
+
+/* Whether a buffer 0 record is a vertex: (index, 0, 1, 2) with an index below `verts`. */
+static bool xfb_record_ok(const float *r, unsigned verts)
+{
+   return r[0] >= 0.0f && r[0] < (float)verts && r[0] == (float)(unsigned)r[0] && r[1] == 0.0f &&
+          r[2] == 1.0f && r[3] == 2.0f;
+}
+
+/* Which corners of triangle t don't hold their own vertex (bit 0 = first). */
+static unsigned xfb_wrong_corners(const float *rec, unsigned t, unsigned verts)
+{
+   unsigned corners = 0;
+   for (unsigned i = 0; i < 3; i++) {
+      const unsigned slot = 3 * t + i;
+      corners |= (rec[4 * slot] != (float)slot || !xfb_record_ok(&rec[4 * slot], verts)) << i;
+   }
+   return corners;
+}
+
+/* Draws a grid of triangles in two draws, the second resuming from the counters the first one
+ * stored (as DXVK does between draws), and captures every vertex's index into two buffers, from
+ * the vertex shader or from a geometry shader. Transform feedback must keep draw order across the
+ * draw's many workgroups, and the buffers must agree vertex for vertex. */
+static void run_xfb_many_with(bool gs)
+{
+   enum { W = 256, H = 256 };
+   /* XD_XFB_TRIS: triangles drawn (hex, like the other XD_ variables). */
+   const unsigned tris = env_uint("XD_XFB_TRIS", 0x6000), half = tris / 2, verts = 3 * tris;
+   if (!has_xfb)
+      finish("skip", "no transformFeedback");
+   if (gs && !has_geometry_shader)
+      finish("skip", "no geometryShader");
+   const bool use_query = has_xfb_queries && env_uint("XD_XFB_QUERY", 1);
+   jint("triangles", tris);
+   jbool("xfb_query", use_query);
+
+#define XFB_FUNCS(X)                                                                               \
+   X(vkCmdBindTransformFeedbackBuffersEXT) X(vkCmdBeginTransformFeedbackEXT)                       \
+   X(vkCmdEndTransformFeedbackEXT) X(vkCmdBeginQueryIndexedEXT) X(vkCmdEndQueryIndexedEXT)
+   XFB_FUNCS(DECLARE)
+   const char *missing = NULL;
+   XFB_FUNCS(LOAD_DEVICE)
+#undef XFB_FUNCS
+   if (missing)
+      finish("fail", "device function %s missing", missing);
+
+   struct target t = make_target(W, H);
+   double ms;
+   /* XD_XFB_FRAG=1: a pixel shader that reads many inputs instead of a constant one. */
+   const bool many_inputs = env_uint("XD_XFB_FRAG", 0) != 0;
+   const uint32_t *frag = many_inputs ? inputs_frag : tri_frag;
+   const size_t frag_size = many_inputs ? sizeof(inputs_frag) : sizeof(tri_frag);
+   jbool("many_ps_inputs", many_inputs);
+   step("creating graphics pipeline");
+   struct graphics g =
+      gs ? make_graphics_gs(grid_vert, sizeof(grid_vert), xfb_many_geom, sizeof(xfb_many_geom), frag,
+                            frag_size, VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms)
+         : make_graphics(xfb_many_vert, sizeof(xfb_many_vert), frag, frag_size,
+                         VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+
+   /* Buffer 0 gets a vec4 per vertex, buffer 1 a uint. Twice the room the draws need: writes past
+    * the end show up as changed fill bytes. The counters sit at offsets 0 and 8 of one buffer. */
+   const VkDeviceSize sizes[2] = {2ull * verts * 16, 2ull * verts * 4}, zeros[2] = {0, 0};
+   const VkDeviceSize counter_offsets[2] = {0, 8};
+   struct buffer out[2];
+   VkBuffer out_bufs[2];
+   for (int i = 0; i < 2; i++) {
+      out[i] = make_buffer(sizes[i], VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT, true);
+      out_bufs[i] = out[i].buf;
+      memset(out[i].map, 0xff, sizes[i]);
+   }
+   struct buffer counter = make_buffer(16, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT,
+                                       true);
+   memset(counter.map, 0xee, 16);
+   const VkBuffer counters[2] = {counter.buf, counter.buf};
+
+   VkQueryPool qpool = VK_NULL_HANDLE;
+   if (use_query) {
+      VkQueryPoolCreateInfo qci = {
+         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+         .queryType = VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT,
+         .queryCount = 1,
+      };
+      VKCHECK("vkCreateQueryPool", vkCreateQueryPool(dev, &qci, NULL, &qpool));
+   }
+
+   VkCommandBuffer cb = begin_cmd();
+   if (qpool) {
+      vkCmdResetQueryPool(cb, qpool, 0, 1);
+      vkCmdBeginQueryIndexedEXT(cb, qpool, 0, 0, 0);
+   }
+   const float clear[4] = {0.0f, 0.0f, 0.25f, 1.0f};
+   for (unsigned part = 0; part < 2; part++) {
+      const unsigned first = part ? half : 0, count = part ? tris - half : half;
+      if (part) {
+         /* The second draw starts where the first one's counters say it stopped. */
+         VkMemoryBarrier counters_written = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFORM_FEEDBACK_COUNTER_WRITE_BIT_EXT,
+            .dstAccessMask = VK_ACCESS_TRANSFORM_FEEDBACK_COUNTER_READ_BIT_EXT,
+         };
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT,
+                              VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, 0, 1, &counters_written, 0, NULL,
+                              0, NULL);
+      }
+      begin_target(cb, &t, clear);
+      vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline);
+      vkCmdBindTransformFeedbackBuffersEXT(cb, 0, 2, out_bufs, zeros, sizes);
+      vkCmdBeginTransformFeedbackEXT(cb, 0, part ? 2 : 0, part ? counters : NULL,
+                                     part ? counter_offsets : NULL);
+      vkCmdDraw(cb, 3 * count, 1, 3 * first, 0);
+      vkCmdEndTransformFeedbackEXT(cb, 0, 2, counters, counter_offsets);
+      vkCmdEndRendering(cb);
+   }
+   if (qpool)
+      vkCmdEndQueryIndexedEXT(cb, qpool, 0, 0);
+   VkMemoryBarrier to_host = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_TRANSFORM_FEEDBACK_WRITE_BIT_EXT |
+                       VK_ACCESS_TRANSFORM_FEEDBACK_COUNTER_WRITE_BIT_EXT,
+      .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT, VK_PIPELINE_STAGE_HOST_BIT,
+                        0, 1, &to_host, 0, NULL, 0, NULL);
+   VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+   jnum("ms_gpu", submit_and_wait(cb, "transform feedback draws"));
+
+   /* Slot k of each buffer should hold vertex k. Records that aren't a vertex at all, vertices
+    * captured twice or never, and vertices captured out of draw order are counted separately. */
+   step("reading results");
+   const float *rec = out[0].map;
+   const uint32_t *index = out[1].map;
+   unsigned char *seen = calloc(verts, 1);
+   if (!seen)
+      finish("fail", "out of host memory");
+   unsigned invalid = 0, duplicated = 0, missing_verts = 0, out_of_order = 0, disagree = 0;
+   unsigned torn = 0, first_wrong = UINT32_MAX, first_wrong_holds = 0;
+   /* Where it went wrong, for the first few places: runs of slots holding no vertex
+    * ("slot+count"), and slots holding the wrong vertex ("slot:vertex"). */
+   char holes[256] = "", misplaced[256] = "";
+   unsigned hole_runs = 0, misplaced_listed = 0;
+   for (unsigned k = 0; k < verts; k++) {
+      if (!xfb_record_ok(&rec[4 * k], verts)) {
+         /* List each run of bad slots once, from its first slot. */
+         if (k == 0 || xfb_record_ok(&rec[4 * (k - 1)], verts)) {
+            unsigned run = 1;
+            while (k + run < verts && !xfb_record_ok(&rec[4 * (k + run)], verts))
+               run++;
+            if (hole_runs++ < 8)
+               add_problem(holes, sizeof(holes), "%u+%u", k, run);
+         }
+         invalid++;
+         continue;
+      }
+      const unsigned v = (unsigned)rec[4 * k];
+      duplicated += seen[v]++ > 0;
+      disagree += index[k] != v;
+      if (v != k) {
+         if (!out_of_order++) {
+            first_wrong = k;
+            first_wrong_holds = v;
+         }
+         if (misplaced_listed++ < 12)
+            add_problem(misplaced, sizeof(misplaced), "%u:%u", k, v);
+      }
+   }
+   for (unsigned v = 0; v < verts; v++)
+      missing_verts += !seen[v];
+   free(seen);
+   /* Wherever a triangle lands, its three vertices must stay together and in order. */
+   for (unsigned k = 0; k + 2 < verts; k += 3) {
+      const float a = rec[4 * k], b = rec[4 * (k + 1)], c = rec[4 * (k + 2)];
+      torn += !((unsigned)a % 3 == 0 && b == a + 1.0f && c == a + 2.0f);
+   }
+   /* Runs of triangles whose slots don't hold their own vertices, as "first+count/corners=value":
+    * which corners went wrong anywhere in the run (bit 0 = first), and what the first wrong slot
+    * holds (-1 for no vertex). */
+   char wrong_runs[512] = "";
+   unsigned wrong_run_count = 0;
+   for (unsigned t = 0; t < tris;) {
+      unsigned corners = xfb_wrong_corners(rec, t, verts);
+      if (!corners) {
+         t++;
+         continue;
+      }
+      const unsigned first = t;
+      const unsigned slot = 3 * t + (unsigned)__builtin_ctz(corners);
+      const int holds = xfb_record_ok(&rec[4 * slot], verts) ? (int)rec[4 * slot] : -1;
+      unsigned all_corners = 0;
+      for (; t < tris && (corners = xfb_wrong_corners(rec, t, verts)); t++)
+         all_corners |= corners;
+      if (wrong_run_count++ < 16)
+         add_problem(wrong_runs, sizeof(wrong_runs), "%u+%u/%u=%d", first, t - first, all_corners, holds);
+   }
+   unsigned past_end = 0;
+   for (int i = 0; i < 2; i++)
+      for (size_t j = sizes[i] / 8; j < sizes[i] / 4; j++)
+         past_end += ((const uint32_t *)out[i].map)[j] != 0xffffffff;
+   const uint32_t *c = counter.map;
+   jint("counter_bytes_0", c[0]);
+   jint("counter_bytes_1", c[2]);
+   jint("records_invalid", invalid);
+   jint("vertices_missing", missing_verts);
+   jint("vertices_duplicated", duplicated);
+   jint("vertices_out_of_order", out_of_order);
+   jint("triangles_torn", torn);
+   jint("buffers_disagree", disagree);
+   jint("dwords_written_past_end", past_end);
+   if (hole_runs)
+      jstr("hole_runs", holes);
+   if (out_of_order)
+      jstr("misplaced", misplaced);
+   if (wrong_run_count)
+      jstr("wrong_runs", wrong_runs);
+
+   char wrong[512] = "";
+#define WRONG(...) add_problem(wrong, sizeof(wrong), __VA_ARGS__)
+   if (c[0] != verts * 16 || c[2] != verts * 4)
+      WRONG("counters %u and %u bytes (want %u and %u)", c[0], c[2], verts * 16, verts * 4);
+   if (invalid)
+      WRONG("%u of %u slots hold no vertex", invalid, verts);
+   if (missing_verts || duplicated)
+      WRONG("%u vertices missing, %u captured twice", missing_verts, duplicated);
+   if (out_of_order)
+      WRONG("%u vertices out of draw order (slot %u holds vertex %u)", out_of_order, first_wrong,
+            first_wrong_holds);
+   if (torn)
+      WRONG("%u triangles torn apart", torn);
+   if (disagree)
+      WRONG("the buffers disagree at %u slots", disagree);
+   if (past_end)
+      WRONG("%u dwords written past the end", past_end);
+   if (qpool) {
+      uint64_t q[2] = {0};
+      VKCHECK("vkGetQueryPoolResults (transform feedback)",
+              vkGetQueryPoolResults(dev, qpool, 0, 1, sizeof(q), q, sizeof(q),
+                                    VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+      jint("primitives_written", (long long)q[0]);
+      jint("primitives_needed", (long long)q[1]);
+      if (q[0] != tris || q[1] != tris)
+         WRONG("query %llu written, %llu needed (want %u)", (unsigned long long)q[0],
+               (unsigned long long)q[1], tris);
+   }
+#undef WRONG
+   if (wrong[0])
+      finish("fail", "%s", wrong);
+
+   if (qpool)
+      vkDestroyQueryPool(dev, qpool, NULL);
+   free_buffer(&counter);
+   free_buffer(&out[1]);
+   free_buffer(&out[0]);
+   free_graphics(&g);
+   free_target(&t);
+}
+
+static void run_xfb_many(void) { run_xfb_many_with(false); }
+static void run_xfb_many_gs(void) { run_xfb_many_with(true); }
+
 /* ---- alu: FP32 FMA throughput ---- */
 
 struct alu_args {
@@ -1755,7 +2040,8 @@ int main(int argc, char **argv)
    }
    if (!driver || !test) {
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
-                      "  correctness: info device submit compute render queries xfb\n"
+                      "  correctness: info device submit compute render queries xfb xfbmany\n"
+                      "               xfbmanygs\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -1771,6 +2057,8 @@ int main(int argc, char **argv)
       {"device", NULL, false, 0},           {"submit", run_submit, false, 0},
       {"compute", run_compute, false, 0},   {"render", run_render, true, 0},
       {"queries", run_queries, true, NEED_QUERIES}, {"xfb", run_xfb, true, NEED_XFB},
+      {"xfbmany", run_xfb_many, true, NEED_XFB},
+      {"xfbmanygs", run_xfb_many_gs, true, NEED_XFB | NEED_GS},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},
