@@ -16,7 +16,12 @@ A run stops early, with a screenshot, when the game shows a message box (an erro
 from Wine, found in a raw screenshot while frames are scarce) or presents no new frame for a minute.
 The later runs still go ahead: stock Heaven's fatal error on its D24 depth texture comes and goes.
 
+To see what a driver renders, --shots saves screenshots at set times after launch, and --seconds
+ends each run early. --prop sets Android properties for the whole session, which is how RADV's
+debug options reach the game (RADV_DEBUG is read from debug.radv_debug, for example).
+
 usage: python pipeline/game.py [--bench gravitymark,heaven] [--runs 3] [--radv-log]
+                               [--shots 60,90] [--seconds 100] [--prop debug.radv_debug=nodcc]
 """
 
 from __future__ import annotations
@@ -279,7 +284,8 @@ def cool_down(target: float, limit_s: float = 120) -> float:
     return gpu_temp()
 
 
-def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dict:
+def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
+             shots: list[int] = (), seconds: int | None = None) -> dict:
     cfg = BENCHES[bench]
     app_id = cfg["ids"][driver]
     shell(f"am force-stop {APP}")
@@ -298,12 +304,17 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
     frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
     exe_seen = exe_gone = 0
     history, last_new, checked = [], 0.0, 0.0  # (seconds, frames so far); when the count last grew
-    while time.monotonic() - started < cfg["seconds"]:
+    shots_left = sorted(shots)
+    while time.monotonic() - started < (seconds or cfg["seconds"]):
         time.sleep(1)
         if phone_state() != "device":
             result["status"] = "phone-lost"
             break
         elapsed = time.monotonic() - started
+        while shots_left and elapsed >= shots_left[0]:
+            shot = run_dir / f"{tag}-{bench}-{driver}-{shots_left.pop(0)}s.png"
+            if screenshot(shot):
+                result.setdefault("screens", []).append(shot.name)
         sample = gpu_sample()
         if sample:
             gpu.append((round(elapsed, 1), *sample))
@@ -399,7 +410,11 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
 
 
 def summarize(meta: dict, results: list[dict]) -> str:
-    out = [f"# Game benchmark run {meta['started']}", "",
+    out = [f"# Game benchmark run {meta['started']}", ""]
+    if meta.get("props"):
+        out += ["Android properties set: " + ", ".join(f"`{k}={v}`" for k, v in meta["props"].items()),
+                ""]
+    out += [
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
            f"first {WARMUP_S} s after the first frame. A run counts (`ran`) only with {MIN_STEADY_S} s "
            f"of frames in a row, none more than {STALL_S} s apart; the medians use only those.", "",
@@ -456,10 +471,16 @@ def main() -> None:
     ap.add_argument("--radv-log", action="store_true",
                     help="turn on RADV's diagnostic log (debug.radv_xclipse_log=1) so radv runs "
                          "prove our driver loaded; it adds CPU work, so leave it off for timing")
+    ap.add_argument("--shots", default="",
+                    help="seconds after launch to save screenshots at, comma-separated")
+    ap.add_argument("--seconds", type=int, help="end each run this many seconds after launch")
+    ap.add_argument("--prop", action="append", default=[], metavar="NAME=VALUE",
+                    help="Android property to set for the session and clear afterwards")
     ap.add_argument("--print-args", action="store_true",
                     help="print the Exec Arguments for each container and exit")
     args = ap.parse_args()
     benches, drivers = args.bench.split(","), args.drivers.split(",")
+    props = dict(p.split("=", 1) for p in args.prop)
 
     if args.print_args:
         for bench in benches:
@@ -483,12 +504,19 @@ def main() -> None:
         shell(f"mkdir -p {OUT_DIR}")
         baseline = cool_down(target=45.0)
         meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
-                "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline}
+                "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline,
+                "props": props}
         shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
+        for name, value in props.items():
+            shell(f"setprop {name} '{value}'")
+            if shell(f"getprop {name}") != value:
+                sys.exit(f"couldn't set {name}")
         results = run_all(args, benches, drivers, run_dir, app_user(), baseline)
     finally:
         shell(f"settings put global stay_on_while_plugged_in {stay_on}")
         shell("setprop debug.radv_xclipse_log 0")
+        for name in props:
+            shell(f"setprop {name} ''")
 
     (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
                                           encoding="utf-8", newline="\n")
@@ -517,7 +545,8 @@ def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: s
             for bench in benches:
                 for driver in (drivers if n % 2 else list(reversed(drivers))):
                     print(f"run {n} {bench:<12} {driver:<5}", end=" ", flush=True)
-                    r = run_once(bench, driver, run_dir, f"run{n}", user)
+                    r = run_once(bench, driver, run_dir, f"run{n}", user,
+                                 [int(t) for t in args.shots.split(",") if t], args.seconds)
                     r["run"] = n
                     s = r["surfaceflinger"]
                     print(f"{r['status']} {s.get('fps_avg', 0):.1f} fps over "
