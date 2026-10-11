@@ -51,6 +51,10 @@ EXEC_ARGS = {
                "-extern_define PHORONIX,RELEASE,QUALITY_LOW"),
 }
 WARMUP_S = 10  # ignore frames from the first seconds after the game starts rendering (ramp-up)
+# A run counts only with this many seconds of frames in a row, none of them more than STALL_S
+# apart. Wine's error box presented 8.8 FPS for 15 s and once passed for a finished run.
+MIN_STEADY_S = 30
+STALL_S = 2
 MEMORY_EVERY_S = 5
 # Log lines that show which Vulkan driver a run loaded. Samsung's driver logs OpenDevice on its
 # own; RADV logs [BUILD] only with debug.radv_xclipse_log >= 1 (--radv-log).
@@ -100,9 +104,15 @@ def frame_stats(times_ns: list[int]) -> dict:
         return {"frames": len(ts)}
     intervals = [(b - a) / 1e6 for a, b in zip(ts, ts[1:])]
     worst = sorted(intervals)[int(len(intervals) * 0.99):]
+    steady, start = 0, ts[0]
+    for a, b in zip(ts, ts[1:]):
+        if b - a > STALL_S * 1_000_000_000:
+            start = b
+        steady = max(steady, b - start)
     return {
         "frames": len(ts),
         "seconds": (ts[-1] - ts[0]) / 1e9,
+        "steady_seconds": steady / 1e9,
         "fps_avg": (len(ts) - 1) / ((ts[-1] - ts[0]) / 1e9),
         "frametime_median_ms": statistics.median(intervals),
         "fps_1pct_low": 1000.0 / statistics.mean(worst) if worst else None,
@@ -256,10 +266,11 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
     result["seconds_to_game_process"] = exe_seen or None
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
-    result["surfaceflinger"] = frame_stats(list(frames))
+    stats = result["surfaceflinger"] = frame_stats(list(frames))
     result["memory"] = memory
-    # A run without frames has usually stopped at a message box, from the game or from Wine.
-    if result["surfaceflinger"].get("frames", 0) < 10 and "status" not in result:
+    counts = stats.get("steady_seconds", 0) >= MIN_STEADY_S
+    # A run without enough frames has usually stopped at a message box, from the game or from Wine.
+    if not counts and "status" not in result:
         shot = run_dir / f"{tag}-{bench}-{driver}-screen.png"
         if screenshot(shot):
             result["screenshot"] = shot.name
@@ -283,8 +294,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
         local = run_dir / f"{tag}-{name}"
         if adb("pull", f"{OUT_DIR}/{name}", str(local)).returncode == 0:
             result["image_file"] = local.name
-    result.setdefault("status", "ran" if result["surfaceflinger"].get("frames", 0) >= 10
-                      else "no-frames")
+    result.setdefault("status", "ran" if counts else "too-short" if "fps_avg" in stats else "no-frames")
     result["gpu_temp_c_after"] = gpu_temp()
     return result
 
@@ -292,10 +302,12 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
 def summarize(meta: dict, results: list[dict]) -> str:
     out = [f"# Game benchmark run {meta['started']}", "",
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
-           f"first {WARMUP_S} s after the first frame.", "",
+           f"first {WARMUP_S} s after the first frame. A run counts (`ran`) only with {MIN_STEADY_S} s "
+           f"of frames in a row, none more than {STALL_S} s apart; the medians use only those.", "",
            "| Benchmark | Driver | Run | Status | Avg FPS | 1% low FPS | Median frame time (ms) "
-           "| Driver seen | Least free memory (MB) | GameNative peak (MB) | Its GPU memory peak (MB) |",
-           "|---|---|---|---|---|---|---|---|---|---|---|"]
+           "| Steady (s) | Driver seen | Least free memory (MB) | GameNative peak (MB) "
+           "| Its GPU memory peak (MB) |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         s = r.get("surfaceflinger", {})
         fmt = lambda v: f"{v:.1f}" if isinstance(v, (int, float)) else ""  # noqa: E731
@@ -305,7 +317,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
         gpu_peak = max((m.get("app_gpu_mb", 0) for m in mem), default=0)
         out.append(f"| {r['bench']} | {r['driver']} | {r['run']} | {r['status']} | "
                    f"{fmt(s.get('fps_avg'))} | {fmt(s.get('fps_1pct_low'))} | "
-                   f"{fmt(s.get('frametime_median_ms'))} | "
+                   f"{fmt(s.get('frametime_median_ms'))} | {fmt(s.get('steady_seconds'))} | "
                    f"{', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} | "
                    f"{gpu_peak} |")
     out += ["", "## Medians", ""]
@@ -313,7 +325,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
         line = []
         for driver in ("stock", "radv"):
             fps = [r["surfaceflinger"]["fps_avg"] for r in results if r["bench"] == bench
-                   and r["driver"] == driver and "fps_avg" in r.get("surfaceflinger", {})]
+                   and r["driver"] == driver and r["status"] == "ran"]
             if fps:
                 line.append((driver, statistics.median(fps)))
         text = ", ".join(f"{d} {v:.1f} FPS" for d, v in line)
