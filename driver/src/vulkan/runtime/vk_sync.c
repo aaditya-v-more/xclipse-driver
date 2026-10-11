@@ -33,6 +33,35 @@
 #include "vk_alloc.h"
 #include "vk_device.h"
 #include "vk_log.h"
+
+#ifdef __ANDROID__
+#include <android/log.h>
+#include <dlfcn.h>
+
+int ac_xclipse_log_level(void);
+
+/* Xclipse diagnostic: with debug.radv_xclipse_log >= 1, log every wait that blocks for 20 ms or
+ * more. `t` is CLOCK_MONOTONIC, like SurfaceFlinger's present times, and `caller` is the return
+ * address as an offset into this library, for addr2line on the unstripped build. */
+static void
+xclipse_log_long_wait(const char *what, uint32_t count, enum vk_sync_wait_flags flags,
+                      uint64_t abs_timeout_ns, uint64_t start_ns, VkResult result, const void *caller)
+{
+   const uint64_t end_ns = os_time_get_nano();
+   if (end_ns - start_ns < 20000000ull || ac_xclipse_log_level() < 1)
+      return;
+   Dl_info info;
+   uintptr_t offset = (uintptr_t)caller;
+   if (dladdr(caller, &info) && info.dli_fbase)
+      offset -= (uintptr_t)info.dli_fbase;
+   const double timeout_ms =
+      abs_timeout_ns == UINT64_MAX ? -1.0 : ((double)abs_timeout_ns - (double)start_ns) / 1e6;
+   __android_log_print(ANDROID_LOG_INFO, "RADV_WAIT",
+                       "[WAIT] %s t=%.3f %.1f ms n=%u flags=0x%x timeout=%.0f ms result=%d caller=+0x%zx",
+                       what, end_ns / 1e9, (end_ns - start_ns) / 1e6, count, (unsigned)flags,
+                       timeout_ms, (int)result, (size_t)offset);
+}
+#endif
 #include "vk_physical_device.h"
 #include "vk_sync_binary.h"
 #include "vk_sync_dummy.h"
@@ -342,12 +371,12 @@ __vk_sync_wait(struct vk_device *device,
    }
 }
 
-VkResult
-vk_sync_wait(struct vk_device *device,
-             struct vk_sync *sync,
-             uint64_t wait_value,
-             enum vk_sync_wait_flags wait_flags,
-             uint64_t abs_timeout_ns)
+static VkResult
+vk_sync_wait_unlogged(struct vk_device *device,
+                      struct vk_sync *sync,
+                      uint64_t wait_value,
+                      enum vk_sync_wait_flags wait_flags,
+                      uint64_t abs_timeout_ns)
 {
    uint64_t max_abs_timeout_ns = get_max_abs_timeout_ns();
    if (abs_timeout_ns > max_abs_timeout_ns) {
@@ -437,12 +466,12 @@ __vk_sync_wait_many(struct vk_device *device,
    }
 }
 
-VkResult
-vk_sync_wait_many(struct vk_device *device,
-                  uint32_t wait_count,
-                  const struct vk_sync_wait *waits,
-                  enum vk_sync_wait_flags wait_flags,
-                  uint64_t abs_timeout_ns)
+static VkResult
+vk_sync_wait_many_unlogged(struct vk_device *device,
+                           uint32_t wait_count,
+                           const struct vk_sync_wait *waits,
+                           enum vk_sync_wait_flags wait_flags,
+                           uint64_t abs_timeout_ns)
 {
    uint64_t max_abs_timeout_ns = get_max_abs_timeout_ns();
    if (abs_timeout_ns > max_abs_timeout_ns) {
@@ -456,6 +485,42 @@ vk_sync_wait_many(struct vk_device *device,
       return __vk_sync_wait_many(device, wait_count, waits, wait_flags,
                                  abs_timeout_ns);
    }
+}
+
+VkResult
+vk_sync_wait(struct vk_device *device,
+             struct vk_sync *sync,
+             uint64_t wait_value,
+             enum vk_sync_wait_flags wait_flags,
+             uint64_t abs_timeout_ns)
+{
+#ifdef __ANDROID__
+   const uint64_t start_ns = os_time_get_nano();
+   VkResult result = vk_sync_wait_unlogged(device, sync, wait_value, wait_flags, abs_timeout_ns);
+   xclipse_log_long_wait("one", 1, wait_flags, abs_timeout_ns, start_ns, result,
+                         __builtin_return_address(0));
+   return result;
+#else
+   return vk_sync_wait_unlogged(device, sync, wait_value, wait_flags, abs_timeout_ns);
+#endif
+}
+
+VkResult
+vk_sync_wait_many(struct vk_device *device,
+                  uint32_t wait_count,
+                  const struct vk_sync_wait *waits,
+                  enum vk_sync_wait_flags wait_flags,
+                  uint64_t abs_timeout_ns)
+{
+#ifdef __ANDROID__
+   const uint64_t start_ns = os_time_get_nano();
+   VkResult result = vk_sync_wait_many_unlogged(device, wait_count, waits, wait_flags, abs_timeout_ns);
+   xclipse_log_long_wait("many", wait_count, wait_flags, abs_timeout_ns, start_ns, result,
+                         __builtin_return_address(0));
+   return result;
+#else
+   return vk_sync_wait_many_unlogged(device, wait_count, waits, wait_flags, abs_timeout_ns);
+#endif
 }
 
 VkResult
