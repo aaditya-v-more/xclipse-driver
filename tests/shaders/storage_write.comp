@@ -1,0 +1,51 @@
+#version 450
+// Writes a pattern into one mip level of a storage image, the way GameNative's Wrapper decodes BC
+// textures in compute: one dispatch per level through a view of that level, with the block data
+// read from a storage buffer or a texel buffer. Each texel gets hash(x, y, level) mixed with the
+// word of its 4x4 block, so a wrong source, level or layout shows as wrong bytes. The host copies
+// the levels out and compares them byte for byte. The image formats are left off the bindings
+// (shaderStorageImageWriteWithoutFormat), so one shader serves every format.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) writeonly uniform image2D dst;    // the float formats
+layout(binding = 1) writeonly uniform uimage2D dst_u; // R32_UINT
+layout(binding = 2) uniform usamplerBuffer blocks_u;  // the blocks as an R32_UINT texel buffer
+layout(binding = 3) uniform samplerBuffer blocks_f;   // the same bytes as RGBA8_UNORM texels
+layout(std430, binding = 4) readonly buffer Blocks { uint blocks[]; };
+// source: 0 none, 1 storage buffer, 2 uint texel buffer, 3 unorm texel buffer.
+// kind: 0 unorm8 (b / 255), 1 snorm8 ((b % 255 - 127) / 127), 2 float (b / 256), 3 uint (h).
+layout(push_constant) uniform P { int level; int source; int kind; };
+
+uint hash(uint x, uint y, uint level)
+{
+   uint h = x * 0x9E3779B1u ^ y * 0x85EBCA77u ^ level * 0xC2B2AE3Du;
+   h ^= h >> 15;
+   h *= 0x2C1B3C6Du;
+   h ^= h >> 12;
+   return h;
+}
+
+void main()
+{
+   ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+   ivec2 size = kind == 3 ? imageSize(dst_u) : imageSize(dst);
+   if (any(greaterThanEqual(p, size)))
+      return;
+   int block = (p.y / 4) * ((size.x + 3) / 4) + p.x / 4;
+   uint src = 0u;
+   if (source == 1)
+      src = blocks[block];
+   else if (source == 2)
+      src = texelFetch(blocks_u, block).x;
+   else if (source == 3)
+      src = packUnorm4x8(texelFetch(blocks_f, block));
+   uint h = hash(uint(p.x), uint(p.y), uint(level)) ^ src;
+   uvec4 b = (uvec4(h) >> uvec4(0, 8, 16, 24)) & 255u;
+   if (kind == 3)
+      imageStore(dst_u, p, uvec4(h, 0u, 0u, 0u));
+   else if (kind == 0)
+      imageStore(dst, p, vec4(b) / 255.0);
+   else if (kind == 1)
+      imageStore(dst, p, vec4(ivec4(b % 255u) - 127) / 127.0);
+   else
+      imageStore(dst, p, vec4(b) / 256.0);
+}

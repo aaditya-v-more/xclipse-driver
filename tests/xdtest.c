@@ -8,7 +8,7 @@
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
  *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
- *                xfbmanygs textures mips mrt vertex depth
+ *                xfbmanygs textures mips mrt vertex depth storage
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -50,6 +50,8 @@
 #include "mrt_add_frag.h"
 #include "mrt_frag.h"
 #include "mips_read_comp.h"
+#include "storage_write_comp.h"
+#include "storage_read_comp.h"
 #include "mrt_read_comp.h"
 #include "xfb_many_vert.h"
 #include "xfb_vert.h"
@@ -218,7 +220,8 @@ static double median(const double *v, int n)
    X(vkCmdCopyImageToBuffer) X(vkCreateQueryPool) X(vkDestroyQueryPool) X(vkCmdResetQueryPool)      \
    X(vkCmdWriteTimestamp) X(vkGetQueryPoolResults) X(vkCmdCopyBuffer) X(vkCmdPushConstants)         \
    X(vkCmdFillBuffer) X(vkCmdBeginQuery) X(vkCmdEndQuery) X(vkCmdCopyBufferToImage)                \
-   X(vkCreateSampler) X(vkDestroySampler) X(vkCmdBindVertexBuffers) X(vkCmdBindVertexBuffers2)
+   X(vkCreateSampler) X(vkDestroySampler) X(vkCmdBindVertexBuffers) X(vkCmdBindVertexBuffers2)   \
+   X(vkCreateBufferView) X(vkDestroyBufferView)
 
 #define DECLARE(fn) static PFN_##fn fn;
 INSTANCE_FUNCS(DECLARE)
@@ -469,11 +472,14 @@ static void run_info(void)
 /* ---- device, commands and resources ---- */
 
 /* What a test needs enabled beyond the basics. */
-enum { NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8, NEED_BC = 16, NEED_VERTEX = 32 };
+enum {
+   NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8, NEED_BC = 16, NEED_VERTEX = 32,
+   NEED_STORAGE = 64
+};
 
 /* Set by start_device for the tests with needs: what the driver has of what they use. */
 static bool has_geometry_shader, has_tessellation_shader, has_stats_query, has_pg_query, has_xfb,
-   has_xfb_queries, has_bc, has_vertex_stores, has_vertex_input_dynamic;
+   has_xfb_queries, has_bc, has_vertex_stores, has_vertex_input_dynamic, has_storage_nofmt;
 
 static bool has_device_extension(const char *name)
 {
@@ -575,6 +581,13 @@ static void start_device(bool dynamic_rendering, unsigned needs)
       vkGetPhysicalDeviceFeatures2(pdev, &f2);
       has_bc = f2.features.textureCompressionBC;
       features.textureCompressionBC = has_bc;
+      dci.pEnabledFeatures = &features;
+   }
+   if (needs & NEED_STORAGE) {
+      VkPhysicalDeviceFeatures2 f2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_storage_nofmt = f2.features.shaderStorageImageWriteWithoutFormat;
+      features.shaderStorageImageWriteWithoutFormat = has_storage_nofmt;
       dci.pEnabledFeatures = &features;
    }
    if (needs & NEED_VERTEX) {
@@ -4494,6 +4507,552 @@ static void run_compile(void)
    jnum("ms_total", total);
 }
 
+/* ---- storage: compute writes every level of a storage image the way GameNative's BCn layer
+ * decodes BC textures (one dispatch per level through a view of that level, between the layer's
+ * own barriers, the blocks read from a storage buffer or a texel buffer); the levels are copied
+ * out and compared byte for byte, then read through a sampler as the game does ---- */
+
+enum storage_kind { ST_UNORM8, ST_SNORM8, ST_FLOAT16, ST_FLOAT32, ST_UINT32 };
+
+static const struct storage_format {
+   const char *name;
+   VkFormat format;
+   enum storage_kind kind;
+   int channels;
+} storage_formats[] = {
+   {"RGBA8_UNORM", VK_FORMAT_R8G8B8A8_UNORM, ST_UNORM8, 4},
+   {"R8_UNORM", VK_FORMAT_R8_UNORM, ST_UNORM8, 1},
+   {"RGBA8_SNORM", VK_FORMAT_R8G8B8A8_SNORM, ST_SNORM8, 4},
+   {"RG8_SNORM", VK_FORMAT_R8G8_SNORM, ST_SNORM8, 2},
+   {"RGBA16F", VK_FORMAT_R16G16B16A16_SFLOAT, ST_FLOAT16, 4},
+   {"RGBA32F", VK_FORMAT_R32G32B32A32_SFLOAT, ST_FLOAT32, 4},
+   {"R32_UINT", VK_FORMAT_R32_UINT, ST_UINT32, 1},
+};
+
+/* The shader's hash (storage_write.comp). */
+static uint32_t storage_hash(uint32_t x, uint32_t y, uint32_t level)
+{
+   uint32_t h = x * 0x9E3779B1u ^ y * 0x85EBCA77u ^ level * 0xC2B2AE3Du;
+   h ^= h >> 15;
+   h *= 0x2C1B3C6Du;
+   h ^= h >> 12;
+   return h;
+}
+
+static int storage_bytes(const struct storage_format *f)
+{
+   return f->channels *
+          (f->kind == ST_FLOAT32 || f->kind == ST_UINT32 ? 4 : f->kind == ST_FLOAT16 ? 2 : 1);
+}
+
+/* b / 256 as a half: exact for 0 <= b < 256. */
+static uint16_t half_of_byte(uint32_t b)
+{
+   if (!b)
+      return 0;
+   int k = 0;
+   while (b >> (k + 1))
+      k++;
+   return (uint16_t)((k + 7) << 10 | (b - (1u << k)) << (10 - k));
+}
+
+/* The bytes the shader's store of texel (x, y) of `level` leaves, given its block's word. */
+static void storage_expected(const struct storage_format *f, uint32_t x, uint32_t y, uint32_t level,
+                             uint32_t src, uint8_t *out)
+{
+   const uint32_t h = storage_hash(x, y, level) ^ src;
+   for (int c = 0; c < f->channels; c++) {
+      const uint32_t b = h >> (8 * c) & 255;
+      switch (f->kind) {
+      case ST_UNORM8:
+         out[c] = (uint8_t)b;
+         break;
+      case ST_SNORM8:
+         out[c] = (uint8_t)(int8_t)((int)(b % 255) - 127);
+         break;
+      case ST_FLOAT16: {
+         const uint16_t half = half_of_byte(b);
+         memcpy(out + 2 * c, &half, 2);
+         break;
+      }
+      case ST_FLOAT32: {
+         const float v = (float)b / 256.0f;
+         memcpy(out + 4 * c, &v, 4);
+         break;
+      }
+      case ST_UINT32:
+         memcpy(out, &h, 4);
+         break;
+      }
+   }
+}
+
+static VkImage make_storage_image(VkFormat format, uint32_t size, uint32_t levels,
+                                  VkDeviceMemory *mem)
+{
+   VkImageCreateInfo ici = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+      .imageType = VK_IMAGE_TYPE_2D,
+      .format = format,
+      .extent = {size, size, 1},
+      .mipLevels = levels,
+      .arrayLayers = 1,
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .tiling = VK_IMAGE_TILING_OPTIMAL,
+      /* The Wrapper's usage: transfer both ways, sampled and storage. */
+      .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+               VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+   };
+   VkImage image;
+   VKCHECK("vkCreateImage", vkCreateImage(dev, &ici, NULL, &image));
+   VkMemoryRequirements req;
+   vkGetImageMemoryRequirements(dev, image, &req);
+   *mem = alloc_memory(req, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   VKCHECK("vkBindImageMemory", vkBindImageMemory(dev, image, *mem, 0));
+   return image;
+}
+
+static VkImageView make_level_view(VkImage image, VkFormat format, uint32_t level,
+                                   uint32_t levels)
+{
+   VkImageViewCreateInfo vci = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image = image,
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format = format,
+      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, level, levels, 0, 1},
+   };
+   VkImageView view;
+   VKCHECK("vkCreateImageView", vkCreateImageView(dev, &vci, NULL, &view));
+   return view;
+}
+
+static VkImageMemoryBarrier storage_barrier(VkImage image, VkImageLayout from, VkImageLayout to,
+                                            VkAccessFlags src, VkAccessFlags dst, uint32_t level,
+                                            uint32_t levels)
+{
+   return (VkImageMemoryBarrier){
+      .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .srcAccessMask = src,
+      .dstAccessMask = dst,
+      .oldLayout = from,
+      .newLayout = to,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image = image,
+      .subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, level, levels, 0, 1},
+   };
+}
+
+static void run_storage(void)
+{
+   enum { SIZE = 512, LEVELS = 10, SOURCES = 4 };
+   static const char *source_names[SOURCES] = {"const", "ssbo", "texel_uint", "texel_rgba8"};
+   const size_t nformats = sizeof(storage_formats) / sizeof(storage_formats[0]);
+   jbool("write_without_format", has_storage_nofmt);
+   if (!has_storage_nofmt)
+      finish("skip", "no shaderStorageImageWriteWithoutFormat");
+
+   step("creating pipeline");
+   const VkDescriptorSetLayoutBinding bindings[5] = {
+      {0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {2, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {3, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {4, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+   };
+   VkDescriptorSetLayoutCreateInfo dslci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .bindingCount = 5,
+      .pBindings = bindings,
+   };
+   VkDescriptorSetLayout dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dslci, NULL, &dsl));
+   const VkPushConstantRange range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(int32_t[3])};
+   VkPipelineLayoutCreateInfo plci = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1,
+      .pSetLayouts = &dsl,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &range,
+   };
+   VkPipelineLayout layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &plci, NULL, &layout));
+   VkShaderModule cs = make_shader(storage_write_comp, sizeof(storage_write_comp));
+   VkComputePipelineCreateInfo cpci = {
+      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+      .stage =
+         {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
+            .module = cs,
+            .pName = "main",
+         },
+      .layout = layout,
+   };
+   VkPipeline pipe;
+   VKCHECK("vkCreateComputePipelines",
+           vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &pipe));
+   const VkDescriptorPoolSize pool_sizes[3] = {{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 * LEVELS},
+                                               {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 2 * LEVELS},
+                                               {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, LEVELS}};
+   VkDescriptorPoolCreateInfo dpci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .maxSets = LEVELS,
+      .poolSizeCount = 3,
+      .pPoolSizes = pool_sizes,
+   };
+   VkDescriptorPool dpool;
+   VKCHECK("vkCreateDescriptorPool", vkCreateDescriptorPool(dev, &dpci, NULL, &dpool));
+   VkDescriptorSetLayout layouts[LEVELS];
+   for (int l = 0; l < LEVELS; l++)
+      layouts[l] = dsl;
+   VkDescriptorSetAllocateInfo dsai = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .descriptorPool = dpool,
+      .descriptorSetCount = LEVELS,
+      .pSetLayouts = layouts,
+   };
+   VkDescriptorSet sets[LEVELS];
+   VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, sets));
+
+   /* The readback through a sampler (storage_read.comp). */
+   const VkDescriptorSetLayoutBinding read_bindings[2] = {
+      {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+      {1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
+   };
+   dslci.bindingCount = 2;
+   dslci.pBindings = read_bindings;
+   VkDescriptorSetLayout read_dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dslci, NULL, &read_dsl));
+   const VkPushConstantRange read_range = {VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(int32_t)};
+   plci.pSetLayouts = &read_dsl;
+   plci.pPushConstantRanges = &read_range;
+   VkPipelineLayout read_layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &plci, NULL, &read_layout));
+   VkShaderModule read_cs = make_shader(storage_read_comp, sizeof(storage_read_comp));
+   cpci.stage.module = read_cs;
+   cpci.layout = read_layout;
+   VkPipeline read_pipe;
+   VKCHECK("vkCreateComputePipelines",
+           vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &read_pipe));
+   const VkDescriptorPoolSize read_pool_sizes[2] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
+                                                    {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
+   dpci.maxSets = 1;
+   dpci.poolSizeCount = 2;
+   dpci.pPoolSizes = read_pool_sizes;
+   VkDescriptorPool read_pool;
+   VKCHECK("vkCreateDescriptorPool", vkCreateDescriptorPool(dev, &dpci, NULL, &read_pool));
+   dsai.descriptorPool = read_pool;
+   dsai.descriptorSetCount = 1;
+   dsai.pSetLayouts = &read_dsl;
+   VkDescriptorSet read_set;
+   VKCHECK("vkAllocateDescriptorSets", vkAllocateDescriptorSets(dev, &dsai, &read_set));
+   VkSamplerCreateInfo sci = {
+      .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+      .mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+      .addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+      .maxLod = VK_LOD_CLAMP_NONE,
+   };
+   VkSampler sampler;
+   VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &sampler));
+   const size_t sampled_size = (size_t)LEVELS * 256 * sizeof(float[4]);
+   struct buffer sampled = make_buffer(sampled_size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+
+   /* One word per 4x4 block of level 0, read three ways. */
+   const uint32_t nblocks = (SIZE / 4) * (SIZE / 4);
+   struct buffer blocks = make_buffer(
+      nblocks * 4, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT,
+      true);
+   uint32_t *words = blocks.map;
+   for (uint32_t i = 0; i < nblocks; i++)
+      words[i] = storage_hash(i, 7, 11);
+   VkBufferView block_views[2];
+   for (int i = 0; i < 2; i++) {
+      VkBufferViewCreateInfo bvci = {
+         .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+         .buffer = blocks.buf,
+         .format = i ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_R32_UINT,
+         .range = VK_WHOLE_SIZE,
+      };
+      VKCHECK("vkCreateBufferView", vkCreateBufferView(dev, &bvci, NULL, &block_views[i]));
+   }
+   /* The binding a format doesn't use gets a 4x4 image of the other type. */
+   VkDeviceMemory dummy_mems[2];
+   VkImage dummies[2] = {make_storage_image(VK_FORMAT_R8G8B8A8_UNORM, 4, 1, &dummy_mems[0]),
+                         make_storage_image(VK_FORMAT_R32_UINT, 4, 1, &dummy_mems[1])};
+   VkImageView dummy_views[2] = {make_level_view(dummies[0], VK_FORMAT_R8G8B8A8_UNORM, 0, 1),
+                                 make_level_view(dummies[1], VK_FORMAT_R32_UINT, 0, 1)};
+   size_t offsets[LEVELS], max_total = 0;
+   for (int l = 0; l < LEVELS; l++) {
+      offsets[l] = max_total;
+      max_total += (size_t)(SIZE >> l) * (SIZE >> l) * 16;
+   }
+   struct buffer readback = make_buffer(max_total, VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
+
+   char wrong[800] = "";
+   jopen("cases", '[');
+   for (size_t k = 0; k < nformats; k++) {
+      const struct storage_format *f = &storage_formats[k];
+      jopen(NULL, '{');
+      jstr("case", f->name);
+      VkFormatProperties fp;
+      vkGetPhysicalDeviceFormatProperties(pdev, f->format, &fp);
+      const VkFormatFeatureFlags need =
+         VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_SRC_BIT;
+      jbool("supported", (fp.optimalTilingFeatures & need) == need);
+      if ((fp.optimalTilingFeatures & need) != need) {
+         jclose();
+         continue;
+      }
+      const int bpt = storage_bytes(f);
+      const int kind =
+         f->kind == ST_UNORM8 ? 0 : f->kind == ST_SNORM8 ? 1 : f->kind == ST_UINT32 ? 3 : 2;
+      VkDeviceMemory mem;
+      VkImage image = make_storage_image(f->format, SIZE, LEVELS, &mem);
+      VkImageView views[LEVELS];
+      for (int l = 0; l < LEVELS; l++) {
+         views[l] = make_level_view(image, f->format, l, 1);
+         const VkDescriptorImageInfo image_infos[2] = {
+            {VK_NULL_HANDLE, kind == 3 ? dummy_views[0] : views[l], VK_IMAGE_LAYOUT_GENERAL},
+            {VK_NULL_HANDLE, kind == 3 ? views[l] : dummy_views[1], VK_IMAGE_LAYOUT_GENERAL},
+         };
+         const VkDescriptorBufferInfo buffer_info = {blocks.buf, 0, VK_WHOLE_SIZE};
+         VkWriteDescriptorSet writes[5];
+         for (uint32_t b = 0; b < 5; b++)
+            writes[b] = (VkWriteDescriptorSet){
+               .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+               .dstSet = sets[l],
+               .dstBinding = b,
+               .descriptorCount = 1,
+               .descriptorType = bindings[b].descriptorType,
+               .pImageInfo = b < 2 ? &image_infos[b] : NULL,
+               .pBufferInfo = b == 4 ? &buffer_info : NULL,
+               .pTexelBufferView = b == 2 || b == 3 ? &block_views[b - 2] : NULL,
+            };
+         vkUpdateDescriptorSets(dev, 5, writes, 0, NULL);
+      }
+      VkImageView full_view = make_level_view(image, f->format, 0, LEVELS);
+      {
+         const VkDescriptorImageInfo tex_info = {sampler, kind == 3 ? dummy_views[0] : full_view,
+                                                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+         const VkDescriptorBufferInfo out_info = {sampled.buf, 0, VK_WHOLE_SIZE};
+         const VkWriteDescriptorSet read_writes[2] = {
+            {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .dstSet = read_set,
+             .dstBinding = 0,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+             .pImageInfo = &tex_info},
+            {.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+             .dstSet = read_set,
+             .dstBinding = 1,
+             .descriptorCount = 1,
+             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+             .pBufferInfo = &out_info},
+         };
+         vkUpdateDescriptorSets(dev, 2, read_writes, 0, NULL);
+      }
+
+      int bad[SOURCES] = {0}, bad_sampled = 0;
+      uint32_t bad_levels = 0;
+      char first[200] = "";
+      for (int source = 0; source < SOURCES; source++) {
+         memset(readback.map, 0xaa, max_total);
+         memset(sampled.map, 0xff, sampled_size); /* NaN */
+         VkCommandBuffer cb = begin_cmd();
+         /* DXVK's image waits in TRANSFER_DST for the upload the layer replaces. */
+         VkImageMemoryBarrier start[3] = {
+            storage_barrier(image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                            VK_ACCESS_TRANSFER_WRITE_BIT, 0, LEVELS),
+            storage_barrier(dummies[0], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0,
+                            VK_ACCESS_SHADER_WRITE_BIT, 0, 1),
+            storage_barrier(dummies[1], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0,
+                            VK_ACCESS_SHADER_WRITE_BIT, 0, 1),
+         };
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                              0, 0, NULL, 0, NULL, 3, start);
+         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+         for (int l = 0; l < LEVELS; l++) {
+            /* The layer's barriers around one level's decode, with its stage and access masks. */
+            VkImageMemoryBarrier to_general =
+               storage_barrier(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+                               VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT, l, 1);
+            vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
+                                 &to_general);
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &sets[l], 0,
+                                    NULL);
+            const int32_t pc[3] = {l, source, kind};
+            vkCmdPushConstants(cb, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), pc);
+            const uint32_t w = SIZE >> l;
+            vkCmdDispatch(cb, (w + 7) / 8, (w + 7) / 8, 1);
+            VkImageMemoryBarrier back = storage_barrier(
+               image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+               VK_ACCESS_SHADER_WRITE_BIT,
+               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT |
+                  VK_ACCESS_TRANSFER_READ_BIT,
+               l, 1);
+            vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
+                                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 0, 0, NULL, 0, NULL, 1, &back);
+         }
+         VkImageMemoryBarrier to_copy = storage_barrier(
+            image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, 0, LEVELS);
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+                              0, NULL, 0, NULL, 1, &to_copy);
+         VkBufferImageCopy regions[LEVELS];
+         for (int l = 0; l < LEVELS; l++)
+            regions[l] = (VkBufferImageCopy){
+               .bufferOffset = offsets[l],
+               .imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, l, 0, 1},
+               .imageExtent = {SIZE >> l, SIZE >> l, 1},
+            };
+         vkCmdCopyImageToBuffer(cb, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buf,
+                                LEVELS, regions);
+         if (kind != 3) {
+            /* Then to the layout DXVK samples it in, and 16x16 texels of every level through a
+             * sampler. */
+            VkImageMemoryBarrier to_sample = storage_barrier(
+               image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+               VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT, 0, LEVELS);
+            vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1,
+                                 &to_sample);
+            vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, read_pipe);
+            vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, read_layout, 0, 1,
+                                    &read_set, 0, NULL);
+            const int32_t levels_pc = LEVELS;
+            vkCmdPushConstants(cb, read_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(levels_pc),
+                               &levels_pc);
+            vkCmdDispatch(cb, 1, 1, 1);
+         }
+         VkMemoryBarrier to_host = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+         };
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                              VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &to_host, 0, NULL, 0, NULL);
+         VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+         submit_and_wait(cb, f->name);
+
+         for (int l = 0; l < LEVELS; l++) {
+            const uint32_t w = SIZE >> l;
+            const uint8_t *level_bytes = (const uint8_t *)readback.map + offsets[l];
+            for (uint32_t y = 0; y < w; y++) {
+               for (uint32_t x = 0; x < w; x++) {
+                  const uint32_t src = source ? words[(y / 4) * ((w + 3) / 4) + x / 4] : 0;
+                  uint8_t want[16];
+                  storage_expected(f, x, y, l, src, want);
+                  const uint8_t *got = level_bytes + ((size_t)y * w + x) * bpt;
+                  if (!memcmp(got, want, bpt))
+                     continue;
+                  bad_levels |= 1u << l;
+                  if (!bad[source]++ && !first[0]) {
+                     char got_hex[40] = "", want_hex[40] = "";
+                     for (int b = 0; b < bpt; b++) {
+                        snprintf(got_hex + 2 * b, sizeof(got_hex) - 2 * b, "%02x", got[b]);
+                        snprintf(want_hex + 2 * b, sizeof(want_hex) - 2 * b, "%02x", want[b]);
+                     }
+                     snprintf(first, sizeof(first), "%s level %d (%u,%u): got %s, want %s",
+                              source_names[source], l, x, y, got_hex, want_hex);
+                  }
+               }
+            }
+         }
+         if (kind == 3)
+            continue;
+         const float(*got)[4] = sampled.map;
+         for (int l = 0; l < LEVELS; l++) {
+            const uint32_t w = SIZE >> l, n = w < 16 ? w : 16;
+            for (uint32_t gy = 0; gy < n; gy++) {
+               for (uint32_t gx = 0; gx < n; gx++) {
+                  const uint32_t x = gx * w / n + w / n / 2, y = gy * w / n + w / n / 2;
+                  const uint32_t src = source ? words[(y / 4) * ((w + 3) / 4) + x / 4] : 0;
+                  const uint32_t h = storage_hash(x, y, l) ^ src;
+                  const float *g = got[l * 256 + gy * 16 + gx];
+                  bool ok = true;
+                  for (int c = 0; c < f->channels; c++) {
+                     const uint32_t b = h >> (8 * c) & 255;
+                     const float want = f->kind == ST_UNORM8   ? (float)b / 255.0f
+                                        : f->kind == ST_SNORM8 ? (float)((int)(b % 255) - 127) / 127.0f
+                                                               : (float)b / 256.0f;
+                     const float tolerance = f->kind == ST_UNORM8   ? 0.5f / 255.0f
+                                             : f->kind == ST_SNORM8 ? 0.5f / 127.0f
+                                                                    : 1e-6f;
+                     ok = ok && fabsf(g[c] - want) <= tolerance;
+                  }
+                  if (ok)
+                     continue;
+                  bad_levels |= 1u << l;
+                  if (!bad_sampled++ && !first[0])
+                     snprintf(first, sizeof(first),
+                              "sampled after %s level %d (%u,%u): got (%g, %g, %g, %g)",
+                              source_names[source], l, x, y, g[0], g[1], g[2], g[3]);
+               }
+            }
+         }
+      }
+      jint("wrong_sampled", bad_sampled);
+      for (int source = 0; source < SOURCES; source++) {
+         char key[40];
+         snprintf(key, sizeof(key), "wrong_%s", source_names[source]);
+         jint(key, bad[source]);
+      }
+      jopen("wrong_levels", '[');
+      for (int l = 0; l < LEVELS; l++)
+         if (bad_levels >> l & 1)
+            jint(NULL, l);
+      jclose();
+      if (first[0])
+         jstr("first_wrong", first);
+      jclose();
+      if (bad[0] + bad[1] + bad[2] + bad[3] + bad_sampled)
+         add_problem(wrong, sizeof(wrong), "%s %d/%d/%d/%d/%d", f->name, bad[0], bad[1], bad[2],
+                     bad[3], bad_sampled);
+
+      vkDestroyImageView(dev, full_view, NULL);
+      for (int l = 0; l < LEVELS; l++)
+         vkDestroyImageView(dev, views[l], NULL);
+      vkDestroyImage(dev, image, NULL);
+      vkFreeMemory(dev, mem, NULL);
+   }
+   jclose();
+   if (wrong[0])
+      finish("fail", "wrong texels (const/ssbo/texel_uint/texel_rgba8/sampled): %s", wrong);
+
+   free_buffer(&readback);
+   free_buffer(&sampled);
+   vkDestroySampler(dev, sampler, NULL);
+   vkDestroyDescriptorPool(dev, read_pool, NULL);
+   vkDestroyPipeline(dev, read_pipe, NULL);
+   vkDestroyShaderModule(dev, read_cs, NULL);
+   vkDestroyPipelineLayout(dev, read_layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, read_dsl, NULL);
+   for (int i = 0; i < 2; i++) {
+      vkDestroyImageView(dev, dummy_views[i], NULL);
+      vkDestroyImage(dev, dummies[i], NULL);
+      vkFreeMemory(dev, dummy_mems[i], NULL);
+      vkDestroyBufferView(dev, block_views[i], NULL);
+   }
+   free_buffer(&blocks);
+   vkDestroyDescriptorPool(dev, dpool, NULL);
+   vkDestroyPipeline(dev, pipe, NULL);
+   vkDestroyShaderModule(dev, cs, NULL);
+   vkDestroyPipelineLayout(dev, layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
+}
+
 int main(int argc, char **argv)
 {
    const char *driver = NULL, *test = NULL;
@@ -4511,6 +5070,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
                       "  correctness: info device submit compute render tess scratch scratchcs\n"
                       "               queries xfb xfbmany xfbmanygs textures mips mrt vertex depth\n"
+                      "               storage\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -4533,6 +5093,7 @@ int main(int argc, char **argv)
       {"textures", run_textures, false, NEED_BC}, {"mips", run_mips, false, NEED_BC},
       {"mrt", run_mrt, true, 0},
       {"vertex", run_vertex, true, NEED_VERTEX}, {"depth", run_depth, true, 0},
+      {"storage", run_storage, false, NEED_STORAGE},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},
