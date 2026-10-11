@@ -65,7 +65,8 @@ tools/python/bin/python3 pipeline/game.py --runs 3
 - The phone (serial `RZCY90ZYQXZ`) connects over USB ADB. `pipeline/run.py` finds adb on PATH or in `~/platform-tools` (`%USERPROFILE%\platform-tools` on Windows).
 - The user approved automated GPU testing on the phone. A GPU hang can reboot it; the runner detects hangs and reboots and stops testing our driver for that run.
 - Put test binaries in `/data/local/tmp`. **Keep the user's files on the phone.** Don't delete benchmark folders, installers, or the driver zip; document them instead (user instruction, 2026-10-10).
-- **When driving the phone's UI, nobody else may touch it.** Keep the screen on with `adb shell svc power stayon usb`, and restore it afterwards with `adb shell settings put global stay_on_while_plugged_in 0` (the original value). Don't use key presses as a keep-alive; GameNative treats them as input.
+- **Keep the phone awake while it's connected** (user instruction, 2026-10-11): `adb shell svc power stayon usb`, and leave it set. It only holds the screen on while USB is connected. `game.py` and `gn_driver.py` put back whatever value they found. Don't use key presses as a keep-alive; GameNative treats them as input.
+- **When driving the phone's UI, nobody else may touch it.**
 - Never enter credentials. GameNative's Steam sign-in is skipped with "Skip login".
 - **Script repeated phone UI work instead of using subagents, and keep token usage low** (standing instruction from the user, 2026-10-11). This replaces the earlier rule that sent UI navigation to Sonnet subagents.
   - Recurring work goes in scripts under `pipeline/`, built on `pipeline/phone_ui.py` (`dump`, `tap`, `type`, `clear`, `shot`). That covers importing a driver in Driver Manager, selecting it in a container, toggling settings, and reading values off screens. Check for an existing script before driving the UI by hand.
