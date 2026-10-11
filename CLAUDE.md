@@ -79,4 +79,5 @@ tools/python/bin/python3 pipeline/game.py --runs 3
 - Clone with `git clone -c core.autocrlf=false -c core.longpaths=true`. Use shallow or sparse clones for big repos, because internet may come through the phone's mobile hotspot.
 - Scripts that run on the phone must have LF line endings.
 - Stay clean-room. Learn the hardware from the GPL kernel source, MIT ports, and our own probing, never from decompiled Samsung code.
-- Update `docs/PROGRESS.md` (and `docs/HANDOFF.md` when stopping) at each milestone, so work can resume after the session closes.
+- Update `docs/PROGRESS.md` at each milestone, so work can resume after the session closes.
+- **Update `docs/HANDOFF.md` only when the user says they're leaving the device** (user instruction, 2026-10-11). Until then, focus on the work, and write the handoff in one pass at the end.
