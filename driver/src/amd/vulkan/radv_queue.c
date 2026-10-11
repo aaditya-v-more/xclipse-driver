@@ -480,7 +480,14 @@ radv_emit_graphics_scratch(struct radv_device *device, struct radv_cmd_stream *c
 
    radv_cs_add_buffer(device->ws, cs->b, scratch_bo);
 
-   ac_emit_cp_gfx_scratch(cs->b, pdev->info.gfx_level, va, tmpring_size);
+   /* Xclipse 940: the hardware gives each wave its scratch address from SPI_GFX_SCRATCH_BASE_LO/HI,
+    * as on GFX11, so the GFX11 sequence also writes those. Without them every wave's scratch is at GPU
+    * address 0, and each draw that uses scratch page-faults (which resets the GPU). SPI_TMPRING_SIZE
+    * keeps GFX10's 1 KiB WAVESIZE units, which tmpring_size already has: 256-byte units fault past the
+    * end of the scratch buffer. The shaders' GFX10 scratch setup is harmless; tests pass with or
+    * without it.
+    */
+   ac_emit_cp_gfx_scratch(cs->b, gpu_info->gfx11_shader_core ? GFX11 : gpu_info->gfx_level, va, tmpring_size);
 }
 
 static void
@@ -519,6 +526,17 @@ radv_emit_compute_scratch(struct radv_device *device, struct radv_cmd_stream *cs
       radeon_set_sh_reg_seq(R_00B900_COMPUTE_USER_DATA_0, 2);
       radeon_emit(scratch_va);
       radeon_emit(rsrc1);
+
+      /* Xclipse 940: as with graphics scratch, the hardware takes the base address from the GFX11
+       * registers. Without them, a compute shader's scratch page-faulted far from any of our
+       * buffers, probably at an address the previous process left there. The shaders still get the
+       * address in s[0:1] as on GFX10, since they use GFX10's argument layout.
+       */
+      if (gpu_info->gfx11_shader_core) {
+         radeon_set_sh_reg_seq(R_00B840_COMPUTE_DISPATCH_SCRATCH_BASE_LO, 2);
+         radeon_emit(scratch_va >> 8);
+         radeon_emit(scratch_va >> 40);
+      }
    }
 
    radeon_set_sh_reg(R_00B860_COMPUTE_TMPRING_SIZE, tmpring_size);
@@ -584,11 +602,20 @@ radv_emit_graphics_shader_pointers(struct radv_device *device, struct radv_cmd_s
          radeon_emit_64bit_pointer(regs[i], va);
       }
    } else if (pdev->info.gfx_level >= GFX10) {
-      uint32_t regs[] = {R_00B030_SPI_SHADER_USER_DATA_PS_0, R_00B130_SPI_SHADER_USER_DATA_VS_0,
-                         R_00B208_SPI_SHADER_USER_DATA_ADDR_LO_GS, R_00B408_SPI_SHADER_USER_DATA_ADDR_LO_HS};
-
-      for (int i = 0; i < ARRAY_SIZE(regs); ++i) {
-         radeon_emit_64bit_pointer(regs[i], va);
+      radeon_emit_64bit_pointer(R_00B030_SPI_SHADER_USER_DATA_PS_0, va);
+      radeon_emit_64bit_pointer(R_00B130_SPI_SHADER_USER_DATA_VS_0, va);
+      if (pdev->info.gfx11_shader_core) {
+         /* Xclipse 940: the merged stages (HS, which runs LS+HS, and GS, which runs NGG VS, TES and GS)
+          * load s[0:1] from SPI_SHADER_PGM_LO/HI_GS and _HS, as on GFX11, not from
+          * USER_DATA_ADDR_LO/HI. With only the GFX10 registers written, s[0:1] is 0 and those shaders
+          * read their ring descriptors and scratch address from GPU address 0, which page-faults and
+          * resets the GPU. The programs' own addresses go in PGM_LO_ES and _LS.
+          */
+         radeon_emit_64bit_pointer(R_00B220_SPI_SHADER_PGM_LO_GS, va);
+         radeon_emit_64bit_pointer(R_00B420_SPI_SHADER_PGM_LO_HS, va);
+      } else {
+         radeon_emit_64bit_pointer(R_00B208_SPI_SHADER_USER_DATA_ADDR_LO_GS, va);
+         radeon_emit_64bit_pointer(R_00B408_SPI_SHADER_USER_DATA_ADDR_LO_HS, va);
       }
    } else if (pdev->info.gfx_level == GFX9) {
       uint32_t regs[] = {R_00B030_SPI_SHADER_USER_DATA_PS_0, R_00B130_SPI_SHADER_USER_DATA_VS_0,
