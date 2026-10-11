@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "started": "2026-10-11T16:20:20",
+    "driver": {
+      "commit": "fc066b9",
+      "so_sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "42.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "700000",
+      "battery": "level: 87 temperature: 388"
+    },
+    "tests": [
+      "depth"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "43.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 87 temperature: 388"
+    }
+  },
+  "results": [
+    {
+      "test": "depth",
+      "driver": "stock",
+      "gpu_temp_c_before": "43.0",
+      "ms_load": 25.823,
+      "ms_instance": 84.898,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.757,
+      "formats": [
+        {
+          "format": "D16",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D32F",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D24S8",
+          "supported": false
+        },
+        {
+          "format": "D32FS8",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating pipelines",
+        "[xdtest] dummy image layout",
+        "[xdtest] D16",
+        "[xdtest] D32F",
+        "[xdtest] D32FS8",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "depth",
+      "driver": "radv",
+      "gpu_temp_c_before": "44.0",
+      "ms_load": 19.377,
+      "ms_instance": 3.096,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 2.046,
+      "formats": [
+        {
+          "format": "D16",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D32F",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D24S8",
+          "supported": false
+        },
+        {
+          "format": "D32FS8",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating pipelines",
+        "[xdtest] dummy image layout",
+        "[xdtest] D16",
+        "[xdtest] D32F",
+        "[xdtest] D32FS8",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

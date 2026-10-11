@@ -1,0 +1,27 @@
+#version 450
+// Reads back a depth target the host drew, at a 64x64 grid of texels: the depth, the stencil, and
+// depth comparisons as shadow maps use them, against references just below and just above the
+// depth the host expects there. The nearest comparison samples the texel's center; the linear one
+// (PCF) samples the corner it shares with three neighbors. A comparison reads 1 where the
+// reference is below the depth, so a right pair reads 1 + 2 * 0 = 1.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2D depth;
+layout(binding = 1) uniform usampler2D stencil;
+layout(binding = 2) uniform sampler2DShadow shadow_nearest;
+layout(binding = 3) uniform sampler2DShadow shadow_linear;
+layout(std430, binding = 4) readonly buffer Want { float want[4096]; };
+layout(std430, binding = 5) writeonly buffer Out { vec4 o[4096]; };
+void main()
+{
+   ivec2 g = ivec2(gl_GlobalInvocationID.xy);
+   int i = g.y * 64 + g.x;
+   ivec2 t = g * 4 + ivec2(1, 2);
+   vec2 size = vec2(textureSize(depth, 0));
+   vec2 center = (vec2(t) + 0.5) / size, corner = (vec2(t) + 1.0) / size;
+   float d = want[i];
+   o[i] = vec4(texelFetch(depth, t, 0).r, float(texelFetch(stencil, t, 0).r),
+               textureLod(shadow_nearest, vec3(center, d - 0.01), 0.0) +
+                  2.0 * textureLod(shadow_nearest, vec3(center, d + 0.01), 0.0),
+               textureLod(shadow_linear, vec3(corner, d - 0.01), 0.0) +
+                  2.0 * textureLod(shadow_linear, vec3(corner, d + 0.01), 0.0));
+}
