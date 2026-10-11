@@ -2353,6 +2353,24 @@ radv_postprocess_binary_config(const struct radv_compiler_info *compiler_info, s
    }
 
    unsigned num_vgprs = MAX2(config->num_vgprs, num_input_vgprs);
+   /* Xclipse: while a wave64 pixel shader allocated 8 VGPRs (the fewest ACO asks for) runs, v0-v1 in
+    * the lower 32 lanes of other waves get overwritten, more of them when the pixel shader has more
+    * input VGPRs. xfbmany and xfbmanygs see it as NGG vertex indices that come out wrong. With 16
+    * VGPRs, or in wave32, it doesn't happen. Every wave64 stage gets at least 16: no shader that
+    * small is limited by VGPRs (32 waves would fit against a limit of 16 per SIMD), so it costs
+    * nothing. */
+   if (compiler_info->hw.gfx11_isa && info->wave_size == 64)
+      num_vgprs = MAX2(num_vgprs, 16);
+   /* RADV_XCLIPSE_VGPRPAD=<n> allocates n more VGPRs than the shader uses, for the stages in
+    * RADV_XCLIPSE_VGPRPAD_MASK (1 << mesa_shader_stage, default all). A diagnostic for register-file
+    * corruption; it changes binaries, so use it with MESA_SHADER_CACHE_DISABLE=true. */
+   {
+      const char *e = getenv("RADV_XCLIPSE_VGPRPAD");
+      const char *m = getenv("RADV_XCLIPSE_VGPRPAD_MASK");
+      const unsigned mask = m && m[0] ? (unsigned)strtoul(m, NULL, 0) : ~0u;
+      if (e && e[0] && (mask & (1u << stage)))
+         num_vgprs = MIN2(num_vgprs + (unsigned)atoi(e), 256);
+   }
    /* +2 for the ring offsets, +3 for scratch wave offset and VCC */
    unsigned num_sgprs = MAX2(config->num_sgprs, args->ac.num_sgprs_used + 2 + 3);
    unsigned num_shared_vgprs = config->num_shared_vgprs;
