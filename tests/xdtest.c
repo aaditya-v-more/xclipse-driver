@@ -7,7 +7,7 @@
  * drives both drivers, so every result is an A/B pair.
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
- *   correctness: info device submit compute render queries
+ *   correctness: info device submit compute render queries xfb
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -34,6 +34,7 @@
 #include "tri_frag.h"
 #include "tri_geom.h"
 #include "tri_vert.h"
+#include "xfb_vert.h"
 
 /* A fence that hasn't signaled after this long means the GPU stopped responding. */
 #define GPU_TIMEOUT_NS 5000000000ull
@@ -437,8 +438,11 @@ static void run_info(void)
 
 /* ---- device, commands and resources ---- */
 
-/* Set by start_device for the queries test: what the driver has of what that test uses. */
-static bool has_geometry_shader, has_stats_query, has_pg_query;
+/* What a test needs enabled beyond the basics. */
+enum { NEED_QUERIES = 1, NEED_XFB = 2 };
+
+/* Set by start_device for the queries and xfb tests: what the driver has of what they use. */
+static bool has_geometry_shader, has_stats_query, has_pg_query, has_xfb, has_xfb_queries;
 
 static bool has_device_extension(const char *name)
 {
@@ -453,7 +457,7 @@ static bool has_device_extension(const char *name)
    return false;
 }
 
-static void start_device(bool dynamic_rendering, bool queries)
+static void start_device(bool dynamic_rendering, unsigned needs)
 {
    if (qfam == UINT32_MAX)
       finish("fail", "no queue family with both graphics and compute");
@@ -478,8 +482,14 @@ static void start_device(bool dynamic_rendering, bool queries)
    VkPhysicalDevicePrimitivesGeneratedQueryFeaturesEXT pgq = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT,
    };
+   VkPhysicalDeviceTransformFeedbackFeaturesEXT xfb = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT,
+   };
    const char *pgq_ext = VK_EXT_PRIMITIVES_GENERATED_QUERY_EXTENSION_NAME;
-   if (queries) {
+   const char *xfb_ext = VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME;
+   const char *exts[2];
+   void **chain = &f13.pNext; /* where the next enabled feature struct goes */
+   if (needs & NEED_QUERIES) {
       bool pgq_listed = has_device_extension(pgq_ext);
       VkPhysicalDeviceFeatures2 f2 = {
          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -497,11 +507,38 @@ static void start_device(bool dynamic_rendering, bool queries)
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PRIMITIVES_GENERATED_QUERY_FEATURES_EXT,
             .primitivesGeneratedQuery = VK_TRUE,
          };
-         f13.pNext = &pgq;
-         dci.enabledExtensionCount = 1;
-         dci.ppEnabledExtensionNames = &pgq_ext;
+         *chain = &pgq;
+         chain = &pgq.pNext;
+         exts[dci.enabledExtensionCount++] = pgq_ext;
       }
    }
+   if ((needs & NEED_XFB) && has_device_extension(xfb_ext)) {
+      VkPhysicalDeviceTransformFeedbackPropertiesEXT props = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_PROPERTIES_EXT,
+      };
+      VkPhysicalDeviceProperties2 p2 = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+         .pNext = &props,
+      };
+      VkPhysicalDeviceFeatures2 f2 = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+         .pNext = &xfb,
+      };
+      vkGetPhysicalDeviceProperties2(pdev, &p2);
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      has_xfb = xfb.transformFeedback;
+      has_xfb_queries = has_xfb && props.transformFeedbackQueries;
+      if (has_xfb) {
+         xfb = (VkPhysicalDeviceTransformFeedbackFeaturesEXT){
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TRANSFORM_FEEDBACK_FEATURES_EXT,
+            .transformFeedback = VK_TRUE,
+         };
+         *chain = &xfb;
+         chain = &xfb.pNext;
+         exts[dci.enabledExtensionCount++] = xfb_ext;
+      }
+   }
+   dci.ppEnabledExtensionNames = exts;
    step("creating device");
    double t = now_ms();
    VKCHECK("vkCreateDevice", vkCreateDevice(pdev, &dci, NULL, &dev));
@@ -1353,6 +1390,127 @@ static void run_queries(void)
    free_target(&t);
 }
 
+/* ---- xfb: transform feedback, which DXVK uses for D3D11 stream output ---- */
+
+static void run_xfb(void)
+{
+   enum { W = 128, H = 128, INSTANCES = 5, VERTS = 3 * INSTANCES, STRIDE = 16 };
+   if (!has_xfb)
+      finish("skip", "no transformFeedback");
+   const bool use_query = has_xfb_queries && env_uint("XD_XFB_QUERY", 1);
+   jbool("has_transform_feedback_queries", has_xfb_queries);
+   jbool("xfb_query", use_query);
+
+   /* Extension entry points, loaded here because only this test enables the extension. */
+#define XFB_FUNCS(X)                                                                               \
+   X(vkCmdBindTransformFeedbackBuffersEXT) X(vkCmdBeginTransformFeedbackEXT)                       \
+   X(vkCmdEndTransformFeedbackEXT) X(vkCmdBeginQueryIndexedEXT) X(vkCmdEndQueryIndexedEXT)
+   XFB_FUNCS(DECLARE)
+   const char *missing = NULL;
+   XFB_FUNCS(LOAD_DEVICE)
+#undef XFB_FUNCS
+   if (missing)
+      finish("fail", "device function %s missing", missing);
+
+   struct target t = make_target(W, H);
+   double ms;
+   step("creating graphics pipeline");
+   struct graphics g = make_graphics(xfb_vert, sizeof(xfb_vert), tri_frag, sizeof(tri_frag),
+                                     VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+
+   /* Twice the room the draw needs: writes past its end show up as changed fill bytes. */
+   const VkDeviceSize size = 2 * VERTS * STRIDE, zero = 0;
+   struct buffer out = make_buffer(size, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT, true);
+   struct buffer counter = make_buffer(4, VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_COUNTER_BUFFER_BIT_EXT,
+                                       true);
+   memset(out.map, 0xff, size);
+   *(uint32_t *)counter.map = 0xdeadbeef;
+
+   VkQueryPool qpool = VK_NULL_HANDLE;
+   if (use_query) {
+      VkQueryPoolCreateInfo qci = {
+         .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+         .queryType = VK_QUERY_TYPE_TRANSFORM_FEEDBACK_STREAM_EXT,
+         .queryCount = 1,
+      };
+      VKCHECK("vkCreateQueryPool", vkCreateQueryPool(dev, &qci, NULL, &qpool));
+   }
+
+   /* Begin without counter buffers, so writing starts at offset 0; end with one, as DXVK does,
+    * so the driver stores how many bytes it wrote. */
+   VkCommandBuffer cb = begin_cmd();
+   if (qpool)
+      vkCmdResetQueryPool(cb, qpool, 0, 1);
+   const float clear[4] = {0.0f, 0.0f, 0.25f, 1.0f};
+   begin_target(cb, &t, clear);
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g.pipeline);
+   vkCmdBindTransformFeedbackBuffersEXT(cb, 0, 1, &out.buf, &zero, &size);
+   if (qpool)
+      vkCmdBeginQueryIndexedEXT(cb, qpool, 0, 0, 0);
+   vkCmdBeginTransformFeedbackEXT(cb, 0, 0, NULL, NULL);
+   vkCmdDraw(cb, 3, INSTANCES, 0, 0);
+   vkCmdEndTransformFeedbackEXT(cb, 0, 1, &counter.buf, &zero);
+   if (qpool)
+      vkCmdEndQueryIndexedEXT(cb, qpool, 0, 0);
+   vkCmdEndRendering(cb);
+   VkMemoryBarrier to_host = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_TRANSFORM_FEEDBACK_WRITE_BIT_EXT |
+                       VK_ACCESS_TRANSFORM_FEEDBACK_COUNTER_WRITE_BIT_EXT,
+      .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFORM_FEEDBACK_BIT_EXT, VK_PIPELINE_STAGE_HOST_BIT,
+                        0, 1, &to_host, 0, NULL, 0, NULL);
+   VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+   jnum("ms_gpu", submit_and_wait(cb, "transform feedback draw"));
+
+   /* Vertex k is vertex k % 3 of instance k / 3: instances are processed in order. */
+   step("reading results");
+   char wrong[400] = "";
+   const float *v = out.map;
+   unsigned bad = 0;
+   for (unsigned k = 0; k < VERTS; k++) {
+      const float want[4] = {(float)(k % 3), (float)(k / 3), 1.0f, 2.0f};
+      if (memcmp(&v[4 * k], want, sizeof(want)) && !bad++)
+         snprintf(wrong, sizeof(wrong), "vertex %u is (%g, %g, %g, %g), want (%g, %g, 1, 2)", k,
+                  v[4 * k], v[4 * k + 1], v[4 * k + 2], v[4 * k + 3], want[0], want[1]);
+   }
+   unsigned past_end = 0;
+   for (unsigned i = VERTS * STRIDE / 4; i < size / 4; i++)
+      past_end += ((const uint32_t *)out.map)[i] != 0xffffffff;
+   const uint32_t bytes = *(const uint32_t *)counter.map;
+   jint("vertices_wrong", bad);
+   jint("dwords_written_past_end", past_end);
+   jint("counter_bytes", bytes);
+   if (past_end)
+      snprintf(wrong + strlen(wrong), sizeof(wrong) - strlen(wrong),
+               "%s%u dwords written past the end", wrong[0] ? ", " : "", past_end);
+   if (bytes != VERTS * STRIDE)
+      snprintf(wrong + strlen(wrong), sizeof(wrong) - strlen(wrong),
+               "%scounter %u bytes (want %u)", wrong[0] ? ", " : "", bytes, VERTS * STRIDE);
+   if (qpool) {
+      uint64_t q[2] = {0};
+      VKCHECK("vkGetQueryPoolResults (transform feedback)",
+              vkGetQueryPoolResults(dev, qpool, 0, 1, sizeof(q), q, sizeof(q),
+                                    VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT));
+      jint("primitives_written", (long long)q[0]);
+      jint("primitives_needed", (long long)q[1]);
+      if (q[0] != INSTANCES || q[1] != INSTANCES)
+         snprintf(wrong + strlen(wrong), sizeof(wrong) - strlen(wrong),
+                  "%squery %llu written, %llu needed (want %u)", wrong[0] ? ", " : "",
+                  (unsigned long long)q[0], (unsigned long long)q[1], INSTANCES);
+   }
+   if (wrong[0])
+      finish("fail", "%s", wrong);
+
+   if (qpool)
+      vkDestroyQueryPool(dev, qpool, NULL);
+   free_buffer(&counter);
+   free_buffer(&out);
+   free_graphics(&g);
+   free_target(&t);
+}
+
 /* ---- alu: FP32 FMA throughput ---- */
 
 struct alu_args {
@@ -1597,7 +1755,7 @@ int main(int argc, char **argv)
    }
    if (!driver || !test) {
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
-                      "  correctness: info device submit compute render queries\n"
+                      "  correctness: info device submit compute render queries xfb\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -1607,13 +1765,15 @@ int main(int argc, char **argv)
    static const struct {
       const char *name;
       void (*run)(void);
-      bool rendering, queries;
+      bool rendering;
+      unsigned needs;
    } tests[] = {
-      {"device", NULL, false, false},          {"submit", run_submit, false, false},
-      {"compute", run_compute, false, false},  {"render", run_render, true, false},
-      {"queries", run_queries, true, true},    {"alu", run_alu, false, false},
-      {"bandwidth", run_bandwidth, false, false}, {"fill", run_fill, true, false},
-      {"draws", run_draws, true, false},       {"compile", run_compile, false, false},
+      {"device", NULL, false, 0},           {"submit", run_submit, false, 0},
+      {"compute", run_compute, false, 0},   {"render", run_render, true, 0},
+      {"queries", run_queries, true, NEED_QUERIES}, {"xfb", run_xfb, true, NEED_XFB},
+      {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
+      {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
+      {"compile", run_compile, false, 0},
    };
    int which = -1;
    for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++)
@@ -1640,7 +1800,7 @@ int main(int argc, char **argv)
       finish("pass", NULL);
    }
 
-   start_device(tests[which].rendering, tests[which].queries);
+   start_device(tests[which].rendering, tests[which].needs);
    if (tests[which].run)
       tests[which].run();
 

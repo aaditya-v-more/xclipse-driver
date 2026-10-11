@@ -141,6 +141,11 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
     - **The primitives-generated query hung the GPU.** RADV's GFX10.3 path enables streamout and samples the streamout statistics (`EVENT_WRITE` `SAMPLE_STREAMOUTSTATS`). With a temporary switch, skipping the sample stopped the hang; enabling streamout (`VGT_STRMOUT_CONFIG`) alone was fine. Xclipse now uses RADV's GFX11 path, which counts in the shaders only.
   - Result: all 11 statistics are identical to Samsung's driver for both draws (including fragment-shader invocations), and primitives generated is 5 and 10.
   - **Risk left: transform feedback.** RADV's GFX10.3 transform-feedback queries use the same `SAMPLE_STREAMOUTSTATS` event, so they would hang the GPU too. GFX10.3 transform feedback also runs on the legacy geometry path, which hung with `RADV_DEBUG=nongg`. Both drivers expose `VK_EXT_transform_feedback`, and DXVK uses it for D3D11 stream output. It needs its own `xdtest` case.
+- [ ] **Transform feedback hangs our driver's GPU (2026-10-11, `results/2026-10-11_091548`).**
+  - New `xdtest` case `xfb`: 5 instances of a triangle, each vertex writing its index and instance, captured with a counter buffer and a transform-feedback query. Samsung's driver passes every check. Ours hangs on the draw; the kernel recovers and the stock health check passes.
+  - Cause: RADV runs GFX10.3 transform feedback on the legacy geometry path, and the 940 has no legacy streamout hardware. The GPL kernel's register map for this chip has GFX11's streamout counters and no GDS, GWS or OA (`docs/findings.md`).
+  - `run.py` runs `xfb` last, so its hang doesn't cost the rest of a run.
+  - Fix: GFX11's NGG streamout without the `ds_ordered_count` lock that needs OA. Games that use D3D11 stream output would hang our driver until then.
 
 ## Optimization targets (from the speed tests)
 

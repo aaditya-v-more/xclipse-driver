@@ -56,8 +56,13 @@ Verified facts only. Raw survey output is in `recon/device-gpu-recon.txt` and `r
 
 - **sgpu has no GDS.** RADV's 256-byte GDS allocation (domain 8) fails, and the submission with it.
 - **The GE counts NGG geometry-shader primitives in the pipeline statistics**, as GFX11 does and GFX10.3 doesn't. With hardware counters only, all 11 statistics match Samsung's driver.
-- **`EVENT_WRITE` `SAMPLE_STREAMOUTSTATS` hangs the GPU.** The kernel recovers without a reboot. Writing `VGT_STRMOUT_CONFIG` to enable streamout doesn't hang.
+- **`EVENT_WRITE` `SAMPLE_STREAMOUTSTATS` hangs the GPU.** The kernel recovers without a reboot. Writing `VGT_STRMOUT_CONFIG` doesn't hang, but that register doesn't exist on this chip (below).
 - **The legacy (non-NGG) geometry path hangs on the first draw batch** (`RADV_DEBUG=nongg`, 2026-10-10).
+- **Transform feedback works on Samsung's driver and hangs ours** (`xdtest xfb`, result `2026-10-11_091548`). Stock captured all 15 vertices in order, wrote nothing past the end, stored a 240-byte counter, and its query gave 5 primitives written and 5 needed. RADV on GFX10.3 compiles transform-feedback pipelines for the legacy geometry path, and the draw hung.
+- **The 940's streamout hardware is GFX11's** (GPL kernel, `gc_10_4_0_offset_m2.h`, the register map the kernel picks for MGFX2 chips like ours):
+  - The legacy streamout registers are gone: `VGT_STRMOUT_CONFIG`, `VGT_STRMOUT_BUFFER_*`, `VGT_STRMOUT_VTX_STRIDE_*` and `CP_STRMOUT_CNTL`.
+  - In their place, `SPI_STRMOUT_DWORDS_WRITTEN_0-3`, `SPI_GS_0-3` and `SPI_STRMOUT_PRIMS_NEEDED/WRITTEN_0-3` sit at 0x31088-0x310e4. Those are GFX11's `GDS_STRMOUT_*` and `GDS_GS_*` addresses under new names. `VGT_STRMOUT_DRAW_OPAQUE_*` stays.
+  - **No GDS, GWS or OA at all.** The MGFX2 map has none of their registers, and `gfx_v10_0_set_gds_init` leaves all three heaps at size 0 on this chip. GFX11's NGG streamout orders workgroups with `ds_ordered_count`, which needs an OA allocation, so that path can't run unchanged either.
 
 ## Build PC
 
