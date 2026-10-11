@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-10
+Last updated: 2026-10-11
 
 ## Goal
 
@@ -141,11 +141,11 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
     - **The primitives-generated query hung the GPU.** RADV's GFX10.3 path enables streamout and samples the streamout statistics (`EVENT_WRITE` `SAMPLE_STREAMOUTSTATS`). With a temporary switch, skipping the sample stopped the hang; enabling streamout (`VGT_STRMOUT_CONFIG`) alone was fine. Xclipse now uses RADV's GFX11 path, which counts in the shaders only.
   - Result: all 11 statistics are identical to Samsung's driver for both draws (including fragment-shader invocations), and primitives generated is 5 and 10.
   - **Risk left: transform feedback.** RADV's GFX10.3 transform-feedback queries use the same `SAMPLE_STREAMOUTSTATS` event, so they would hang the GPU too. GFX10.3 transform feedback also runs on the legacy geometry path, which hung with `RADV_DEBUG=nongg`. Both drivers expose `VK_EXT_transform_feedback`, and DXVK uses it for D3D11 stream output. It needs its own `xdtest` case.
-- [ ] **Transform feedback hangs our driver's GPU (2026-10-11, `results/2026-10-11_091548`).**
+- [x] **Transform feedback hung our driver's GPU (2026-10-11, `results/2026-10-11_091548`).** Fixed; see "Transform feedback works on our driver" below.
   - New `xdtest` case `xfb`: 5 instances of a triangle, each vertex writing its index and instance, captured with a counter buffer and a transform-feedback query. Samsung's driver passes every check. Ours hangs on the draw; the kernel recovers and the stock health check passes.
   - Cause: RADV runs GFX10.3 transform feedback on the legacy geometry path, and the 940 has no legacy streamout hardware. The GPL kernel's register map for this chip has GFX11's streamout counters and no GDS, GWS or OA (`docs/findings.md`).
   - `run.py` runs `xfb` last, so its hang doesn't cost the rest of a run.
-  - Fix: GFX11's NGG streamout without the `ds_ordered_count` lock that needs OA. Games that use D3D11 stream output would hang our driver until then.
+  - The fix planned here was GFX11's NGG streamout without the `ds_ordered_count` lock, which was thought to need OA. As built, the lock works.
 - [ ] **Heaven runs to the end on our driver, at 2 FPS; GravityMark still runs out of memory on both (2026-10-11, `results/2026-10-11_091657-game`).**
   - Driver `xd-ea7b521` (queries without GDS) is imported and selected in both radv containers.
   - **Heaven-stock, with BCn Emulation `full`:** the BC1/BC3 errors are gone, but Unigine still stops with a fatal error on the 2048x2048 D24 depth texture. `game.py` called it `too-short` (9 s of frames), as intended.
@@ -159,14 +159,44 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
   - **GravityMark:** lmkd killed both runs. GPU memory peaked at 3663 MB on stock (after 5 s of frames at 49 FPS) and 3573 MB on radv (before its first frame). DXVK's `maxDeviceMemory` was 0 (no limit). Next: Max Device Memory 2048 MB in both GravityMark containers.
   - `WRAPPER_NATIVE_BCN=1` reached all four launches (`launch_settings` in `results.json`).
 
+- [x] **Transform feedback works on our driver (2026-10-11, `results/2026-10-11_103659`).**
+  - Transform feedback now runs in the NGG shaders with GFX11's streamout counters, which is what this chip has. Geometry shaders always use NGG now; the legacy path is the one that hangs.
+  - **The `ds_ordered_count` lock works without an OA allocation.** GFX11 uses it to order the workgroups' buffer writes. `RADV_XCLIPSE_XFB` (or `debug.radv_xclipse_xfb`) picks the variant, for A/B:
+    - `1` (default): GFX11's lock as is. Writes follow draw order.
+    - `2`: no lock. Workgroups take buffer space in arrival order: tens of thousands of vertices land out of order, and the two buffers disagree.
+    - `3`: the lock encoded as on GFX10, with the GS shader type. Same results as `1`.
+    - `0`: the legacy path, which hangs.
+  - **New tests `xfbmany` and `xfbmanygs`.** They draw 24576 triangles in two draws, the second resuming from the counters the first stored (as DXVK does), from the vertex shader or from a geometry shader. Every vertex index is captured into two buffers. The tests check for missing, duplicated, torn and out-of-order vertices and for writes past the end, and they check the counters and the transform-feedback query.
+  - **Results:**
+    - In mode 1, all 32 runs pass: 20 with the default wave64 and 12 with wave32 vertex and geometry shaders (`RADV_PERFTEST=gewave32`). Mode 3 passes 10 of 10.
+    - `xfb`, `xfbmany` and `xfbmanygs` pass on both drivers in the full run.
+    - No GPU hang or page fault in those runs.
+    - The three tests moved from `run.py`'s hang set to the correctness set.
+  - **A bug found on the way:** RADV set the hardware VS streamout-enable bits in RSRC2 for NGG shaders too. NGG runs as the hardware GS, where those bits are EXCP_EN, so they turned on float exceptions. Fixed; it didn't change the test results.
+  - Until the fix in the next entry, about half of the `xfbmany` and `xfbmanygs` runs still failed (`results/2026-10-11_094708`).
+- [x] **Small wave64 pixel shaders overwrote other waves' registers (2026-10-11).**
+  - **Symptom.** In about half the runs, a run of 10–32 triangles in some workgroups came out wrong, always in the lower 32 lanes of a wave.
+    - From a geometry shader, the third corner held vertex 0 or nothing. `v1`, which holds the third vertex index, was wrong.
+    - From the vertex shader in passthrough mode, whole triangles were missing: `v0`, the packed primitive, was wrong.
+  - **Bisection with switches:**
+    - Ruled out: the ordered lock (mode 2 failed the same way), missing LDS waits (`ACO_DEBUG=force-waitcnt`), the RSRC2 bits, and the number of input VGPRs the hardware loads for the geometry shader.
+    - Giving every shader more VGPRs (`RADV_XCLIPSE_VGPRPAD=4`) fixed it. Padding only the vertex and geometry stages didn't; padding only the pixel shader did.
+    - The test's pixel shader writes a constant color. It gets 8 VGPRs in wave64, with one dummy input VGPR (`LINE_STIPPLE_TEX`, which RADV enables when a pixel shader reads no inputs).
+    - With two dummy input VGPRs (`PERSP_CENTER`), every run failed and `v0` was hit too. The GPU hung 4 times (`gpu_info` hang count 434→438, timeouts 4→8); the kernel recovered each time.
+    - Never seen with a wave32 pixel shader, a 12- or 16-VGPR one, or a 16-VGPR one that reads 8 input VGPRs (`XD_XFB_FRAG=1`).
+  - **Fix:** on Xclipse, every wave64 shader gets at least 16 VGPRs. A shader that small isn't limited by VGPRs (32 waves would fit, and the limit is 16 per SIMD), and the speed tests didn't change.
+  - **Why it matters beyond transform feedback.** The overwritten registers are other waves' first inputs: NGG primitives and vertex indices, compute thread IDs, pixel barycentrics.
+    - Any game that draws with a tiny pixel shader (constant colors, or a dummy color output on a depth pass) could get broken triangles, wrong compute results or GPU hangs.
+    - The radv game runs so far, Heaven's 2 FPS included, used drivers without this fix.
+
 ## Optimization targets (from the speed tests)
 
-1. **GPU per-draw overhead (5×).**
+1. **GPU per-draw overhead** (5× at first, 2× in `2026-10-11_103659`).
    - **NGG culling is most of it.** With `RADV_DEBUG=nonggc`, GPU cost per draw drops from 0.298 to 0.122 µs (Samsung: 0.055 µs; result `2026-10-10_184237`).
    - Next: decide when NGG culling is worth it on this GPU, for example only above a vertex-count threshold, as desktop RADV does on some chips. Then find the remaining 2×.
    - **Don't use `RADV_DEBUG=nongg`** (the legacy geometry path). It hung the 940's GPU on the first draw batch (result `2026-10-10_184254`). The kernel recovered, `gpu_info` showed hang +1 and timeout +1, and Samsung's driver passed right after. The runner now detects hangs from those counters, stops testing our driver for that run, and health-checks the GPU with the stock driver.
-2. **CPU cost per draw and per pipeline bind (2–3×).** These matter for DXVK games that issue thousands of draws per frame.
-3. **Opaque fill (−14%).** Check DCC and render-backend settings (`RADV_XCLIPSE_DCC*`).
+2. **CPU cost per draw and per pipeline bind** (2–3× at first; in `2026-10-11_103659`, 1.6× per draw and about equal with a pipeline switch). These matter for DXVK games that issue thousands of draws per frame.
+3. **Opaque fill:** equal to Samsung's (25.5 Gpixel/s) in every full run since `2026-10-10_184607`. The −14% came from one earlier run.
 
 ## Notes for unattended runs
 
@@ -174,14 +204,7 @@ This PC's internet usually comes from the phone's hotspot. If a GPU hang reboots
 
 ## Next steps
 
-1. **Driver-level performance tests** in `xdtest`, fully automatic:
-   - compute ALU throughput
-   - memory bandwidth
-   - fill rate
-   - draw-call CPU overhead
-   - pipeline compile time over many shaders
-
-   Results get tracked per run.
-2. **Game-level A/B in GameNative** (`app.gamenative`, already installed; v1.3.0-prerelease is the latest). It's a Winlator-based Steam launcher with Winlator's `AdrenotoolsManager`, so it should accept our driver zip. The user does a one-time setup: install the zip, then make one container with our driver and one with the stock wrapper. After that, automation launches the benchmark over adb and collects FPS logs (`DXVK_HUD`). The fallback app is Bannerlator 3.1.6 (525 MB), which documents a hand-picked driver install.
-3. **Benchmarks** need the user's approval to download: GravityMark (211 MB) and Unigine Heaven 4.0 (247 MB). Use DXVK 2.7.1 for both drivers, at least 3 runs each, and report the median and 1% lows.
-4. Fix what breaks, mining `third_party/Xclipse940-RADV`. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6; the maintainer asked for exactly that.
+1. **Timed game A/B:** `game.py --runs 3` with driver `xd-3e88e3e`, the first with the register fix.
+2. **Heaven's 2 FPS on radv,** if the new driver doesn't change it: measure GPU busy time during a run, to tell GPU-bound from waiting.
+3. **GPU cost per draw:** decide when NGG culling pays off on this GPU (optimization target 1).
+4. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.
