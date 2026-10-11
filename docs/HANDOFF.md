@@ -59,7 +59,7 @@ The Mac stopped the A/B between runs and left the phone clean: GameNative closed
 
 **Bisecting without the logger.** Each game run now records its GPU faults, and Heaven faults about once a second. So one Heaven run per setting shows whether a switch stops them: for example, set `adb shell setprop debug.radv_debug nonggc` (or `nodcc`, `nohiz`) before the run, and clear it afterwards.
 
-**Phone UI work goes to a Sonnet subagent** (see `CLAUDE.md`). Container edits, Driver Manager imports, and settings changes are slow, mechanical taps.
+**Script repeated phone UI work** (see `CLAUDE.md`). Container edits, Driver Manager imports, and settings changes go in `pipeline/` scripts built on `phone_ui.py`, not subagents. Subagents are only for one-off exploration, on whatever model fits the task.
 
 - Give it the exact values and the UI rules from this file.
 - Have it read every change back after saving.
