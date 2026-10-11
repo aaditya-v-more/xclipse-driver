@@ -1,0 +1,18 @@
+run 1 gravitymark  stock killed-low-memory 0.0 fps over 0 s
+run 1 gravitymark  radv  killed-low-memory 17.9 fps over 1 s
+run 1 heaven       stock ran 40.0 fps over 296 s
+run 1 heaven       radv  ran 2.0 fps over 283 s
+run 2 gravitymark  radv  killed-low-memory 0.0 fps over 0 s
+Traceback (most recent call last):
+  File "/Users/aaditya/Developer/xclipse-driver/pipeline/game.py", line 438, in <module>
+    if __name__ == "__main__":
+        ^^^^^^
+  File "/Users/aaditya/Developer/xclipse-driver/pipeline/game.py", line 393, in main
+    shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/aaditya/Developer/xclipse-driver/pipeline/game.py", line 433, in run_all
+    return results
+  File "/Users/aaditya/Developer/xclipse-driver/pipeline/game.py", line 218, in cool_down
+    time.sleep(5)
+    ~~~~~~~~~~^^^
+KeyboardInterrupt

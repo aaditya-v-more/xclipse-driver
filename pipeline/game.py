@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import re
 import statistics
 import subprocess
 import sys
@@ -195,6 +196,28 @@ def screenshot(path: Path) -> bool:
     return True
 
 
+def gpu_sample() -> tuple[int, int] | None:
+    """How busy the GPU was over the kernel's last DVFS window (8 ms), in percent, and its clock in
+    kHz. Sampled once a second, the busy share averages out to the share of time the GPU had work."""
+    try:
+        busy, clock = shell("cat /sys/kernel/gpu/gpu_busy /sys/kernel/gpu/gpu_clock", 15).split()
+        return int(busy), int(clock)
+    except ValueError:
+        return None
+
+
+def gpu_faults() -> dict[str, int]:
+    """The sgpu kernel's lifetime counts of GPU page faults (GPF_S) and GPU resets (GHG_S). Every
+    page fault ends in a full GPU reset (sgpu_page_fault_recovery), so a run that faults stalls."""
+    info = shell("cat /sys/kernel/gpu/gpu_info", 15)
+    counts = {}
+    for key, name in (("GPF_S", "page_faults"), ("GHG_S", "resets")):
+        m = re.search(rf'"{key}":"(\d+)"', info)
+        if m:
+            counts[name] = int(m.group(1))
+    return counts
+
+
 def gpu_temp() -> float:
     try:
         return float(shell("cat /sys/kernel/gpu/gpu_tmu", 15))
@@ -218,8 +241,9 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
             shell(f"rm -f {OUT_DIR}/{cfg[key].format(driver=driver)}")
     result = {"bench": bench, "driver": driver, "app_id": app_id, "gpu_temp_c_before": gpu_temp(),
               "available_mb_before": free_memory(user)}
+    faults_before = gpu_faults()
     since = shell("date '+%m-%d %H:%M:%S.000'")
-    memory, processes = [], {}
+    memory, processes, gpu = [], {}, []
     started = time.monotonic()
     shell(f"am start -n {APP}/.MainActivity -a {APP}.LAUNCH_GAME --ei app_id {app_id} "
           f"--es game_source CUSTOM_GAME")
@@ -232,6 +256,9 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
             result["status"] = "phone-lost"
             break
         elapsed = time.monotonic() - started
+        sample = gpu_sample()
+        if sample:
+            gpu.append((round(elapsed, 1), *sample))
         if elapsed - sampled >= MEMORY_EVERY_S:
             now = {}
             memory.append({"t": round(elapsed), **memory_sample(user, now)})
@@ -268,6 +295,11 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
     result["layer"] = layer
     stats = result["surfaceflinger"] = frame_stats(list(frames))
     result["memory"] = memory
+    result["gpu"] = gpu  # [seconds since launch, busy %, clock kHz]
+    result["present_ns"] = sorted(frames)  # CLOCK_MONOTONIC, as RADV's [WAIT] log lines
+    busy = [b for t, b, _ in gpu if seen_at is not None and t >= seen_at + WARMUP_S]
+    if busy:
+        result["gpu_busy_pct"] = statistics.mean(busy)
     counts = stats.get("steady_seconds", 0) >= MIN_STEADY_S
     # A run without enough frames has usually stopped at a message box, from the game or from Wine.
     if not counts and "status" not in result:
@@ -295,6 +327,9 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str) -> dic
         if adb("pull", f"{OUT_DIR}/{name}", str(local)).returncode == 0:
             result["image_file"] = local.name
     result.setdefault("status", "ran" if counts else "too-short" if "fps_avg" in stats else "no-frames")
+    faults_after = gpu_faults()
+    for name in faults_before.keys() & faults_after.keys():
+        result[f"gpu_{name}"] = faults_after[name] - faults_before[name]
     result["gpu_temp_c_after"] = gpu_temp()
     return result
 
@@ -305,9 +340,9 @@ def summarize(meta: dict, results: list[dict]) -> str:
            f"first {WARMUP_S} s after the first frame. A run counts (`ran`) only with {MIN_STEADY_S} s "
            f"of frames in a row, none more than {STALL_S} s apart; the medians use only those.", "",
            "| Benchmark | Driver | Run | Status | Avg FPS | 1% low FPS | Median frame time (ms) "
-           "| Steady (s) | Driver seen | Least free memory (MB) | GameNative peak (MB) "
-           "| Its GPU memory peak (MB) |",
-           "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+           "| Steady (s) | GPU busy (%) | GPU faults | Driver seen | Least free memory (MB) "
+           "| GameNative peak (MB) | Its GPU memory peak (MB) |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in results:
         s = r.get("surfaceflinger", {})
         fmt = lambda v: f"{v:.1f}" if isinstance(v, (int, float)) else ""  # noqa: E731
@@ -318,7 +353,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
         out.append(f"| {r['bench']} | {r['driver']} | {r['run']} | {r['status']} | "
                    f"{fmt(s.get('fps_avg'))} | {fmt(s.get('fps_1pct_low'))} | "
                    f"{fmt(s.get('frametime_median_ms'))} | {fmt(s.get('steady_seconds'))} | "
-                   f"{', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} | "
+                   f"{fmt(r.get('gpu_busy_pct'))} | {r.get('gpu_page_faults', '')} | {', '.join(r.get('vulkan_drivers_seen', [])) or 'none'} | {least} | {peak} | "
                    f"{gpu_peak} |")
     out += ["", "## Medians", ""]
     for bench in dict.fromkeys(r["bench"] for r in results):
@@ -400,20 +435,26 @@ def wait_unlocked(limit_s: float) -> bool:
 def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: str,
             baseline: float) -> list[dict]:
     results = []
-    for n in range(1, args.runs + 1):
-        for bench in benches:
-            for driver in (drivers if n % 2 else list(reversed(drivers))):
-                print(f"run {n} {bench:<12} {driver:<5}", end=" ", flush=True)
-                r = run_once(bench, driver, run_dir, f"run{n}", user)
-                r["run"] = n
-                s = r["surfaceflinger"]
-                print(f"{r['status']} {s.get('fps_avg', 0):.1f} fps over {s.get('seconds', 0):.0f} s",
-                      flush=True)
-                results.append(r)
-                if r["status"] == "phone-lost":
-                    print("lost the phone; stopping")
-                    return results
-                cool_down(target=baseline + 3)
+    try:
+        for n in range(1, args.runs + 1):
+            for bench in benches:
+                for driver in (drivers if n % 2 else list(reversed(drivers))):
+                    print(f"run {n} {bench:<12} {driver:<5}", end=" ", flush=True)
+                    r = run_once(bench, driver, run_dir, f"run{n}", user)
+                    r["run"] = n
+                    s = r["surfaceflinger"]
+                    print(f"{r['status']} {s.get('fps_avg', 0):.1f} fps over "
+                          f"{s.get('seconds', 0):.0f} s, {r.get('gpu_page_faults', '?')} GPU faults",
+                          flush=True)
+                    results.append(r)
+                    if r["status"] == "phone-lost":
+                        print("lost the phone; stopping")
+                        return results
+                    cool_down(target=baseline + 3)
+    except KeyboardInterrupt:
+        # Ctrl+C keeps the finished runs; the one in progress is dropped.
+        print("\ninterrupted; saving the finished runs", flush=True)
+        shell(f"am force-stop {APP}")
     return results
 
 
