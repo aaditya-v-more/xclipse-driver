@@ -184,7 +184,7 @@ def phone_context() -> dict:
         "gpu_temp_c": "cat /sys/kernel/gpu/gpu_tmu",
         "gpu_clock_khz": "cat /sys/kernel/gpu/gpu_clock",
         "gpu_max_clock_khz": "cat /sys/kernel/gpu/gpu_max_clock",
-        "battery": "dumpsys battery | grep -E 'level|temperature'",
+        "battery": "dumpsys battery | grep -E '^  (level|temperature):'",
     }
     return {key: " ".join(shell(cmd, 20).split()) for key, cmd in queries.items()}
 
