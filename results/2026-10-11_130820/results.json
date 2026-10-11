@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "started": "2026-10-11T13:08:20",
+    "driver": {
+      "commit": "f41503a+changes",
+      "so_sha256": "a8bb0abe89ae549c2da8c1606be7133f31779e2f9b99b60ed6da4e49a10bfcb6"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "41.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 373"
+    },
+    "tests": [
+      "scratch"
+    ],
+    "drivers": [
+      "stock"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "41.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 373"
+    }
+  },
+  "results": [
+    {
+      "test": "scratch",
+      "driver": "stock",
+      "gpu_temp_c_before": "41.0",
+      "ms_load": 28.851,
+      "ms_instance": 53.342,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 3.371,
+      "ms_pipeline": 44.519,
+      "image": "/data/local/tmp/xd/out/scratch_stock.ppm",
+      "ms_gpu": 3.512,
+      "pixels_triangles": 4096,
+      "pixels_different": 0,
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating graphics pipelines",
+        "[xdtest] scratch_reference",
+        "[xdtest] scratch",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

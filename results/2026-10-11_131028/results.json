@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "started": "2026-10-11T13:10:28",
+    "driver": {
+      "commit": "f41503a+changes",
+      "so_sha256": "8b62ca2cde9b164c0178c807223f4b94dc7652ab38f2386f4914b04d069d4ec1"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "40.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 370"
+    },
+    "tests": [
+      "scratch",
+      "tess"
+    ],
+    "drivers": [
+      "radv"
+    ],
+    "env": [
+      "RADV_XCLIPSE_RINGPTR=2",
+      "RADV_XCLIPSE_GFXSCRATCH=2"
+    ],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "40.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 370"
+    }
+  },
+  "results": [
+    {
+      "test": "scratch",
+      "driver": "radv",
+      "gpu_temp_c_before": "40.0",
+      "ms_load": 16.584,
+      "ms_instance": 2.922,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 3.14,
+      "ms_pipeline": 12.049,
+      "image": "/data/local/tmp/xd/out/scratch_radv.ppm",
+      "ms_gpu": 10.298,
+      "pixels_triangles": 4096,
+      "pixels_different": 0,
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating graphics pipelines",
+        "[xdtest] scratch_reference",
+        "[xdtest] scratch",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "tess",
+      "driver": "radv",
+      "gpu_temp_c_before": "40.0",
+      "ms_load": 14.215,
+      "ms_instance": 2.508,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 2.547,
+      "ms_pipeline": 11.95,
+      "ms_gpu": 2.68,
+      "image": "/data/local/tmp/xd/out/tess_radv.ppm",
+      "pixels_triangle": 5202,
+      "pixels_clear": 11182,
+      "pixels_other": 0,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating tessellation pipeline",
+        "[xdtest] tess",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

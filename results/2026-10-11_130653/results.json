@@ -1,0 +1,72 @@
+{
+  "meta": {
+    "started": "2026-10-11T13:06:53",
+    "driver": {
+      "commit": "f41503a+changes",
+      "so_sha256": "a8bb0abe89ae549c2da8c1606be7133f31779e2f9b99b60ed6da4e49a10bfcb6"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "41.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 373"
+    },
+    "tests": [
+      "scratch"
+    ],
+    "drivers": [
+      "radv"
+    ],
+    "env": [
+      "RADV_XCLIPSE_LOG=1",
+      "RADV_XCLIPSE_RINGPTR=2",
+      "RADV_XCLIPSE_GFXSCRATCH=1"
+    ],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "41.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 373"
+    }
+  },
+  "results": [
+    {
+      "test": "scratch",
+      "driver": "radv",
+      "gpu_temp_c_before": "41.0",
+      "ms_load": 20.627,
+      "ms_instance": 3.746,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 3.044,
+      "ms_pipeline": 16.857,
+      "ms_gpu": 7.476,
+      "image": "/data/local/tmp/xd/out/scratch_radv.ppm",
+      "pixels_triangle": 5202,
+      "pixels_clear": 11182,
+      "pixels_other": 0,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating graphics pipeline",
+        "[xdtest] triangle draw",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

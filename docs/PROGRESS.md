@@ -208,6 +208,31 @@ Play Windows games in Winlator (or a better Android PC-emulation app) on the Gal
     - That's why `mem_info` shows Heaven with only about 60 MB of GPU memory.
     - GameNative 0.9.2 bundles four wrappers (`wrapper`, `wrapper-v2`, `wrapper-legacy`, `wrapper-leegao`); which one the containers use isn't known.
     - Heaven-radv's launch environment includes `WRAPPER_RESOURCE_TYPE=auto`, `WRAPPER_EMULATE_BCN=3`, `WRAPPER_NATIVE_BCN=1`, `WRAPPER_VK_VERSION=1.3.0`, `WRAPPER_MAX_IMAGE_COUNT=0`, `WRAPPER_DISABLE_PRESENT_WAIT=0`, `MESA_VK_WSI_PRESENT_MODE=mailbox`, `MESA_SHADER_CACHE_DISABLE=false` and `DXVK_ASYNC=1`.
+- [x] **Heaven's page faults were all at GPU address 0, from three registers the port never wrote (2026-10-11, fix `fc066b9`).**
+  - **The fault logger** (`f41503a`, `3d3e5ea`). With `debug.radv_xclipse_log` ≥ 1 (`game.py --radv-log`) or `RADV_XCLIPSE_LOG=1` (xdtest), the winsys asks the kernel for its page-fault addresses after every submission, and once more when the device is destroyed.
+    - It logs one `[VMFAULT]` line per fault under the logcat tag `RADV_VMFAULT`: the buffer that holds the page, or the nearest buffers on either side of it, and any freed buffer that held it. Each buffer comes with its owner (the Vulkan object type) and the code that created it.
+    - `pipeline/vmfault.py` groups the lines by buffer and names the creating code with `llvm-addr2line`. It needs the unstripped library from the same build.
+    - The poll at teardown is there because the GPU runs a submission after the poll that follows it. A test that submits once and exits would never see its fault. xdtest now destroys the device when a test fails, so that poll runs.
+  - **Heaven on radv with the logger** (driver `xd-f41503a`, `results/2026-10-11_124544-game`): 1.9 FPS over 297 s and 418 page faults by `gpu_info`. The log has 417, **every one at page 0**. So shaders were reading or writing through a null pointer, not running off the end of a buffer.
+  - **Three new tests**, from the suspects list: `tess` (the render test's triangle, tessellated), `scratch` (4096 triangles whose vertex shader keeps positions in a 1 KiB local array, which has to live in scratch memory) and `scratchcs` (the same in a compute shader). All three faulted on radv and passed on stock.
+  - **Cause 1, merged-stage pointers.** The HS stage (which runs LS+HS) and the GS stage (which runs NGG VS, TES and GS) load s[0:1], the pointer to their ring descriptors and scratch address, from `SPI_SHADER_PGM_LO/HI_HS` and `_GS`, as on GFX11. The port wrote it to GFX10's `SPI_SHADER_USER_DATA_ADDR_LO/HI_*`, so s[0:1] was 0.
+    - `tess` faulted (`130000`) and passed with the pointer in the GFX11 registers (`RADV_XCLIPSE_RINGPTR=2`, `130152`).
+  - **Cause 2, graphics scratch base.** The hardware takes each wave's scratch address from `SPI_GFX_SCRATCH_BASE_LO/HI`, as on GFX11. The port never wrote them, so scratch was at address 0 (`130349`).
+    - With them written, the 3-vertex first version of `scratch` passed (`130653`), but the 4096-triangle one still faulted 27 MB past the end of a buffer (`130847`).
+    - **`SPI_TMPRING_SIZE` counts WAVESIZE in 1 KiB units, as on GFX10**, not GFX11's 256 bytes. A sweep: 256-byte units failed (`130931`, `130946`); 1 KiB units passed, with WAVES per shader engine or in total (`130937`, `130941`). Those two are the same here, since the chip has one shader engine.
+    - The shaders' own GFX10 scratch setup (`s_setreg` of `FLAT_SCR`) makes no difference: `scratch` passes with it and without it (`RADV_XCLIPSE_SCRATCHINIT=0`).
+  - **Cause 3, compute scratch base.** Compute takes its scratch base from `COMPUTE_DISPATCH_SCRATCH_BASE_LO/HI`, which the port never wrote either. `scratchcs` faulted at 0x4e78ad652000, far from all of our buffers (`131643`), probably an address the previous process left there.
+    - The first `scratchcs` passed without testing anything (`131559`). Its `uvec4[64]` array had only `.x` read, so the compiler shrank it to 256 bytes and kept it in VGPRs (`RADV_DEBUG=shaderstats`: scratch size 0). The test now uses `uint[256]` (scratch 64 KiB per wave).
+  - **Fix (`fc066b9`, in `radv_queue.c`).** When `gfx11_shader_core` is set:
+    - The merged-stage pointer goes to `PGM_LO_GS/HS` instead of the GFX10 registers.
+    - Graphics scratch uses GFX11's three-register sequence, with the GFX10 WAVESIZE units it already had.
+    - Compute scratch also writes `COMPUTE_DISPATCH_SCRATCH_BASE_LO/HI`. The scratch address stays in user data 0–1 too, since the shaders keep GFX10's argument layout.
+    - **All 17 tests pass on both drivers, with no GPU fault** (`results/2026-10-11_131855`). The speed tests didn't change.
+  - **Heaven on radv with `xd-fc066b9`: 51.8 FPS over 285 s, 0 GPU faults** (`results/2026-10-11_133724-game`, one run with `--radv-log`). Before the fix: 1.9 FPS. Stock ran Heaven at 40.0 FPS in the last A/B (`105144`); the timed A/B is next.
+    - Median frame 16.7 ms (the 60 Hz display rate), GPU busy 61%. `gpu_info` and the fault log both show 0 faults.
+    - 1% low 3.7 FPS: there are 15 frame gaps over 250 ms. The two longest (16 s and 14 s) are in the first 25 s, while Heaven still loads. Mid-run, the longest are 3.5 s, 2.0 s and 1.0 s.
+  - Graphics scratch is still slower on radv: the `scratch` test takes 10.2 ms of GPU time against stock's 3.3 ms. Compute scratch is even (14.3 ms against 14.8 ms).
+  - **`pipeline/gn_driver.py`** now does the GameNative steps: it imports a driver zip in Driver Manager and selects it in containers, reading each change back (`install ZIP GAME...`, `select ENTRY GAME...`, `show GAME...`).
 
 ## Optimization targets (from the speed tests)
 
@@ -224,7 +249,7 @@ This PC's internet usually comes from the phone's hotspot. If a GPU hang reboots
 
 ## Next steps
 
-1. **Find Heaven's page fault on radv.** Log the faulting addresses from the driver and match them to its buffers; the design is in `docs/HANDOFF.md`. Then fix the cause.
+1. **Check the fix in Heaven.** Run Heaven on radv once with `--radv-log`, then `vmfault.py`. If faults remain, the log names their buffers.
 2. **Timed game A/B again** (`game.py --runs 3`). The new `GPU faults` column should read 0 for both drivers.
 3. **GravityMark's memory:** Max Device Memory doesn't reach it (`-vk`). Try fewer asteroids (`-asteroids`) in both containers' Exec Arguments, or another native-Vulkan benchmark.
 4. **GPU cost per draw:** decide when NGG culling pays off on this GPU (optimization target 1).

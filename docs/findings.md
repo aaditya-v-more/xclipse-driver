@@ -72,6 +72,19 @@ Verified facts only. Raw survey output is in `recon/device-gpu-recon.txt` and `r
   - Not seen with a wave32 pixel shader, with 12 or 16 VGPRs allocated, or with 16 VGPRs and 8 input VGPRs.
   - The mechanism isn't known. Our driver gives every wave64 shader at least 16 VGPRs (`radv_postprocess_binary_config` in `radv_shader.c`). That costs no occupancy for shaders that small, since the SIMD's limit of 16 waves comes first.
 
+### Shader setup registers (probed with `xdtest`, 2026-10-11)
+
+The 940 runs GFX10.3 command streams, but its shader launch works like GFX11's in these places. Each was found from a test that page-faulted on our driver (`docs/PROGRESS.md`):
+
+- **Merged stages take s[0:1] from `SPI_SHADER_PGM_LO/HI_HS` and `_GS`** (0xB420/0xB424, 0xB220/0xB224), not from `SPI_SHADER_USER_DATA_ADDR_LO/HI_HS` and `_GS` (0xB408, 0xB208). Those are HS (LS+HS) and GS (NGG VS, TES and GS). s[0:1] points to the table of ring descriptors (tessellation factor and off-chip rings) and, in graphics, the scratch ring. The programs' own addresses go in `PGM_LO/HI_LS` and `_ES`, as on GFX10 and GFX11.
+- **Graphics scratch takes its base from `SPI_GFX_SCRATCH_BASE_LO/HI`** (context registers 0x286EC/0x286F0, address >> 8 and >> 40), as on GFX11. Unwritten, it's 0.
+- **`SPI_TMPRING_SIZE` counts WAVESIZE in 1 KiB units, as on GFX10.** GFX11's 256-byte units fault past the end of the scratch buffer. WAVES per shader engine and in total are the same here.
+- **Compute scratch takes its base from `COMPUTE_DISPATCH_SCRATCH_BASE_LO/HI`** (0xB840/0xB844). Unwritten, it held an address outside our process's buffers.
+- **The hardware sets each wave's scratch address itself.** A graphics shader's GFX10 setup of `FLAT_SCRATCH` (`s_setreg`, from the address in s[0:1]) makes no difference: tests pass with it and without it (`RADV_XCLIPSE_SCRATCHINIT=0`).
+- **One shader engine:** `num_se` = `max_se` = 1, 2 shader arrays, 6 CUs per array. RADV's scratch limit is 384 waves (`max_scratch_waves`).
+- **The MGFX2 register map has nothing at 0xB130** (`SPI_SHADER_USER_DATA_VS_0`; there's no hardware VS stage left). RADV still writes the descriptor pointer there, apparently harmlessly.
+- **Register remapping** (`ac_titan_remap`): every SH and context register RADV writes for this chip lands where the MGFX2 map has it. There's one gap, in `ac_pm4_set_reg`: it doesn't remap UCONFIG registers. So `GE_USER_VGPR_EN` lands on this chip's `VGT_TF_MEMORY_BASE_HI`. That's harmless today, because the tessellation ring setup writes that register afterwards.
+
 ### GPU faults, resets and load (GPL kernel source and sysfs, 2026-10-11)
 
 - **Every GPU page fault ends in a full GPU reset.**
@@ -87,6 +100,7 @@ Verified facts only. Raw survey output is in `recon/device-gpu-recon.txt` and `r
   - It's an `AMDGPU_INFO` query, `SGPU_INFO_GPU_PAGE_FAULTS` (0x101, `include/uapi/drm/sgpu_drm.h`). It returns `struct drm_sgpu_query_gpu_page_faults { __u32 num_faults; __u64 fault_addr[4]; }`.
   - The records are per DRM file, so only the driver inside the faulting process can read them. Reading consumes them, and the kernel holds at most 4.
   - The addresses are 4 KiB page starts, 48-bit GPU VAs.
+  - The kernel records a fault when the GPU hits it, which is after the submission that caused it has returned. So a driver that asks right after each submission sees each fault one submission late, or at teardown.
   - dmesg has the full fault status, but the shell can't read it without root.
 - **GPU load:**
   - `/sys/kernel/gpu/gpu_busy` is the busy percentage over the kernel's last 8 ms DVFS window (`sgpu_devfreq_polling_ms`). Busy time is counted while jobs are in flight (`sgpu_utilization.c`).

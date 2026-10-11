@@ -1,0 +1,160 @@
+{
+  "meta": {
+    "started": "2026-10-11T13:15:59",
+    "driver": {
+      "commit": "f41503a+changes",
+      "so_sha256": "8b62ca2cde9b164c0178c807223f4b94dc7652ab38f2386f4914b04d069d4ec1"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "40.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 364"
+    },
+    "tests": [
+      "compute",
+      "scratchcs"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "env": [
+      "RADV_XCLIPSE_LOG=1"
+    ],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "40.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 364"
+    }
+  },
+  "results": [
+    {
+      "test": "compute",
+      "driver": "stock",
+      "gpu_temp_c_before": "40.0",
+      "ms_load": 23.404,
+      "ms_instance": 53.714,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 3.36,
+      "ms_pipeline": 18.898,
+      "ms_gpu": 0.912,
+      "elements": 65536,
+      "mismatches": 0,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating compute pipeline",
+        "[xdtest] compute dispatch",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "compute",
+      "driver": "radv",
+      "gpu_temp_c_before": "40.0",
+      "ms_load": 15.944,
+      "ms_instance": 3.081,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 2.878,
+      "ms_pipeline": 4.019,
+      "ms_gpu": 2.025,
+      "elements": 65536,
+      "mismatches": 0,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating compute pipeline",
+        "[xdtest] compute dispatch",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "scratchcs",
+      "driver": "stock",
+      "gpu_temp_c_before": "40.0",
+      "ms_load": 23.95,
+      "ms_instance": 52.149,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 3.781,
+      "ms_pipeline": 42.24,
+      "ms_gpu": 15.547,
+      "elements": 65536,
+      "mismatches": 0,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device",
+        "[xdtest] creating compute pipeline",
+        "[xdtest] compute dispatch",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "scratchcs",
+      "driver": "radv",
+      "gpu_temp_c_before": "40.0",
+      "ms_load": 15.666,
+      "ms_instance": 3.014,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 3.407,
+      "ms_pipeline": 12.582,
+      "ms_gpu": 1.892,
+      "elements": 65536,
+      "mismatches": 0,
+      "status": "pass",
+      "progress": [
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "c:/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating compute pipeline",
+        "[xdtest] compute dispatch",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}
