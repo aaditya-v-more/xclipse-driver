@@ -30,6 +30,12 @@ Build the driver. On Windows, in a cmd window:
 call tools\env.cmd && driver\build.cmd
 ```
 
+From PowerShell, run the environment setup and build in the same cmd process:
+
+```powershell
+cmd /d /c "call tools\env.cmd && driver\build.cmd"
+```
+
 On macOS or Linux:
 
 ```sh
@@ -50,6 +56,26 @@ Each test runs on both Samsung's driver and ours. The report goes to `results/<t
 - `--tests info,device,submit,compute,render` picks tests.
 - `--drivers stock,radv` picks drivers.
 - `--keep-going` keeps testing our driver even after it made the phone reboot.
+
+## Working with Claude Code or Codex
+
+Open this repository folder in either tool, or run your installed `claude` or `codex` CLI from the repo root. Both use the same portable toolchain, build scripts, and phone-test pipeline.
+
+- [AGENTS.md](AGENTS.md) is the shared source for project instructions, commands, device rules, and commit conventions. Codex [loads it automatically](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+- [CLAUDE.md](CLAUDE.md) [imports](https://code.claude.com/docs/en/memory#import-additional-files) `AGENTS.md`, so edits to the shared guidance apply to Claude Code too. Start a fresh session after changing the instructions.
+- [.claude/settings.json](.claude/settings.json) holds Claude-specific settings. Codex uses its own model, permission, and integration settings; no repo-local Codex configuration is needed for these instructions.
+- [docs/PROGRESS.md](docs/PROGRESS.md) and [docs/HANDOFF.md](docs/HANDOFF.md) carry project state between tools and computers. Read the latest progress entries after the handoff, and update the handoff only when the user says they are leaving the device.
+
+Check `git status` when switching tools and coordinate concurrent edits. Only one process or agent may drive or test the phone at a time.
+
+To check the pipeline entry points without a connected phone, run these from PowerShell after toolchain setup:
+
+```powershell
+.\tools\python\python.exe pipeline\run.py --help
+.\tools\python\python.exe pipeline\game.py --help
+```
+
+On macOS or Linux, use `tools/python/bin/python3` in place of `.\tools\python\python.exe`.
 
 ## Layout
 

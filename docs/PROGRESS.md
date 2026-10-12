@@ -1,6 +1,6 @@
 # Progress
 
-Last updated: 2026-10-11
+Last updated: 2026-10-12
 
 ## Goal
 
@@ -293,6 +293,12 @@ A read of the whole repo, the Heaven numbers and GameNative 0.9.2's source (`utk
 **DXVK 2.7.1 doesn't exist in GameNative 0.9.2.** `gn_driver.py set` picked it in both Heaven containers, and the A/B (`213525-game`) failed on both: radv black at 1.5 FPS, stock back at the home screen with no frames. The log says why: `ContentsManager: Total profiles for type DXVK: 0`, then `Extracting DXVK/D8VK DLLs for dxwrapper: dxvk-2.7.1` with nothing to extract. The APK bundles only `async-1.10.3`; the downloader (`DXWrapperDownloader.kt`, `dxwrapper_download.json`) was added after 0.9.2. Both containers are back on `async-1.10.3`, read back after saving.
 
 **The emulator presets matter more than the driver for Heaven.** The containers run FEXCore preset Intermediate (`FEX_TSOENABLED=1`, `FEX_VECTORTSOENABLED=0`, `FEX_MEMCPYSETTSOENABLED=0`, `FEX_HALFBARRIERTSOENABLED=1`, `FEX_X87REDUCEDPRECISION=1`, `FEX_MULTIBLOCK=1`) and Box64 0.3.6 preset Compatibility (`BOX64_DYNAREC_SAFEFLAGS=2`, `FASTNAN=0`, `FASTROUND=0`, `X87DOUBLE=1`, `BIGBLOCK=0`, `STRONGMEM=1`), from `FEXCorePresetManager.java` and `Box86_64PresetManager.java` at `v0.9.2`. Performance turns TSO off (`FEX_TSOENABLED=0`, `FEX_HALFBARRIERTSOENABLED=0`) and for Box64 sets `SAFEFLAGS=1`, `FASTNAN=1`, `FASTROUND=1`, `X87DOUBLE=0`, `BIGBLOCK=3`, `STRONGMEM=0`, `CALLRET=1`.
+
+## Claude Code and Codex support (2026-10-12)
+
+Pulled `main` to `f23ca58` before making changes. Moved the existing project instructions into root `AGENTS.md` and made `CLAUDE.md` import it, so both agents share the same workflow, device rules, git identity, and commit/push convention. Claude's settings remain in `.claude/settings.json`. Added PowerShell build commands, guidance for switching agents, and checks that do not need the phone to `AGENTS.md` and the README.
+
+Validation: all prior project instructions were preserved, the Claude import resolves, local documentation links and Claude's JSON settings validate, and `git diff --check` passes. From PowerShell, both pipeline `--help` commands and the `cmd /d /c` toolchain environment check passed (Python 3.13.16, Meson 1.12.1, Ninja 1.13.2). No driver rebuild or on-device run was needed for this documentation change.
 
 ## Next steps
 
