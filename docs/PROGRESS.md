@@ -419,6 +419,35 @@ original emulator presets. Stock remains on `async-1.10.3`, BCn `full`; GravityM
 Final device checks: GameNative stopped, DND restored off, USB stay-awake 2, RADV logging 0,
 and min/peak refresh overrides unset.
 
+## Controlled optimization experiments (2026-10-12, afternoon)
+
+The user requested the five optimization targets in priority order and proper comparisons across
+experiments. Added `pipeline/compare.py`: pinned library hashes and environment variants in a
+manifest, six AB/BA pairs per test/candidate, X4 CPU affinity, optional Android fixed performance
+mode, a start-temperature limit, telemetry during every attempt, checkpointed raw results, and
+paired medians/ranges. Failed or unmatched attempts never contribute to gains. Fixed mode is
+disabled in `finally`; Android exposes no getter, so use this from normal mode. GPU counter
+increases now override even an `xdtest`-reported pass in `run.py`. Nine regression checks pass.
+
+The old scratch `ms_gpu` was a cold, host-observed submission time. The harness now also records
+GPU timestamps after at least 250 ms of warm-up, seven timed iterations, while retaining its
+pixel/word correctness checks. Game FPS comparisons remain separate from native-driver timings.
+
+`results/2026-10-12_160406-compare` (manifest `experiments/2026-10-12/native-initial.json`):
+72 attempts pass, no GPU events; active GPU clock 400 MHz and X4 1632 MHz throughout the samples
+(GPU 0 means idle). With NGG culling disabled, tiny-draw median GPU time drops **0.375 to
+0.121 microseconds** (3.10x throughput), CPU recording **0.105 to 0.089 microseconds** (about 15%
+less time). Graphics scratch's paired median speedup is 1.73x, with substantial variation.
+Disabling the extra scratch initialization gives no consistent improvement; do not promote that
+setting. Compute scratch also varies even under an option that should affect graphics only,
+so its small differences are not a demonstrated optimization. Memory clocks were not controlled.
+Fixed performance mode was successfully released afterward.
+
+Direct RADV loading needs X11 WSI first: the current driver builds only `platforms=android`.
+GameNative's wrapper supplies Xlib/XCB surfaces for Wine. The library exports the ICD entry
+points, but changing the JSON alone would not provide those missing surface extensions. The
+official GameNative submodule and installed app remain the unchanged reference baseline.
+
 ## Next steps
 
 1. Stock still needs a working D24 path on the updated app before a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.

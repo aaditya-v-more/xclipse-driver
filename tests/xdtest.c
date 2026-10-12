@@ -1295,7 +1295,20 @@ static void run_submit(void)
 
 /* ---- compute: a dispatch that writes a pattern the host checks element by element ---- */
 
-static void dispatch_fill(const uint32_t *code, size_t size)
+static void record_scratch_compute(VkCommandBuffer cb, void *arg)
+{
+   struct compute *c = arg;
+   bind_compute(cb, c);
+   vkCmdDispatch(cb, 65536 / 64, 1, 1);
+   VkMemoryBarrier barrier = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                        0, 1, &barrier, 0, NULL, 0, NULL);
+}
+
+static void dispatch_fill(const uint32_t *code, size_t size, bool timed)
 {
    enum { N = 65536 };
    struct buffer b = make_buffer(N * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
@@ -1331,13 +1344,19 @@ static void dispatch_fill(const uint32_t *code, size_t size)
       finish("fail", "%u of %u elements wrong; first at %u: got 0x%08x, want 0x%08x", bad, N, first,
              data[first], first * 3u + 7u);
 
+   if (timed) {
+      double runs[RUNS];
+      jnum("ms_compute_gpu_median", measure(record_scratch_compute, &c, "compute scratch timing", runs));
+      jruns("ms_compute_gpu_runs", runs, RUNS);
+      record_gpu_clock();
+   }
    free_compute(&c);
    free_buffer(&b);
 }
 
 static void run_compute(void)
 {
-   dispatch_fill(fill_comp, sizeof(fill_comp));
+   dispatch_fill(fill_comp, sizeof(fill_comp), false);
 }
 
 /* Exercise native descriptor buffers without Wine or GameNative's memory wrapper. Two nonzero
@@ -1491,7 +1510,7 @@ static void run_descriptors(void)
 /* The same pattern, with every value passing through scratch memory on its way out. */
 static void run_scratch_cs(void)
 {
-   dispatch_fill(fill_scratch_comp, sizeof(fill_scratch_comp));
+   dispatch_fill(fill_scratch_comp, sizeof(fill_scratch_comp), true);
 }
 
 /* ---- render: one triangle offscreen, read back and checked pixel by pixel ---- */
@@ -1640,6 +1659,21 @@ static void run_tess(void)
 /* grid.vert's 4096 small triangles, drawn by a vertex shader that passes every position through
  * scratch memory, against the same grid drawn without it. Many waves use scratch at once, so
  * waves that share scratch space move triangles. */
+struct scratch_draw {
+   struct graphics *graphics;
+   struct target *target;
+};
+
+static void record_scratch_draw(VkCommandBuffer cb, void *arg)
+{
+   struct scratch_draw *draw = arg;
+   const float clear[4] = {0.0f, 0.0f, 0.25f, 1.0f};
+   begin_target(cb, draw->target, clear);
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->graphics->pipeline);
+   vkCmdDraw(cb, 3 * 4096, 1, 0, 0);
+   vkCmdEndRendering(cb);
+}
+
 static void run_scratch(void)
 {
    enum { VERTICES = 3 * 4096 };
@@ -1666,6 +1700,13 @@ static void run_scratch(void)
              PIC_W * PIC_H);
    free(want);
    free(got);
+   struct target timed_target = make_target(PIC_W, PIC_H);
+   struct scratch_draw draw = {&g, &timed_target};
+   double runs[RUNS];
+   jnum("ms_scratch_gpu_median", measure(record_scratch_draw, &draw, "graphics scratch timing", runs));
+   jruns("ms_scratch_gpu_runs", runs, RUNS);
+   record_gpu_clock();
+   free_target(&timed_target);
    free_graphics(&g);
    free_graphics(&ref);
 }

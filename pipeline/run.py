@@ -20,6 +20,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -225,11 +226,20 @@ def driver_log(since: str) -> list[str]:
 
 
 def run_test(driver: str, test: str, run_dir: Path, known_records: set[str],
-             extra_env: list[str]) -> dict:
-    spec = "stock" if driver == "stock" else f"{PHONE_DIR}/vulkan.radeon.so"
-    env = "" if driver == "stock" else " ".join(["MESA_SHADER_CACHE_DISABLE=true", *extra_env]) + " "
-    command = (f"cd {PHONE_DIR} && {env}timeout 30 ./xdtest --driver {spec} --test {test} "
-               f"--out {PHONE_DIR}/out --tag {driver}")
+             extra_env: list[str], *, library: str | None = None, cpu: int | None = None) -> dict:
+    spec = library or ("stock" if driver == "stock" else f"{PHONE_DIR}/vulkan.radeon.so")
+    assignments = []
+    for value in (["MESA_SHADER_CACHE_DISABLE=true", *extra_env] if driver != "stock" else []):
+        key, sep, val = value.partition("=")
+        if not sep or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            raise ValueError(f"invalid environment assignment: {value!r}")
+        assignments.append(f"{key}={shlex.quote(val)}")
+    if cpu is not None and not 0 <= cpu < 64:
+        raise ValueError("CPU index must be between 0 and 63")
+    prefix = f"taskset {1 << cpu:x} " if cpu is not None else ""
+    command = (f"cd {PHONE_DIR} && {' '.join(assignments)} {prefix}timeout 30 ./xdtest "
+               f"--driver {shlex.quote(spec)} --test {shlex.quote(test)} "
+               f"--out {PHONE_DIR}/out --tag {shlex.quote(driver)}")
     since = shell("date '+%m-%d %H:%M:%S.000'", 15)
     result = {"test": test, "driver": driver,
               "gpu_temp_c_before": shell("cat /sys/kernel/gpu/gpu_tmu", 15)}
@@ -261,10 +271,10 @@ def run_test(driver: str, test: str, run_dir: Path, known_records: set[str],
         counters_after = gpu_event_counters()
         # Without a snapshot from before the test, every counter would look like an event.
         events = {GPU_EVENT_COUNTERS.get(k, k): counters_after[k] - counters_before[k]
-                  for k in counters_after if counters_after[k] != counters_before.get(k, counters_after[k])}
+                  for k in counters_after if counters_after[k] > counters_before.get(k, counters_after[k])}
         if events:
             result["gpu_events"] = events
-            if result["status"] != "pass" and ("hang" in events or "timeout" in events):
+            if any(name in events for name in ("hang", "timeout", "page fault")):
                 result["status"] = "gpu-hang"
         if result["status"] != "pass" and driver != "stock":
             result["driver_log"] = driver_log(since)

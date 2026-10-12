@@ -1,0 +1,23 @@
+{
+  "purpose": "Isolate NGG culling and redundant scratch initialization on the unchanged fc066b9 driver",
+  "variants": [
+    {
+      "name": "baseline",
+      "library": "tools/driver-fc066b9-reference.so",
+      "sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa",
+      "env": {"RADV_XCLIPSE_LOG": "0"}
+    },
+    {
+      "name": "no_culling",
+      "library": "tools/driver-fc066b9-reference.so",
+      "sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa",
+      "env": {"RADV_XCLIPSE_LOG": "0", "RADV_DEBUG": "nonggc"}
+    },
+    {
+      "name": "hardware_scratch",
+      "library": "tools/driver-fc066b9-reference.so",
+      "sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa",
+      "env": {"RADV_XCLIPSE_LOG": "0", "RADV_XCLIPSE_SCRATCHINIT": "0"}
+    }
+  ]
+}
