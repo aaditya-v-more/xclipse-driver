@@ -464,6 +464,34 @@ zero GPU events. This is a native CPU improvement, not yet a game FPS claim. Man
 Also corrected the Windows build invocation in `run.py`: literal relative batch paths avoid
 Python's escaped quotes being interpreted as part of a command name by `cmd.exe`.
 
+### Adaptive-culling experiment and game comparison runner
+
+Source `f3ae7c4` adds **opt-in** `RADV_XCLIPSE_CULL_MIN` / `debug.radv_cull_min` (default 0).
+It disables the shader's existing runtime culling branch for small single direct vertex draws,
+and restores normal culling for larger, indirect, multi-draw, tessellated/geometry and mesh draws.
+The Xclipse VGT flush workaround is preserved. The new `culling` test alternates 3/126/129/192/6/384
+vertices in one command buffer and compares every pixel with a single-draw reference.
+
+`results/2026-10-12_162242-compare`: **108 passing attempts**, six pairs per candidate/test,
+zero GPU events. A 128-vertex threshold gives **no measurable tiny-draw GPU gain** (both 0.372
+microseconds) and pipeline-switch CPU timing is slightly worse. Keep the setting off. Compiling
+culling out with `nonggc` still reduces tiny-draw GPU time to **0.121 microseconds**, and warmed
+graphics scratch to **1.8875 ms from 3.528 ms** (paired throughput +86.2%, every pair positive).
+This suggests compiled culling/synchronization cost, not the extra scratch-base initialization,
+is worth pursuing. It does not justify removing the known-needed flush without separate tests.
+Manifest: `experiments/2026-10-12/adaptive-culling.json`.
+
+`pipeline/game_compare.py` compares property variants in one unchanged container, exports and
+checks its settings, warms each persistent shader cache, alternates AB/BA order, uses the same
+90-second rendered window after warm-up, and checkpoints every attempt. It rejects crashes,
+faults, short windows, missing screenshots/telemetry, and lost frame samples; screenshots also
+require visual review. It restores properties, DND, refresh rate, and fixed performance mode.
+The initial 42 C cooling target could not be reached after the two warm-up runs
+(`results/2026-10-12_161530-game-compare`); no pairs were scored. The next attempt exposed the
+phone export's retained `container.json` basename, so exports now include the unique run name.
+The corrected comparison uses a consistent 45 C start limit. Eleven Python checks pass,
+including measurement-window clipping and failure exclusion. Full game results follow separately.
+
 ## Next steps
 
 1. Stock still needs a working D24 path on the updated app before a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.

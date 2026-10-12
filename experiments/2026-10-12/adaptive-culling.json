@@ -1,0 +1,39 @@
+{
+  "purpose": "Compare opt-in adaptive culling with unchanged logging-guard build; retain VGT synchronization",
+  "variants": [
+    {
+      "name": "baseline",
+      "library": "tools/driver-01f09ed.so",
+      "sha256": "9d00f8100328c33726fa0a4b95e1be2856dbf91d9d7974cfffff09f11a082d9d",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0"
+      }
+    },
+    {
+      "name": "threshold_off",
+      "library": "tools/driver-f3ae7c4.so",
+      "sha256": "6c7bfe873607628eeafc325f469bfa2ad911d6fa7270ce250a9aaef7d4dd7824",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0"
+      }
+    },
+    {
+      "name": "adaptive_128",
+      "library": "tools/driver-f3ae7c4.so",
+      "sha256": "6c7bfe873607628eeafc325f469bfa2ad911d6fa7270ce250a9aaef7d4dd7824",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0",
+        "RADV_XCLIPSE_CULL_MIN": "128"
+      }
+    },
+    {
+      "name": "no_culling",
+      "library": "tools/driver-f3ae7c4.so",
+      "sha256": "6c7bfe873607628eeafc325f469bfa2ad911d6fa7270ce250a9aaef7d4dd7824",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0",
+        "RADV_DEBUG": "nonggc"
+      }
+    }
+  ]
+}

@@ -116,7 +116,7 @@ def present_times(layer: str) -> tuple[list[int], bool, int]:
     return times, len(rows) >= RING, period
 
 
-def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = ()) -> dict:
+def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = (), duration_s: float | None = None) -> dict:
     """Frame statistics from present timestamps. `holes` are (last seen, first seen again) pairs
     where SurfaceFlinger's ring overflowed between two reads: frames were presented in between but
     their times are gone, so those intervals count for nothing rather than as one long frame."""
@@ -127,6 +127,8 @@ def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = ()) -> dict:
     if rendering is None:
         return {"frames": len(ts)}
     ts = [t for t in ts if t >= rendering + WARMUP_S * 1_000_000_000]
+    if duration_s is not None:
+        ts = [t for t in ts if t <= rendering + (WARMUP_S + duration_s) * 1_000_000_000]
     if len(ts) < 10:
         return {"frames": len(ts)}
     def lost(a: int, b: int) -> bool:
@@ -375,7 +377,8 @@ def cool_down(target: float, limit_s: float = 120) -> float:
 
 
 def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
-             shots: list[int] = (), seconds: int | None = None) -> dict:
+             shots: list[int] = (), seconds: int | None = None,
+             measure_seconds: float | None = None) -> dict:
     cfg = BENCHES[bench]
     app_id = cfg["ids"][driver]
     shell(f"am force-stop {APP}")
@@ -496,10 +499,13 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         if len(frames) > (history[-1][1] if history else 0):
             last_new = elapsed
         history.append((elapsed, len(frames)))
+        if measure_seconds is not None and frame_stats(list(frames), holes).get("seconds", 0) >= measure_seconds:
+            break
     result["seconds_to_game_process"] = exe_seen or None
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
-    stats = result["surfaceflinger"] = frame_stats(list(frames), holes)
+    stats = result["surfaceflinger"] = (frame_stats(list(frames), holes, measure_seconds)
+                                       if measure_seconds is not None else frame_stats(list(frames), holes))
     result["refresh_period_ns"] = periods.most_common(1)[0][0] if periods else None
     result["memory"] = memory
     result["gpu"] = gpu  # [seconds since launch, busy %, clock kHz, temp C, CPU cluster kHz...]

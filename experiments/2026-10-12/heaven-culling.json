@@ -1,0 +1,16 @@
+{
+  "purpose": "Isolate NGG culling on the same fc066b9 RADV / DXVK 2.7.1 Heaven container. Driver-only comparison at fixed performance mode; does not predict normal-mode FPS.",
+  "bench": "heaven",
+  "driver": "radv",
+  "container_contains": {
+    "graphicsDriverConfig": "version=RADV Xclipse (Mesa 26.3.0-devel-xd-fc066b9)",
+    "dxwrapperConfig": "version=2.7.1",
+    "envVars": "dxvk.enableDescriptorBuffer=False",
+    "box64Preset": "COMPATIBILITY",
+    "fexcorePreset": "INTERMEDIATE"
+  },
+  "variants": [
+    {"name": "baseline", "props": {"debug.radv_debug": ""}},
+    {"name": "no_culling", "props": {"debug.radv_debug": "nonggc"}}
+  ]
+}
