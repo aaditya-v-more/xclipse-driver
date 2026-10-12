@@ -14174,9 +14174,10 @@ radv_before_draw(struct radv_cmd_buffer *cmd_buffer, const struct radv_draw_info
    /* Consecutive NGG culling draws race on this chip: one per submit is clean, four or more in a
     * command buffer hang. A VGT_FLUSH between draws fixes it (same class as
     * has_vgt_flush_ngg_legacy_bug); VS_PARTIAL_FLUSH alone still hangs. */
-   if (unlikely(pdev->info.pci_id == 0x73a0) && cmd_buffer->state.last_vgt_shader &&
-       cmd_buffer->state.last_vgt_shader->info.has_ngg_culling)
-      cmd_buffer->state.flush_bits |= RADV_CMD_FLAG_VGT_FLUSH;
+   const bool xclipse_nggc_flush = unlikely(pdev->info.pci_id == 0x73a0) &&
+                                  cmd_buffer->state.last_vgt_shader &&
+                                  cmd_buffer->state.last_vgt_shader->info.has_ngg_culling;
+   const bool previous_small_draw = cmd_buffer->state.ngg_culling_small_draw;
 
    if (likely(!info->indirect_va)) {
       /* GFX6-GFX7 treat instance_count==0 as instance_count==1. There is
@@ -14206,13 +14207,21 @@ radv_before_draw(struct radv_cmd_buffer *cmd_buffer, const struct radv_draw_info
    if (unlikely(pdev->xclipse_cull_min_vertices)) {
       /* Indirect, multi-draw and amplified geometry have no cheap, reliable output size.
        * Restore normal culling for them, including after a preceding small direct draw.
-       * Keep the Xclipse VGT_FLUSH workaround above even when shader culling is disabled. */
+       * The separate no-flush experiment below defaults off. */
       const struct radv_shader *shader = cmd_buffer->state.last_vgt_shader;
       const bool small = !dgc && drawCount == 1 && !info->indirect_va && !info->strmout_va &&
                          shader && shader->info.stage == MESA_SHADER_VERTEX && shader->info.has_ngg_culling &&
                          (uint64_t)info->count * info->instance_count < pdev->xclipse_cull_min_vertices;
       radv_set_nggc_small_draw(cmd_buffer, small);
    }
+
+   /* Isolate the workaround's cost only between two runtime-unculled vertex draws. NIR's
+    * uncull branch skips LDS culling/repacking and allocates unmodified vertex/primitive counts.
+    * Keep the flush on either transition and never clear bits requested by another workaround.
+    * This is independently opt-in; a threshold alone retains the proven synchronization. */
+   if (xclipse_nggc_flush && !(pdev->xclipse_cull_small_no_flush && previous_small_draw &&
+                              cmd_buffer->state.ngg_culling_small_draw))
+      cmd_buffer->state.flush_bits |= RADV_CMD_FLAG_VGT_FLUSH;
 
    /* This is the optimal packet order:
     * Set all states first, so that all SET packets are processed in parallel with previous draw

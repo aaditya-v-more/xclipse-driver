@@ -3139,8 +3139,11 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                             (instance->perftest_flags & RADV_PERFTEST_NGGC)) &&
                            !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
 
-   if (pdev->info.xclipse_model == AC_XCLIPSE_940 && pdev->use_ngg_culling)
+   if (pdev->info.xclipse_model == AC_XCLIPSE_940 && pdev->use_ngg_culling) {
       pdev->xclipse_cull_min_vertices = radv_xclipse_cull_min_vertices();
+      pdev->xclipse_cull_small_no_flush =
+         radv_xclipse_flag("RADV_XCLIPSE_CULL_NOFLUSH", "radv_cull_noflush");
+   }
 
    /* Samsung's sgpu has no GDS. The first query that needed it made the queue allocate it, and the
     * refusal failed the whole submission (D3D11 pipeline statistics through DXVK). */

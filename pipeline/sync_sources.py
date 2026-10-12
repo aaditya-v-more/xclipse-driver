@@ -15,6 +15,7 @@ SPARSE = {
     "kernel-r12s": ["drivers/gpu/drm/samsung", "include/uapi/drm", "arch/arm64/configs"],
     "gamenative-mesa": ["src/vulkan/wrapper", "src/vulkan/wsi"],
     "radv-xclipse940": ["src/amd", "src/vulkan", "src/util", "include"],
+    "mesa-upstream": ["src/x11", "src/loader", "include/vulkan"],
 }
 
 

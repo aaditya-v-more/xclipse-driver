@@ -2322,6 +2322,10 @@ dep_xshmfence_version = '>= 1.1'
 with_dri3_explicit_sync = false
 with_xcb_keysyms = false
 if with_platform_x11
+  xclipse_x11_sdk = meson.get_external_property('xclipse_x11_sdk', '')
+  if xclipse_x11_sdk != ''
+    subdir('android/x11-sdk')
+  endif
   dep_xcb = dependency('xcb')
   dep_xcb_xrandr = dependency('xcb-randr')
   if with_glx == 'xlib'

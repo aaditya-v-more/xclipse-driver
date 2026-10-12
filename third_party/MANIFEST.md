@@ -12,6 +12,7 @@ a branch automatically. The driver/ directory remains our editable RADV subtree.
 | radv-xclipse940 | [yoro1836/radv-xclipse](https://github.com/yoro1836/radv-xclipse) | d3f2c124c346a5e2aebfe19e8082412126db039e | Xclipse 940 bring-up used by our subtree |
 | Xclipse940-RADV | [Xclipse940-RADV](https://github.com/Matheus-TestUser1/Xclipse940-RADV) | 06546b365454d7b5b4c1986578cfd4262e8b3b8a | Earlier 940 build/reference work |
 | mesa-unified-drivers | [mesa-unified-drivers](https://github.com/JimVulkan/mesa-unified-drivers) | a5010bb447ae34e697cb917c2d387272063e9fd8 | Android driver delivery/reference |
+| mesa-upstream | [Mesa](https://gitlab.freedesktop.org/mesa/mesa) | 1b75efe0014c0d71163a01589bafb510460e7049 | Sparse X11 and loader helpers missing from the trimmed RADV tree; MIT notices retained |
 | kernel-r12s | [Samsung r12s kernel](https://github.com/Elchanz3/android_kernel_samsung_r12s) | 9526364f2502c6a110905c600c71db4c5ffb28b6 | GPL sgpu implementation and DRM UAPI, OS-16 |
 | ExynosTools | [ExynosTools](https://github.com/WearyConcern1165/ExynosTools) | 3dcdbcb2034e5f19a1606e54668e6a87f92476c6 | Device capability/reference research |
 
@@ -33,6 +34,7 @@ out exact Git-link commits, and refuses to change dirty worktrees. It configures
   filenames reserved by Windows, such as aux.c; do not run an unrestricted fresh checkout there.
 - gamenative-mesa: src/vulkan/wrapper and src/vulkan/wsi.
 - radv-xclipse940: src/amd, src/vulkan, src/util, and include.
+- mesa-upstream: src/x11, src/loader, and include/vulkan.
 
 GameNative's own submodules are initialized recursively at the commits recorded by its release:
 adrenotools 8483dfdaa2abf97ee89ad0e5f337e7b508550c6b (including liblinkernsbypass), LSFG

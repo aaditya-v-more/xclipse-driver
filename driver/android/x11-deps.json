@@ -1,0 +1,12 @@
+{
+  "runtime": {
+    "url": "https://downloads.gamenative.app/imagefs_bionic.txz",
+    "sha256": "368db62bfc58b72c97e5169bda9aa64d4246f07964c447e27c79a065e7e9c48b"
+  },
+  "headers": [
+    {"package": "libx11", "version": "1.8.13-1", "file": "pool/main/libx/libx11/libx11_1.8.13-1_aarch64.deb", "sha256": "a18c5cf3cfe2670bf1cb4243e3140a0b7639350a4175b5229c969402fdb12e9f"},
+    {"package": "libxcb", "version": "1.17.0-1", "file": "pool/main/libx/libxcb/libxcb_1.17.0-1_aarch64.deb", "sha256": "191c3642b6a8c754bc75b69b94a81858ecb5f18766dc085aff55559b8087ad34"},
+    {"package": "libxshmfence", "version": "1.3.3-1", "file": "pool/main/libx/libxshmfence/libxshmfence_1.3.3-1_aarch64.deb", "sha256": "7644c2969c2ce4d763785bd2a85eb32ccf8e5ad40228cd92b193f7edb6398d92"},
+    {"package": "xorgproto", "version": "2026.1", "file": "pool/main/x/xorgproto/xorgproto_2026.1_all.deb", "sha256": "2463651143a386eba0d7baebac87ca5d2db5239d36cf38f9b2086f3c1bfdcbce"}
+  ]
+}

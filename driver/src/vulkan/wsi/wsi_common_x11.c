@@ -1775,7 +1775,8 @@ x11_present_to_x11_dri3(struct x11_swapchain *chain, uint32_t image_index,
        !wsi_device->x11.ignore_suboptimal)
       options |= XCB_PRESENT_OPTION_SUBOPTIMAL;
 
-   xshmfence_reset(image->shm_fence);
+   if (image->shm_fence)
+      xshmfence_reset(image->shm_fence);
 
    if (!chain->base.image_info.explicit_sync) {
       ++chain->sent_image_count;
@@ -1984,6 +1985,11 @@ x11_needs_wait_for_fences(const struct wsi_device *wsi_device,
                           struct wsi_x11_connection *wsi_conn,
                           VkPresentModeKHR present_mode)
 {
+   /* This server maps the linear dma-buf on the CPU without importing its implicit fence.
+    * Wait in the presentation worker, so recording the next frame can still overlap. */
+   if (wsi_device->x11.gamenative)
+      return true;
+
    if (wsi_conn->is_xwayland) {
       return false;
    }
@@ -2740,6 +2746,11 @@ x11_image_init(VkDevice device_h, struct x11_swapchain *chain,
 #endif
 
 out_fence:
+   /* GameNative implements PresentIdleNotify but not DRI3 FenceFromFD. The acquire queue waits
+    * for the idle event before reusing an image. GPU completion is waited before presenting. */
+   if (chain->base.wsi->x11.gamenative)
+      return VK_SUCCESS;
+
    fence_fd = xshmfence_alloc_shm();
    if (fence_fd < 0)
       goto fail_pixmap;
@@ -2782,9 +2793,12 @@ x11_image_finish(struct x11_swapchain *chain,
    xcb_void_cookie_t cookie;
    if (!chain->base.wsi->sw || chain->has_mit_shm) {
 #ifdef HAVE_X11_DRM
-      cookie = xcb_sync_destroy_fence(chain->conn, image->sync_fence);
-      xcb_discard_reply(chain->conn, cookie.sequence);
-      xshmfence_unmap_shm(image->shm_fence);
+      if (image->sync_fence) {
+         cookie = xcb_sync_destroy_fence(chain->conn, image->sync_fence);
+         xcb_discard_reply(chain->conn, cookie.sequence);
+      }
+      if (image->shm_fence)
+         xshmfence_unmap_shm(image->shm_fence);
 #endif
 
       cookie = xcb_free_pixmap(chain->conn, image->pixmap);

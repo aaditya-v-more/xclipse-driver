@@ -492,10 +492,68 @@ phone export's retained `container.json` basename, so exports now include the un
 The corrected comparison uses a consistent 45 C start limit. Eleven Python checks pass,
 including measurement-window clipping and failure exclusion. Full game results follow separately.
 
-## Next steps
+## Checkpoint at user-requested stop (2026-10-12, 16:48 IST)
 
-1. Stock still needs a working D24 path on the updated app before a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.
-2. DXVK 2.7.1 now runs with `dxvk.enableDescriptorBuffer=False`. Investigate the descriptor-buffer address/memory-type boundary with the wrapper, while retaining this verified workaround; `async-1.10.3` is the fallback.
-3. Measure a controlled performance comparison, then decide on the GameNative fork with a direct-ICD "RADV (Xclipse)" option, Game Mode performance declared and ADPF hints. Preserve the official app/source pin as the baseline.
-4. `--fixed-clocks` in `game.py` and `run.py` for driver-only comparisons.
-5. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.
+The user stopped the work and requested a handoff, commit and push. The running Heaven study
+`results/2026-10-12_162819-game-compare` was stopped during pair 2 baseline. Two warm-ups and
+three scored attempts completed; only **one complete pair** exists: baseline 38.49 FPS versus
+`nonggc` 49.73 FPS (+29.20%) at fixed performance mode. This is provisional, with screenshot
+review pending, and does not establish repeatability or normal-clock gains. Pair 2 candidate
+has no baseline and started at a reported 46 C despite the 45 C cooldown limit. Recheck temperature
+at the actual launch boundary before running a fresh study. The interrupted attempt is excluded;
+raw metadata records the stop and manual cleanup.
+
+Hard termination bypassed the runner's `finally`. GameNative was manually force-stopped; fixed
+performance mode disabled successfully; RADV debug cleared and logging set to 0; refresh overrides
+deleted; DND restored off; USB stay-awake retained at 2. Readbacks are in the result JSON. No driver
+was newly imported into GameNative, and its saved containers remain as documented in HANDOFF.md.
+
+### Experimental direct-X11 build, not deployed
+
+Added pinned `third_party/mesa-upstream` at `1b75efe0014c0d71163a01589bafb510460e7049`, restoring
+MIT X11 helpers, the loader's X11 screen helper and Vulkan platform headers into the trimmed
+driver tree with notices retained. `driver/android/x11-deps.json` pins GameNative's Bionic runtime
+and official Termux header packages. `prepare_x11.py` downloads/verifies/extracts a local SDK;
+`build_x11.py` builds separately in `driver/build-android-x11`; `deploy_x11.py` verifies the pinned
+ELF library closure and supports deployment to a hash-named native-test directory.
+
+SDK preparation, the X11 build, and dependency `--check-only` succeeded. Nothing from this path
+was deployed to the phone or imported into GameNative. The compiled dirty package was
+`radv-xclipse-26.3.0-devel-xd-0a61e5b-dirty-x11.zip`, ELF SHA256
+`f42f14be96a42dca7940ff41ffd550622139cafa634c9bd754d1bcb826f05064`.
+It predates the final no-flush edits below: rebuild from the checkpoint commit before testing.
+
+`RADV_XCLIPSE_GAMENATIVE_WSI=1` is an opt-in Xclipse 940 adaptation using linear PRIME blits,
+render-completion waits and PresentIdleNotify recycling, without shared X fences, scanout,
+modifiers or the SDMA blit queue. Native loading, presentation, buffer mapping/cache coherence
+and protocol compatibility are unverified. A container `VK_ICD_FILENAMES` override may avoid
+needing a new APK, based on the pinned app's environment order, but this is not runtime-proven.
+No ICD file or container override has been installed. Descriptor buffers must remain disabled
+for the first presentation tests. This checkpoint does not fix the descriptor-buffer issue.
+
+### Unbuilt no-flush experiment
+
+Final source edits add `RADV_XCLIPSE_CULL_NOFLUSH` / `debug.radv_cull_noflush`, default false.
+With a nonzero small-draw threshold, it attempts to omit the extra VGT flush only between two
+consecutive runtime-unculled direct vertex draws; transitions retain flushing and no other
+flush request is cleared. **These edits have not been built or tested.** The known culling hang
+makes isolated correctness/fault testing essential before any game use. Earlier threshold
+measurements retained the flush and do not validate this new option.
+
+Checkpoint verification: Python compilation and all 11 offline runner regression tests pass.
+No further phone tests or driver builds were run after the stop request.
+
+## Next steps when the user resumes
+
+1. Rebuild from the checkpoint and validate the latest C source; compare no-flush separately,
+   default off. Preserve baseline artifacts and stop immediately on GPU events.
+2. Validate native loading of the separate X11 build and its dependencies, then direct
+   GameNative presentation with descriptor buffers still disabled. Do not infer WSI correctness
+   from a compute pass. Investigate descriptor integration only after presentation works.
+3. Fix the launch-temperature drift, run a fresh complete six-pair Heaven study, review images,
+   and repeat promising results at normal clocks. The partial fixed-mode pair is not a final gain.
+4. Fix stock's D24 path before a fair Samsung comparison. Keep FEXCore/Box64 original presets
+   and the verified DXVK 2.7.1 descriptor-buffer workaround.
+5. Deliver a package only from repeatably correct improvements. Any upstream message requires
+   explicit user instruction to send. See the rewritten `docs/HANDOFF.md` for exact state,
+   source/artifact hashes, portable commands and remaining limitations.

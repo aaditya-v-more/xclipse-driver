@@ -20,6 +20,7 @@
 
 #include "tools/radv_debug.h"
 #include "wsi_common.h"
+#include "util/u_debug.h"
 
 static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
 radv_wsi_proc_addr(VkPhysicalDevice physicalDevice, const char *pName)
@@ -104,6 +105,18 @@ radv_init_wsi(struct radv_physical_device *pdev)
    pdev->wsi_device.supports_modifiers = pdev->info.gfx_level >= GFX9;
    pdev->wsi_device.set_memory_ownership = radv_wsi_set_memory_ownership;
    pdev->wsi_device.get_blit_queue = radv_wsi_get_prime_blit_queue;
+
+#ifdef VK_USE_PLATFORM_XCB_KHR
+   if (pdev->info.xclipse_model == AC_XCLIPSE_940 &&
+       debug_get_bool_option("RADV_XCLIPSE_GAMENATIVE_WSI", false)) {
+      /* The in-app X server uploads the pixmap on the CPU. Keep RADV's native allocation and
+       * descriptors; use the existing PRIME linear blit plus a completed GPU fence for display. */
+      pdev->wsi_device.x11.gamenative = true;
+      pdev->wsi_device.supports_modifiers = false;
+      pdev->wsi_device.supports_scanout = false;
+      pdev->wsi_device.get_blit_queue = NULL;
+   }
+#endif
 
    for (uint32_t i = 0; i < ARRAY_SIZE(pdev->wsi_device.supports_protected); i++) {
       pdev->wsi_device.supports_protected[i] = radv_tmz_enabled(pdev);

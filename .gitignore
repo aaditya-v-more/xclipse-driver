@@ -10,6 +10,7 @@
 !/third_party/gamenative-mesa
 !/third_party/kernel-r12s
 !/third_party/mesa-unified-drivers
+!/third_party/mesa-upstream
 !/third_party/radv-xclipse
 !/third_party/radv-xclipse940
 /tools/*

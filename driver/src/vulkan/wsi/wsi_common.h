@@ -136,6 +136,10 @@ struct wsi_device {
       /* Never report VK_SUBOPTIMAL_KHR. Used to workaround
        * games that cannot handle SUBOPTIMAL correctly. */
       bool ignore_suboptimal;
+
+      /* GameNative consumes linear CPU-readable pixmaps and PresentIdleNotify, but has no
+       * DRI3 FenceFromFD or dma-buf implicit wait in its upload path. Opt-in compatibility. */
+      bool gamenative;
    } x11;
 
    struct {
