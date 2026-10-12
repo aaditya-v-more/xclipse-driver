@@ -74,6 +74,23 @@ values, and keep the other settings fixed. Inspect screenshots as well as frame 
 presets relax emulation behavior and a run with wrong rendering does not count. Nobody else may
 touch the phone or run another phone script during these commands.
 
+Text environment variables can be added or updated through the Environment tab:
+
+```sh
+python pipeline/gn_driver.py env Heaven-radv DXVK_CONFIG "dxvk.enableDescriptorBuffer=False"
+```
+
+The helper scrolls the tab row, uses the Add dialog to insert or replace the named value, saves,
+and verifies it after reopening. It never deletes a variable. Record the old value before changing
+it; this command replaces the entire value, so preserve any other settings in an existing
+`DXVK_CONFIG`. Use `dxvk.enableDescriptorBuffer=Auto` to restore that option's default.
+
+On the verified GameNative v1.3.0-prerelease APK and RADV `xd-fc066b9`, Heaven with DXVK 2.7.1
+faults at startup with descriptor buffers enabled. Disabling them is a working compatibility
+setting; BCn remains `none`, with FEXCore `Intermediate` and Box64 `Compatibility`. The exact
+measurements and remaining uncertainty are in `PROGRESS.md`. This is not a general performance
+recommendation for other games or drivers.
+
 ## Running
 
 For GameNative 0.9.2, an unbundled DXVK version must first be installed in Contents Manager.

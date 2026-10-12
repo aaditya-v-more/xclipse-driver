@@ -17,5 +17,27 @@
     "version_code": 23,
     "target_sdk": 28
   },
-  "note": "The v1.3.0-prerelease tag retains versionName 1.2.1 upstream. The installed APK SHA256 was verified against the release asset; the tag commit, not the display version, is the source pin."
+  "note": "The v1.3.0-prerelease tag retains versionName 1.2.1 upstream. The installed APK SHA256 was verified against the release asset; the tag commit, not the display version, is the source pin.",
+  "bundled_wrapper": {
+    "asset": "assets/graphics_driver/wrapper.tzst",
+    "library": "usr/lib/libvulkan_wrapper.so",
+    "sha256": "b598a54166790a6fc071f08495f141f92dc192f1eb339e029bfc7a303c7486ce",
+    "environment_names_found": [
+      "WRAPPER_DISABLE_PLACED",
+      "WRAPPER_DMAHEAP_CACHED"
+    ],
+    "environment_names_absent": [
+      "WRAPPER_BYPASS_SWAPCHAIN_PLACED"
+    ]
+  },
+  "bundled_dxvk_2_7_1": {
+    "asset": "assets/dxwrapper/dxvk-2.7.1.tzst",
+    "d3d11_and_dxgi_match_imported_upstream_package": true,
+    "dll_sha256": {
+      "system32/d3d11.dll": "523da2cd765dd51d99fe1644b24f9ee7ee6247e4c98953bcc449ce84cd303405",
+      "system32/dxgi.dll": "ec02eb37620ff52361cb45376a4611fc4210d96e71d0363f1cc9807f151c01be",
+      "syswow64/d3d11.dll": "7406e13d2694244499783d2e9fb1be285b6324890a348137fe5b5042c64b5913",
+      "syswow64/dxgi.dll": "53defc65dd2e53d05924a960c0891e15692ca8780ed0509a1a7efda71f4d631e"
+    }
+  }
 }

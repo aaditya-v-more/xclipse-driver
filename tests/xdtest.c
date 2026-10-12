@@ -8,7 +8,7 @@
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
  *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
- *                xfbmanygs textures mips mrt vertex depth storage bcn
+ *                xfbmanygs textures mips mrt vertex depth storage bcn descriptors
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -475,7 +475,7 @@ static void run_info(void)
 /* What a test needs enabled beyond the basics. */
 enum {
    NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8, NEED_BC = 16, NEED_VERTEX = 32,
-   NEED_STORAGE = 64
+   NEED_STORAGE = 64, NEED_DESCRIPTORS = 128
 };
 
 /* Set by start_device for the tests with needs: what the driver has of what they use. */
@@ -538,8 +538,39 @@ static void start_device(bool dynamic_rendering, unsigned needs)
    };
    const char *xfb_ext = VK_EXT_TRANSFORM_FEEDBACK_EXTENSION_NAME;
    const char *vid_ext = VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME;
-   const char *exts[3];
+   VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_features = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+   };
+   VkPhysicalDeviceBufferDeviceAddressFeatures address_features = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+   };
+   const char *exts[4];
    void **chain = &f13.pNext; /* where the next enabled feature struct goes */
+   if (needs & NEED_DESCRIPTORS) {
+      const char *ext = VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME;
+      if (!has_device_extension(ext))
+         finish("skip", "VK_EXT_descriptor_buffer is not exposed");
+      descriptor_features.pNext = &address_features;
+      VkPhysicalDeviceFeatures2 f2 = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+         .pNext = &descriptor_features,
+      };
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      if (!descriptor_features.descriptorBuffer || !address_features.bufferDeviceAddress)
+         finish("skip", "descriptorBuffer or bufferDeviceAddress is unsupported");
+      descriptor_features = (VkPhysicalDeviceDescriptorBufferFeaturesEXT){
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+         .pNext = &address_features,
+         .descriptorBuffer = VK_TRUE,
+      };
+      address_features = (VkPhysicalDeviceBufferDeviceAddressFeatures){
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
+         .bufferDeviceAddress = VK_TRUE,
+      };
+      *chain = &descriptor_features;
+      chain = &address_features.pNext;
+      exts[dci.enabledExtensionCount++] = ext;
+   }
    if (needs & NEED_QUERIES) {
       bool pgq_listed = has_device_extension(pgq_ext);
       VkPhysicalDeviceFeatures2 f2 = {
@@ -793,21 +824,32 @@ static int find_memory(uint32_t type_bits, VkMemoryPropertyFlags want)
    return -1;
 }
 
-static VkDeviceMemory alloc_memory(VkMemoryRequirements req, VkMemoryPropertyFlags want)
+static VkDeviceMemory alloc_memory_flags(VkMemoryRequirements req, VkMemoryPropertyFlags want,
+                                         VkMemoryAllocateFlags flags)
 {
    int type = find_memory(req.memoryTypeBits, want);
    if (type < 0 && !(want & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT))
       type = find_memory(req.memoryTypeBits, 0);
    if (type < 0)
       finish("fail", "no memory type with flags 0x%x", want);
+   VkMemoryAllocateFlagsInfo afi = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO,
+      .flags = flags,
+   };
    VkMemoryAllocateInfo mai = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+      .pNext = flags ? &afi : NULL,
       .allocationSize = req.size,
       .memoryTypeIndex = (uint32_t)type,
    };
    VkDeviceMemory mem;
    VKCHECK("vkAllocateMemory", vkAllocateMemory(dev, &mai, NULL, &mem));
    return mem;
+}
+
+static VkDeviceMemory alloc_memory(VkMemoryRequirements req, VkMemoryPropertyFlags want)
+{
+   return alloc_memory_flags(req, want, 0);
 }
 
 struct buffer {
@@ -830,9 +872,11 @@ static struct buffer make_buffer(VkDeviceSize size, VkBufferUsageFlags usage, bo
    VKCHECK("vkCreateBuffer", vkCreateBuffer(dev, &bci, NULL, &b.buf));
    VkMemoryRequirements req;
    vkGetBufferMemoryRequirements(dev, b.buf, &req);
-   b.mem = alloc_memory(req, host ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                  : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+   b.mem = alloc_memory_flags(req, host ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                       : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                              usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+                                 ? VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT : 0);
    VKCHECK("vkBindBufferMemory", vkBindBufferMemory(dev, b.buf, b.mem, 0));
    if (host)
       VKCHECK("vkMapMemory", vkMapMemory(dev, b.mem, 0, VK_WHOLE_SIZE, 0, &b.map));
@@ -1294,6 +1338,154 @@ static void dispatch_fill(const uint32_t *code, size_t size)
 static void run_compute(void)
 {
    dispatch_fill(fill_comp, sizeof(fill_comp));
+}
+
+/* Exercise native descriptor buffers without Wine or GameNative's memory wrapper. Two nonzero
+ * descriptor offsets select different storage buffers; every output word and guard is checked.
+ * See https://docs.vulkan.org/spec/latest/chapters/descriptorbuffers.html for the API contract. */
+static void run_descriptors(void)
+{
+#define LOAD_DESCRIPTOR(fn) \
+   PFN_##fn fn = (PFN_##fn)vkGetDeviceProcAddr(dev, #fn); \
+   if (!fn) finish("fail", "missing enabled entry point %s", #fn)
+   LOAD_DESCRIPTOR(vkGetBufferDeviceAddress);
+   LOAD_DESCRIPTOR(vkGetDescriptorSetLayoutSizeEXT);
+   LOAD_DESCRIPTOR(vkGetDescriptorSetLayoutBindingOffsetEXT);
+   LOAD_DESCRIPTOR(vkGetDescriptorEXT);
+   LOAD_DESCRIPTOR(vkCmdBindDescriptorBuffersEXT);
+   LOAD_DESCRIPTOR(vkCmdSetDescriptorBufferOffsetsEXT);
+#undef LOAD_DESCRIPTOR
+   VkPhysicalDeviceDescriptorBufferPropertiesEXT dp = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_PROPERTIES_EXT,
+   };
+   VkPhysicalDeviceProperties2 p2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+      .pNext = &dp,
+   };
+   vkGetPhysicalDeviceProperties2(pdev, &p2);
+   VkDescriptorSetLayoutBinding binding = {
+      .binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+   };
+   VkDescriptorSetLayoutCreateInfo dci = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+      .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
+      .bindingCount = 1, .pBindings = &binding,
+   };
+   VkDescriptorSetLayout dsl;
+   VKCHECK("vkCreateDescriptorSetLayout", vkCreateDescriptorSetLayout(dev, &dci, NULL, &dsl));
+   VkDeviceSize layout_size, binding_offset;
+   vkGetDescriptorSetLayoutSizeEXT(dev, dsl, &layout_size);
+   vkGetDescriptorSetLayoutBindingOffsetEXT(dev, dsl, 0, &binding_offset);
+   VkDeviceSize alignment = dp.descriptorBufferOffsetAlignment;
+   if (!alignment || binding_offset + dp.storageBufferDescriptorSize > layout_size)
+      finish("fail", "invalid descriptor size, offset or alignment");
+   VkDeviceSize stride = (layout_size + alignment - 1) / alignment * alignment;
+   struct buffer descriptors = make_buffer(stride * 3,
+      VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+      true);
+   VkBufferDeviceAddressInfo address_info = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,
+      .buffer = descriptors.buf,
+   };
+   VkDeviceAddress descriptor_address = vkGetBufferDeviceAddress(dev, &address_info);
+   if (!descriptor_address || descriptor_address % alignment)
+      finish("fail", "descriptor buffer address is null or misaligned");
+   VkMemoryRequirements req;
+   vkGetBufferMemoryRequirements(dev, descriptors.buf, &req);
+   jhex("descriptor_memory_type_bits", req.memoryTypeBits);
+   jint("descriptor_layout_size", layout_size);
+   jint("descriptor_binding_offset", binding_offset);
+   jint("descriptor_stride", stride);
+   char address_text[32];
+   snprintf(address_text, sizeof address_text, "0x%llx", (unsigned long long)descriptor_address);
+   jstr("descriptor_address", address_text);
+
+   enum { N = 4096, COUNT = 2 };
+   VkDeviceSize guard = props.limits.minStorageBufferOffsetAlignment;
+   if (guard < 256) guard = 256;
+   VkDeviceSize data_size = N * sizeof(uint32_t), size = guard * 2 + data_size;
+   struct buffer output[COUNT];
+   memset(descriptors.map, 0, stride * 3);
+   for (unsigned i = 0; i < COUNT; i++) {
+      output[i] = make_buffer(size,
+         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, true);
+      memset(output[i].map, 0xee, size);
+      address_info.buffer = output[i].buf;
+      VkDeviceAddress address = vkGetBufferDeviceAddress(dev, &address_info);
+      if (!address) finish("fail", "output buffer has a null device address");
+      if (!i) {
+         snprintf(address_text, sizeof address_text, "0x%llx", (unsigned long long)address);
+         jstr("output_address", address_text);
+      }
+      VkDescriptorAddressInfoEXT da = {
+         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ADDRESS_INFO_EXT,
+         .address = address + guard, .range = data_size, .format = VK_FORMAT_UNDEFINED,
+      };
+      VkDescriptorGetInfoEXT gi = {
+         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_GET_INFO_EXT,
+         .type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .data.pStorageBuffer = &da,
+      };
+      vkGetDescriptorEXT(dev, &gi, dp.storageBufferDescriptorSize,
+                         (char *)descriptors.map + stride * (i + 1) + binding_offset);
+   }
+   VkPipelineLayoutCreateInfo lci = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .setLayoutCount = 1, .pSetLayouts = &dsl,
+   };
+   VkPipelineLayout layout;
+   VKCHECK("vkCreatePipelineLayout", vkCreatePipelineLayout(dev, &lci, NULL, &layout));
+   VkShaderModule shader = make_shader(fill_comp, sizeof(fill_comp));
+   VkComputePipelineCreateInfo pci = {
+      .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
+      .flags = VK_PIPELINE_CREATE_DESCRIPTOR_BUFFER_BIT_EXT,
+      .stage = {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+                .stage = VK_SHADER_STAGE_COMPUTE_BIT, .module = shader, .pName = "main"},
+      .layout = layout,
+   };
+   VkPipeline pipeline;
+   VKCHECK("vkCreateComputePipelines", vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &pci, NULL,
+                                                               &pipeline));
+   VkCommandBuffer cb = begin_cmd();
+   vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+   VkDescriptorBufferBindingInfoEXT dbi = {
+      .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_BUFFER_BINDING_INFO_EXT,
+      .address = descriptor_address, .usage = VK_BUFFER_USAGE_RESOURCE_DESCRIPTOR_BUFFER_BIT_EXT,
+   };
+   vkCmdBindDescriptorBuffersEXT(cb, 1, &dbi);
+   for (unsigned i = 0; i < COUNT; i++) {
+      uint32_t index = 0;
+      VkDeviceSize offset = stride * (i + 1);
+      vkCmdSetDescriptorBufferOffsetsEXT(cb, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &index,
+                                         &offset);
+      vkCmdDispatch(cb, N / 64, 1, 1);
+   }
+   VkMemoryBarrier barrier = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT, .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                        0, 1, &barrier, 0, NULL, 0, NULL);
+   VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+   submit_and_wait(cb, "descriptor buffer dispatches");
+   unsigned bad = 0;
+   for (unsigned i = 0; i < COUNT; i++) {
+      const uint32_t *words = output[i].map;
+      for (VkDeviceSize w = 0; w < size / sizeof(uint32_t); w++) {
+         uint32_t expected = w >= guard / 4 && w < (guard + data_size) / 4
+                               ? (uint32_t)(w - guard / 4) * 3u + 7u : 0xeeeeeeeeu;
+         bad += words[w] != expected;
+      }
+   }
+   jint("elements", N * COUNT);
+   jint("mismatches_including_guards", bad);
+   if (bad) finish("fail", "%u incorrect output or guard words", bad);
+   for (unsigned i = 0; i < COUNT; i++) free_buffer(&output[i]);
+   free_buffer(&descriptors);
+   vkDestroyPipeline(dev, pipeline, NULL);
+   vkDestroyShaderModule(dev, shader, NULL);
+   vkDestroyPipelineLayout(dev, layout, NULL);
+   vkDestroyDescriptorSetLayout(dev, dsl, NULL);
 }
 
 /* The same pattern, with every value passing through scratch memory on its way out. */
@@ -5390,7 +5582,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
                       "  correctness: info device submit compute render tess scratch scratchcs\n"
                       "               queries xfb xfbmany xfbmanygs textures mips mrt vertex depth\n"
-                      "               storage bcn\n"
+                      "               storage bcn descriptors\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -5415,6 +5607,7 @@ int main(int argc, char **argv)
       {"vertex", run_vertex, true, NEED_VERTEX}, {"depth", run_depth, true, 0},
       {"storage", run_storage, false, NEED_STORAGE},
       {"bcn", run_bcn, false, NEED_STORAGE},
+      {"descriptors", run_descriptors, false, NEED_DESCRIPTORS},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},

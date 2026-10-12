@@ -356,10 +356,73 @@ The run exposed a monitoring gap: `game.py` checked GPU fault counters only afte
 
 `results/2026-10-12_135643-game` checked the restored configuration and the updated runner on the phone. Stock, BCn `full`, still fails Heaven's **D24 2048×2048 depth-texture creation** on the new app; the runner caught the error dialog and excluded it, with zero GPU faults. RADV, BCn `none`, completed **88.7 steady seconds at 57.4 FPS**, zero faults and sampling gaps; the inspected 90-second screenshot renders correctly. Both runs used the original emulator presets, DXVK `async-1.10.3`, and diagnostic RADV logging. These are validation runs, not evidence of a stock/RADV speed advantage. Early fault shutdown is covered by simulated counter changes; the subsequent live run verifies the fault-free path without intentionally repeating the fault storm.
 
+## DXVK descriptor-buffer isolation (2026-10-12)
+
+Added `gn_driver.py env GAME NAME VALUE` to add or replace a text environment variable through
+the container's Environment tab, save, reopen, and verify it. The tab row scrolls horizontally;
+the helper locates it from the current UI dump. No variable is deleted. Live add/update/readback
+checks passed for `WRAPPER_DISABLE_PLACED` and `DXVK_CONFIG`. The latter is a whole-value update,
+so other options in an existing value must be preserved when applying it elsewhere.
+
+Verified the actual standard wrapper from the installed release APK: SHA256
+`b598a54166790a6fc071f08495f141f92dc192f1eb339e029bfc7a303c7486ce`. It contains
+`WRAPPER_DISABLE_PLACED` and `WRAPPER_DMAHEAP_CACHED`, but not
+`WRAPPER_BYPASS_SWAPCHAIN_PLACED`. The APK's bundled DXVK 2.7.1 x86/x64 `d3d11.dll` and
+`dxgi.dll` are byte-for-byte identical to the imported upstream package. Recorded their hashes
+in `third_party/gamenative-release.json`; a different DXVK binary does not explain the fault.
+
+Focused Heaven-radv experiments, all with DXVK 2.7.1, BCn `none`, the original emulator presets,
+and the unchanged `xd-fc066b9` driver:
+
+| Result directory | Change | Outcome |
+|---|---|---|
+| `2026-10-12_141607-game` | `WRAPPER_DISABLE_PLACED=1` | Fault/reset detected at 7.6 s; stopped after one of each |
+| `2026-10-12_142156-game` | Placed mapping restored to 0; `dxvk.enableGraphicsPipelineLibrary=False` | Fault/reset detected at 6.0 s; stopped after one of each |
+| `2026-10-12_142913-game` | GPL back to default; `dxvk.enableDescriptorBuffer=False` | **Pass: 57.4 FPS, 95.5 steady seconds, zero faults/gaps** |
+| `2026-10-12_143223-game` | Same descriptor-buffer setting, diagnostic logging off, two runs | **Both pass: 52.9 and 46.8 FPS, 95.7 and 94.0 steady seconds, zero faults/gaps** |
+
+All three passing runs have correctly textured inspected screenshots. The live fault cases
+also verify that the new monitor stops after the first observed kernel counter increase, without
+waiting for its 120-second timer or a UI screenshot. Disabling descriptor buffers is now a
+repeatable compatibility workaround for this stack. These runs do not establish a performance
+gain: the confirmation runs' mean GPU clocks drifted from 625 to 506 MHz, and stock's D24 failure
+still prevents a fair driver comparison.
+
+The pinned DXVK source enables descriptor buffers by default on RADV. RADV requires their memory
+in its 32-bit address window (`radv_get_buffer_memory_requirements`) and reconstructs shader
+pointers with `address32_hi`. Its fd imports use a separate address range, and
+`GetMemoryFdPropertiesKHR` excludes 32-bit memory types. The reference wrapper's dma-heap path
+replaces the requested memory type. This is a plausible integration mismatch, **not a proven
+root cause in the APK binary**. Disabling placed mapping alone still failed. The nearest BO in
+the fault log is only a nearby allocation, not evidence that it caused the access.
+
+The extracted phone-driver ELF and existing unstripped build have the same build ID
+`6268e19c8538a2bcb4a6fd69134bec31c8a4946f`; the deployed ELF's SHA256 is
+`62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa`. The nearby command-buffer
+allocation resolves to `radv_cmd_buffer_resize_upload_buf`, but no driver change is justified by
+that proximity alone.
+
+Added the native `descriptors` correctness test to `xdtest` and the default `run.py` list. It
+enables descriptor buffers and buffer device addresses, generates storage-buffer descriptors at
+two nonzero offsets, dispatches to two outputs, and checks all 8,192 output words plus guards.
+It records the memory-type mask and GPU addresses. In `results/2026-10-12_143852`, **both Samsung
+and RADV pass**, along with the existing compute and render tests. RADV's descriptor address is
+`0xffff800000000000`, while its output buffer is at `0xffff800100020000`, consistent with the
+separate address windows. This validates this native compute path; it does not cover all DXVK
+descriptor types or prove which integration component is faulty. The native driver binary was
+unchanged. The harness builds without warnings; Python compilation, six runner regression tests,
+and diff checks pass.
+
+Heaven-radv is left on the verified DXVK **2.7.1** configuration with
+`DXVK_CONFIG=dxvk.enableDescriptorBuffer=False`, `WRAPPER_DISABLE_PLACED=0`, BCn `none`, and the
+original emulator presets. Stock remains on `async-1.10.3`, BCn `full`; GravityMark is unchanged.
+Final device checks: GameNative stopped, DND restored off, USB stay-awake 2, RADV logging 0,
+and min/peak refresh overrides unset.
+
 ## Next steps
 
 1. Stock still needs a working D24 path on the updated app before a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.
-2. Isolate DXVK 2.7.1's RADV GPU fault with a focused driver-feature or wrapper-memory experiment under the new early-stop monitor. Keep `async-1.10.3` as the working configuration meanwhile.
-3. The wrapper env A/Bs on Heaven-radv, then decide on the GameNative fork with a direct-ICD "RADV (Xclipse)" option, Game Mode performance declared and ADPF hints.
+2. DXVK 2.7.1 now runs with `dxvk.enableDescriptorBuffer=False`. Investigate the descriptor-buffer address/memory-type boundary with the wrapper, while retaining this verified workaround; `async-1.10.3` is the fallback.
+3. Measure a controlled performance comparison, then decide on the GameNative fork with a direct-ICD "RADV (Xclipse)" option, Game Mode performance declared and ADPF hints. Preserve the official app/source pin as the baseline.
 4. `--fixed-clocks` in `game.py` and `run.py` for driver-only comparisons.
 5. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.
