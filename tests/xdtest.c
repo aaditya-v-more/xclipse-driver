@@ -8,7 +8,7 @@
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
  *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
- *                xfbmanygs textures mips mrt vertex depth storage bcn descriptors
+ *                xfbmanygs textures mips mrt vertex depth storage bcn descriptors culling
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -1545,8 +1545,8 @@ enum { PIC_W = 128, PIC_H = 128 };
 /* Draws VERTICES vertices with g into a PIC_W x PIC_H target cleared to dark blue, saves the
  * picture as NAME and returns it (RGBA8, for the caller to free). The GPU time goes in MS_KEY
  * unless that's NULL. */
-static uint8_t *draw_picture(struct graphics *g, uint32_t vertices, const char *name,
-                             const char *ms_key)
+static uint8_t *draw_picture_parts(struct graphics *g, uint32_t vertices, const char *name,
+                                   const char *ms_key, const uint32_t *parts, uint32_t num_parts)
 {
    enum { W = PIC_W, H = PIC_H };
    struct target t = make_target(W, H);
@@ -1556,7 +1556,17 @@ static uint8_t *draw_picture(struct graphics *g, uint32_t vertices, const char *
    const float clear[4] = {0.0f, 0.0f, 0.25f, 1.0f};
    begin_target(cb, &t, clear);
    vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, g->pipeline);
-   vkCmdDraw(cb, vertices, 1, 0, 0);
+   if (!num_parts) {
+      vkCmdDraw(cb, vertices, 1, 0, 0);
+   } else {
+      for (uint32_t first = 0, part = 0; first < vertices; part++) {
+         uint32_t count = parts[part % num_parts];
+         if (count > vertices - first)
+            count = vertices - first;
+         vkCmdDraw(cb, count, 1, first, 0);
+         first += count;
+      }
+   }
    vkCmdEndRendering(cb);
    VkImageMemoryBarrier to_transfer = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1597,6 +1607,38 @@ static uint8_t *draw_picture(struct graphics *g, uint32_t vertices, const char *
    free_buffer(&readback);
    free_target(&t);
    return px;
+}
+
+static uint8_t *draw_picture(struct graphics *g, uint32_t vertices, const char *name,
+                             const char *ms_key)
+{
+   return draw_picture_parts(g, vertices, name, ms_key, NULL, 0);
+}
+
+/* Exercise transitions below and above a 128-vertex adaptive-culling threshold in ONE command
+ * buffer. A single-draw reference covers the exact same grid; every pixel must match. This also
+ * stresses the Xclipse inter-draw VGT flush, which must remain even on the runtime uncull path. */
+static void run_culling(void)
+{
+   double ms;
+   struct graphics g = make_graphics(grid_vert, sizeof(grid_vert), tri_frag, sizeof(tri_frag),
+                                     VK_FORMAT_R8G8B8A8_UNORM, false, 0, &ms);
+   const uint32_t parts[] = {3, 126, 129, 192, 6, 384};
+   uint8_t *want = draw_picture(&g, 3 * 4096, "culling_reference", NULL);
+   uint8_t *got = draw_picture_parts(&g, 3 * 4096, "culling_alternating", NULL,
+                                      parts, sizeof(parts) / sizeof(parts[0]));
+   int covered = 0, different = 0;
+   for (int i = 0; i < PIC_W * PIC_H; i++) {
+      covered += near(want + i * 4, 255, 128, 0, 255);
+      different += memcmp(want + i * 4, got + i * 4, 4) != 0;
+   }
+   jint("pixels_triangles", covered);
+   jint("pixels_different", different);
+   if (!covered || different)
+      finish("fail", "adaptive culling transitions: %d covered, %d differing pixels", covered, different);
+   free(want);
+   free(got);
+   free_graphics(&g);
 }
 
 /* Checks a picture of tri.vert's triangle: every pixel is its orange or the clear color. */
@@ -5623,7 +5665,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
                       "  correctness: info device submit compute render tess scratch scratchcs\n"
                       "               queries xfb xfbmany xfbmanygs textures mips mrt vertex depth\n"
-                      "               storage bcn descriptors\n"
+                      "               storage bcn descriptors culling\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -5649,6 +5691,7 @@ int main(int argc, char **argv)
       {"storage", run_storage, false, NEED_STORAGE},
       {"bcn", run_bcn, false, NEED_STORAGE},
       {"descriptors", run_descriptors, false, NEED_DESCRIPTORS},
+      {"culling", run_culling, true, 0},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},

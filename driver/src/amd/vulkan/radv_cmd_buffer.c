@@ -12426,6 +12426,9 @@ radv_get_nggc_settings(struct radv_cmd_buffer *cmd_buffer, bool vp_y_inverted)
 {
    const struct radv_dynamic_state *d = &cmd_buffer->state.dynamic;
 
+   if (cmd_buffer->state.ngg_culling_small_draw)
+      return radv_nggc_none;
+
    /* Disable shader culling entirely when conservative overestimate is used.
     * The face culling algorithm can delete very tiny triangles (even if unintended).
     */
@@ -14145,6 +14148,15 @@ radv_bind_graphics_shaders(struct radv_cmd_buffer *cmd_buffer)
    }
 }
 
+ALWAYS_INLINE static void
+radv_set_nggc_small_draw(struct radv_cmd_buffer *cmd_buffer, bool small)
+{
+   if (cmd_buffer->state.ngg_culling_small_draw != small) {
+      cmd_buffer->state.ngg_culling_small_draw = small;
+      cmd_buffer->state.dirty |= RADV_CMD_DIRTY_NGGC_SETTINGS;
+   }
+}
+
 /* MUST inline this function to avoid massive perf loss in drawoverhead */
 ALWAYS_INLINE static bool
 radv_before_draw(struct radv_cmd_buffer *cmd_buffer, const struct radv_draw_info *info, uint32_t drawCount, bool dgc)
@@ -14189,6 +14201,17 @@ radv_before_draw(struct radv_cmd_buffer *cmd_buffer, const struct radv_draw_info
 
    if (cmd_buffer->state.dirty & RADV_CMD_DIRTY_GRAPHICS_SHADERS) {
       radv_bind_graphics_shaders(cmd_buffer);
+   }
+
+   if (unlikely(pdev->xclipse_cull_min_vertices)) {
+      /* Indirect, multi-draw and amplified geometry have no cheap, reliable output size.
+       * Restore normal culling for them, including after a preceding small direct draw.
+       * Keep the Xclipse VGT_FLUSH workaround above even when shader culling is disabled. */
+      const struct radv_shader *shader = cmd_buffer->state.last_vgt_shader;
+      const bool small = !dgc && drawCount == 1 && !info->indirect_va && !info->strmout_va &&
+                         shader && shader->info.stage == MESA_SHADER_VERTEX && shader->info.has_ngg_culling &&
+                         (uint64_t)info->count * info->instance_count < pdev->xclipse_cull_min_vertices;
+      radv_set_nggc_small_draw(cmd_buffer, small);
    }
 
    /* This is the optimal packet order:
@@ -14282,6 +14305,8 @@ radv_before_taskmesh_draw(struct radv_cmd_buffer *cmd_buffer, const struct radv_
    if (cmd_buffer->state.dirty & RADV_CMD_DIRTY_GRAPHICS_SHADERS) {
       radv_bind_graphics_shaders(cmd_buffer);
    }
+
+   radv_set_nggc_small_draw(cmd_buffer, false);
 
    struct radv_cmd_stream *ace_cs = cmd_buffer->gang.cs;
    struct radv_shader *task_shader = cmd_buffer->state.shaders[MESA_SHADER_TASK];

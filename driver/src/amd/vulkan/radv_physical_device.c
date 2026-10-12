@@ -103,6 +103,25 @@ radv_xclipse_flag_off(const char *env, const char *prop)
    return false;
 }
 
+/* Keep the threshold opt-in until comparisons establish a useful cutoff in games. */
+static uint32_t
+radv_xclipse_cull_min_vertices(void)
+{
+   const char *value = getenv("RADV_XCLIPSE_CULL_MIN");
+#if DETECT_OS_ANDROID
+   char property[PROP_VALUE_MAX] = {0};
+   if (!value || !value[0]) {
+      __system_property_get("debug.radv_cull_min", property);
+      value = property;
+   }
+#endif
+   if (!value || !value[0])
+      return 0;
+   char *end;
+   const unsigned long long count = strtoull(value, &end, 10);
+   return end == value || *end || count > UINT32_MAX ? 0 : count;
+}
+
 /* Allocatable system memory from /proc/meminfo MemAvailable; 0 if unavailable (callers must treat
  * 0 as "don't clamp"). Queried per frame, possibly from a thread the GPU waits on: raw
  * open/read/close, no stdio or malloc, cached ~500ms. */
@@ -3119,6 +3138,9 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                            (pdev->info.gfx_level == GFX10_3 || pdev->info.gfx_level == GFX10 ||
                             (instance->perftest_flags & RADV_PERFTEST_NGGC)) &&
                            !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
+
+   if (pdev->info.xclipse_model == AC_XCLIPSE_940 && pdev->use_ngg_culling)
+      pdev->xclipse_cull_min_vertices = radv_xclipse_cull_min_vertices();
 
    /* Samsung's sgpu has no GDS. The first query that needed it made the queue allocate it, and the
     * refusal failed the whole submission (D3D11 pipeline statistics through DXVK). */

@@ -472,6 +472,7 @@ struct radv_cmd_state {
    int32_t last_index_type;
    int32_t last_primitive_restart_en;
    bool last_vertex_offset_valid;
+   bool ngg_culling_small_draw;
 
    /* SQTT related state. */
    uint32_t current_event_type;
