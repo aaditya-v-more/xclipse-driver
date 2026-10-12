@@ -542,7 +542,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
                    and r["driver"] == driver and r["status"] == "ran"]
             if fps:
                 line.append((driver, statistics.median(fps)))
-        text = ", ".join(f"{d} {v:.1f} FPS" for d, v in line)
+        text = ", ".join(f"{d} {v:.1f} FPS" for d, v in line) or "no valid runs"
         if len(line) == 2 and line[0][1] > 0:
             text += f" (radv/stock {line[1][1] / line[0][1]:.2f}x)"
         out.append(f"- **{bench}**: {text}")

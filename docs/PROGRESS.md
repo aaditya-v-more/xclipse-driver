@@ -300,6 +300,20 @@ Pulled `main` to `f23ca58` before making changes. Moved the existing project ins
 
 Validation: all prior project instructions were preserved, the Claude import resolves, local documentation links and Claude's JSON settings validate, and `git diff --check` passes. From PowerShell, both pipeline `--help` commands and the `cmd /d /c` toolchain environment check passed (Python 3.13.16, Meson 1.12.1, Ninja 1.13.2). No driver rebuild or on-device run was needed for this documentation change.
 
+## Preset automation and baseline checks (2026-10-12)
+
+Resumed on Windows with the same S24 FE (`RZCY90ZYQXZ`), GameNative 0.9.2, and driver `xd-fc066b9`. Both Heaven containers were read back: DXVK `async-1.10.3`, BCn Emulation `none`, FEXCore 2603 with both 32-bit and 64-bit emulators set to FEXCore, FEXCore preset `Intermediate`, Box64 0.3.6 preset `Compatibility`. USB stay-awake remains 2. Do Not Disturb was temporarily enabled for UI automation (previously off).
+
+`gn_driver.py` now accepts `get`, `options`, and `set` with `--tab Emulation` for the preset dropdowns; Graphics remains the default. All existing commands retain their arguments, and argparse adds help and rejects unsupported tabs before accessing the phone. The new tab navigation and a saved FEXCore preset change were verified on the phone; Python compilation and `git diff --check` passed. Commands are in `docs/game-setup.md`.
+
+Baseline checks, before changing emulator presets:
+
+- `results/2026-10-12_115904-game`: stock at BCn `none` reported 48.1 FPS, but screenshots show black surfaces. Stopped and excluded from the comparison.
+- `results/2026-10-12_120311-game`: stock at BCn `auto` failed twice with Heaven texture-creation errors (DXT1, DXT5, D24). RADV at BCn `none` completed two runs at **46.03 and 45.17 FPS**, with 0 GPU faults and no sampling gaps; the inspected screenshot was correctly textured. GPU means were 65.7 and 66.0 C, with runs starting at 45 and 44 C. Interrupted during the third stock launch after the repeated failures.
+- `results/2026-10-12_121240-game`: stock at BCn `full` failed both runs. The inspected screenshot no longer had DXT errors, but still failed to create the D24 depth texture. There is no usable stock baseline for a speed comparison yet. Each report records the exact container settings and the visual-validation limitation.
+
+The preset comparison will use the valid RADV baseline and separately report whether stock launches. In this GameNative version, [FEXCore Performance](https://github.com/utkarshdalal/GameNative/blob/v0.9.2/app/src/main/java/com/winlator/fexcore/FEXCorePresetManager.java) disables TSO and half-barrier TSO; [Box64 Performance](https://github.com/utkarshdalal/GameNative/blob/v0.9.2/app/src/main/java/com/winlator/box86_64/Box86_64PresetManager.java) changes several emulation settings, so the combined preset test cannot isolate one knob's contribution.
+
 ## Next steps
 
 1. FEXCore and Box64 preset A/B on Heaven, the same preset on both containers (`docs/HANDOFF.md`, resume item 1).

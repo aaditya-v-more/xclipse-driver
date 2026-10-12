@@ -18,8 +18,9 @@ usage: python pipeline/gn_driver.py install ZIP GAME [GAME...]
        python pipeline/gn_driver.py select ENTRY GAME [GAME...]
        python pipeline/gn_driver.py show GAME [GAME...]
        python pipeline/gn_driver.py args GAME [GAME...]
-       python pipeline/gn_driver.py options GAME LABEL
-       python pipeline/gn_driver.py set GAME LABEL VALUE
+       python pipeline/gn_driver.py get GAME LABEL [--tab Graphics|Emulation]
+       python pipeline/gn_driver.py options GAME LABEL [--tab Graphics|Emulation]
+       python pipeline/gn_driver.py set GAME LABEL VALUE [--tab Graphics|Emulation]
 
 install copies ZIP (a build from driver/dist) to the phone's Download/xclipse folder, imports it in
 Driver Manager unless it's there already, and makes it the Graphics Driver Version of each GAME (a
@@ -27,12 +28,14 @@ custom game's name in the library, such as Heaven-radv). select does the last st
 that's already installed, named as the dropdown shows it ("RADV Xclipse (Mesa ...)", "System").
 show prints each GAME's Graphics Driver Version and changes nothing. args sets each GAME's Exec
 Arguments to game.py's EXEC_ARGS for it (GAME is <bench>-<driver>, such as GravityMark-radv).
-options prints the choices of the dropdown under LABEL on GAME's Graphics tab (such as "BCn
-Emulation") and changes nothing; set picks VALUE there, saves, and reads it back.
+get reads the value under LABEL; options prints its dropdown choices; set picks VALUE, saves, and
+reads it back. These use the Graphics tab by default (such as "BCn Emulation"); --tab Emulation
+reaches "FEXCore Preset" and "Box64 Preset". get and options change nothing.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -48,6 +51,7 @@ APP = "app.gamenative"
 PHONE_DIR = "/sdcard/Download/xclipse"  # where the file picker opens
 NEVER_TAP = {"uninstall", "reset container", "import config", "delete variable", "delete",
              "clear preferences", "clear local database"}
+TAB_MARKERS = {"Graphics": "Graphics Driver Version", "Emulation": "FEXCore Version"}
 
 
 def label(n: dict) -> str:
@@ -170,10 +174,16 @@ def open_container(game: str, from_library: bool = True) -> list[dict]:
     return go("Edit container", "Exec Arguments")
 
 
+def open_tab(game: str, tab: str, from_library: bool = True) -> list[dict]:
+    """Opens a supported container tab and waits for one of its own fields."""
+    marker = TAB_MARKERS[tab]
+    open_container(game, from_library)
+    return go(tab, marker)
+
+
 def open_graphics(game: str, from_library: bool = True) -> list[dict]:
     """Opens GAME's container settings on the Graphics tab."""
-    open_container(game, from_library)
-    return go("Graphics", "Graphics Driver Version")
+    return open_tab(game, "Graphics", from_library)
 
 
 def args_field(nodes: list[dict]) -> dict:
@@ -219,13 +229,14 @@ def close_container(nodes: list[dict]) -> None:
     wait_for("Game Information")
 
 
-def graphics_field(game: str, text: str, from_library: bool = True) -> tuple[dict, list[dict]]:
-    """Opens GAME's Graphics tab scrolled so the label `text` is on screen: (node, dump)."""
-    open_graphics(game, from_library)
+def container_field(game: str, text: str, tab: str = "Graphics",
+                    from_library: bool = True) -> tuple[dict, list[dict]]:
+    """Opens GAME's tab scrolled so the label `text` is on screen: (node, dump)."""
+    open_tab(game, tab, from_library)
     h = screen_height()
     found = scroll_to(text, 640, h - 500, h - 1300, h)
     if not found:
-        sys.exit(f"{game}: no {text!r} on the Graphics tab")
+        sys.exit(f"{game}: no {text!r} on the {tab} tab")
     return found
 
 
@@ -251,18 +262,24 @@ def close_dropdown(nodes: list[dict]) -> None:
     time.sleep(1)
 
 
-def options(game: str, text: str) -> list[str]:
-    lab, nodes = graphics_field(game, text)
+def get_option(game: str, text: str, tab: str = "Graphics") -> str:
+    _, nodes = container_field(game, text, tab)
+    value = field_value(nodes, text)
+    close_container(nodes)
+    return value
+
+
+def options(game: str, text: str, tab: str = "Graphics") -> list[str]:
+    lab, nodes = container_field(game, text, tab)
     entries = open_dropdown(lab, nodes)
     close_dropdown(nodes)
     close_container(dump())
     return [label(n) for n in entries]
 
 
-def set_option(game: str, text: str, value: str) -> None:
-    """Picks `value` in the dropdown under the label `text` on GAME's Graphics tab, saves, and reads
-    it back."""
-    lab, nodes = graphics_field(game, text)
+def set_option(game: str, text: str, value: str, tab: str = "Graphics") -> None:
+    """Picks `value` in GAME's dropdown, saves, and reads it back on the same tab."""
+    lab, nodes = container_field(game, text, tab)
     before = field_value(nodes, text)
     if before == value:
         print(f"{game}: {text} already {value}")
@@ -280,7 +297,7 @@ def set_option(game: str, text: str, value: str) -> None:
         sys.exit(f"{game}: {text} reads {field_value(nodes, text)!r} after picking {value!r}")
     tap_node(title_buttons(nodes)[1], nodes)  # save
     wait_for("Game Information")
-    _, nodes = graphics_field(game, text, from_library=False)
+    _, nodes = container_field(game, text, tab, from_library=False)
     after = field_value(nodes, text)
     close_container(nodes)
     if after != value:
@@ -375,13 +392,28 @@ def wait_awake_unlocked(limit_s: float = 300) -> None:
 
 
 def main() -> None:
-    args = sys.argv[1:]
-    needed = {"install": 3, "select": 3, "show": 2, "args": 2, "options": 3, "set": 4}
-    if not args or args[0] not in needed or len(args) < needed[args[0]]:
-        sys.exit(__doc__)
-    if args[0] == "args":
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    commands = parser.add_subparsers(dest="command", required=True)
+    install_parser = commands.add_parser("install", help="import a driver zip and select it")
+    install_parser.add_argument("zip", type=Path)
+    install_parser.add_argument("games", nargs="+")
+    select_parser = commands.add_parser("select", help="select an installed graphics driver")
+    select_parser.add_argument("entry")
+    select_parser.add_argument("games", nargs="+")
+    for command in ("show", "args"):
+        commands.add_parser(command).add_argument("games", nargs="+")
+    for command in ("get", "options", "set"):
+        sub = commands.add_parser(command)
+        sub.add_argument("game")
+        sub.add_argument("label")
+        if command == "set":
+            sub.add_argument("value")
+        sub.add_argument("--tab", choices=TAB_MARKERS, default="Graphics")
+    args = parser.parse_args()
+    if args.command == "args":
         texts = {}
-        for game in args[1:]:
+        for game in args.games:
             bench, _, driver = game.lower().partition("-")
             if bench not in EXEC_ARGS or not driver:
                 sys.exit(f"{game}: not a <bench>-<driver> name for one of {sorted(EXEC_ARGS)}")
@@ -390,20 +422,22 @@ def main() -> None:
     shell("svc power stayon usb")
     try:
         wait_awake_unlocked()
-        if args[0] == "install":
-            install(Path(args[1]), args[2:])
-        elif args[0] == "select":
-            for game in args[2:]:
-                select(args[1], game)
-        elif args[0] == "args":
+        if args.command == "install":
+            install(args.zip, args.games)
+        elif args.command == "select":
+            for game in args.games:
+                select(args.entry, game)
+        elif args.command == "args":
             for game, text in texts.items():
                 set_args(game, text)
-        elif args[0] == "options":
-            print(f"{args[1]}: {args[2]}: {options(args[1], args[2])}")
-        elif args[0] == "set":
-            set_option(args[1], args[2], args[3])
+        elif args.command == "get":
+            print(f"{args.game}: {args.label}: {get_option(args.game, args.label, args.tab)}")
+        elif args.command == "options":
+            print(f"{args.game}: {args.label}: {options(args.game, args.label, args.tab)}")
+        elif args.command == "set":
+            set_option(args.game, args.label, args.value, args.tab)
         else:
-            for game in args[1:]:
+            for game in args.games:
                 print(f"{game}: {show(game)}")
     finally:
         if stay_on.isdigit():  # "null" when unset, "" when adb hiccuped: then leave it alone

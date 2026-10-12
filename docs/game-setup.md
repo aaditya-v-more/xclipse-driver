@@ -37,6 +37,25 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
      - DX Wrapper: DXVK, same version on all four.
    - Save.
 
+## Inspecting and changing emulator presets
+
+`pipeline/gn_driver.py` reads dropdowns with `get`, lists their choices with `options`, and changes
+them with `set`. It reopens the container after saving and verifies the value. The default tab is
+Graphics; use `--tab Emulation` for FEXCore and Box64 presets. Use the toolchain's Python below
+(`tools/python/bin/python3` on macOS/Linux, `tools\python\python.exe` on Windows):
+
+```sh
+python pipeline/gn_driver.py get Heaven-radv "FEXCore Preset" --tab Emulation
+python pipeline/gn_driver.py options Heaven-radv "FEXCore Preset" --tab Emulation
+python pipeline/gn_driver.py set Heaven-radv "FEXCore Preset" Performance --tab Emulation
+python pipeline/gn_driver.py set Heaven-radv "Box64 Preset" Performance --tab Emulation
+```
+
+For a driver A/B, apply the same presets to `Heaven-stock` and `Heaven-radv`, record the previous
+values, and keep the other settings fixed. Inspect screenshots as well as frame rates: faster
+presets relax emulation behavior and a run with wrong rendering does not count. Nobody else may
+touch the phone or run another phone script during these commands.
+
 ## Running
 
 ```sh
