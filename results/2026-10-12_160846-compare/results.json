@@ -1,0 +1,1068 @@
+{
+  "meta": {
+    "started": "2026-10-12T16:08:46",
+    "manifest": {
+      "purpose": "Measure call-site log guards, no shader or synchronization changes",
+      "variants": [
+        {
+          "name": "baseline",
+          "library": "tools/driver-fc066b9-reference.so",
+          "sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa",
+          "env": {
+            "RADV_XCLIPSE_LOG": "0"
+          },
+          "phone_library": "/data/local/tmp/xd/compare-62f186db960ad64c.so"
+        },
+        {
+          "name": "log_guard",
+          "library": "tools/driver-01f09ed.so",
+          "sha256": "9d00f8100328c33726fa0a4b95e1be2856dbf91d9d7974cfffff09f11a082d9d",
+          "env": {
+            "RADV_XCLIPSE_LOG": "0"
+          },
+          "phone_library": "/data/local/tmp/xd/compare-9d00f8100328c337.so"
+        }
+      ]
+    },
+    "tests": [
+      "draws"
+    ],
+    "repetitions": 6,
+    "cpu": 9,
+    "fixed_clocks": true,
+    "max_start_temp_c": 50,
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "35.0",
+      "gpu_clock_khz": "252000",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 70 temperature: 318"
+    },
+    "sampler_columns": [
+      "gpu_busy_pct",
+      "gpu_khz",
+      "gpu_c",
+      "cpu0_khz",
+      "cpu4_khz",
+      "cpu7_khz",
+      "cpu9_khz"
+    ],
+    "test_sha256": "9e95c3578e0c1c65ac8cbe1ef42c3dab67fc8d28fce98b00d7ed70d2b176fbf5",
+    "fixed_mode_release": {
+      "returncode": 0,
+      "output": ""
+    }
+  },
+  "results": [
+    {
+      "test": "draws",
+      "driver": "baseline",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 8.534,
+      "ms_instance": 1.565,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.677,
+      "us_record_per_draw": 0.105,
+      "us_gpu_per_draw": 0.373,
+      "us_record_per_draw_switching": 0.565,
+      "us_gpu_per_draw_switching": 0.51,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "baseline",
+      "repeat": 1,
+      "candidate": "log_guard",
+      "role": "baseline",
+      "samples": [
+        [
+          0,
+          0,
+          35.0,
+          1440000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          0,
+          400000,
+          36.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          55,
+          400000,
+          36.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          24,
+          400000,
+          36.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          36.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "log_guard",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 8.283,
+      "ms_instance": 1.895,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.475,
+      "us_record_per_draw": 0.089,
+      "us_gpu_per_draw": 0.377,
+      "us_record_per_draw_switching": 0.534,
+      "us_gpu_per_draw_switching": 0.502,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "log_guard",
+      "repeat": 1,
+      "candidate": "log_guard",
+      "role": "candidate",
+      "samples": [
+        [
+          0,
+          0,
+          36.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          83,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          87,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          0,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          23,
+          400000,
+          36.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "log_guard",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 8.548,
+      "ms_instance": 1.462,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.322,
+      "us_record_per_draw": 0.089,
+      "us_gpu_per_draw": 0.377,
+      "us_record_per_draw_switching": 0.535,
+      "us_gpu_per_draw_switching": 0.51,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "log_guard",
+      "repeat": 2,
+      "candidate": "log_guard",
+      "role": "candidate",
+      "samples": [
+        [
+          1,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          65,
+          400000,
+          37.0,
+          768000,
+          1152000,
+          1536000,
+          1632000
+        ],
+        [
+          62,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          76,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          81,
+          400000,
+          36.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "baseline",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 8.329,
+      "ms_instance": 1.419,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.463,
+      "us_record_per_draw": 0.107,
+      "us_gpu_per_draw": 0.374,
+      "us_record_per_draw_switching": 0.541,
+      "us_gpu_per_draw_switching": 0.504,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "baseline",
+      "repeat": 2,
+      "candidate": "log_guard",
+      "role": "baseline",
+      "samples": [
+        [
+          1,
+          400000,
+          37.0,
+          1536000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          55,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          84,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          58,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          32,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "baseline",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 11.934,
+      "ms_instance": 2.08,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.515,
+      "us_record_per_draw": 0.107,
+      "us_gpu_per_draw": 0.378,
+      "us_record_per_draw_switching": 0.547,
+      "us_gpu_per_draw_switching": 0.511,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "baseline",
+      "repeat": 3,
+      "candidate": "log_guard",
+      "role": "baseline",
+      "samples": [
+        [
+          0,
+          0,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          21,
+          400000,
+          37.0,
+          1536000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          79,
+          400000,
+          37.0,
+          1056000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          86,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          61,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "log_guard",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 8.629,
+      "ms_instance": 1.938,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.947,
+      "us_record_per_draw": 0.091,
+      "us_gpu_per_draw": 0.374,
+      "us_record_per_draw_switching": 0.537,
+      "us_gpu_per_draw_switching": 0.502,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "log_guard",
+      "repeat": 3,
+      "candidate": "log_guard",
+      "role": "candidate",
+      "samples": [
+        [
+          0,
+          0,
+          36.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          82,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          56,
+          400000,
+          37.0,
+          1152000,
+          1152000,
+          1536000,
+          1632000
+        ],
+        [
+          75,
+          400000,
+          37.0,
+          960000,
+          1152000,
+          1536000,
+          1632000
+        ],
+        [
+          43,
+          400000,
+          36.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "log_guard",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 10.524,
+      "ms_instance": 1.587,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.236,
+      "us_record_per_draw": 0.09,
+      "us_gpu_per_draw": 0.372,
+      "us_record_per_draw_switching": 0.539,
+      "us_gpu_per_draw_switching": 0.521,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "log_guard",
+      "repeat": 4,
+      "candidate": "log_guard",
+      "role": "candidate",
+      "samples": [
+        [
+          0,
+          0,
+          37.0,
+          1152000,
+          1152000,
+          1536000,
+          1632000
+        ],
+        [
+          42,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          1,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          0,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "baseline",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 9.2,
+      "ms_instance": 1.613,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.488,
+      "us_record_per_draw": 0.106,
+      "us_gpu_per_draw": 0.372,
+      "us_record_per_draw_switching": 0.544,
+      "us_gpu_per_draw_switching": 0.504,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "baseline",
+      "repeat": 4,
+      "candidate": "log_guard",
+      "role": "baseline",
+      "samples": [
+        [
+          0,
+          0,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          38.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "baseline",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 11.005,
+      "ms_instance": 2.464,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.434,
+      "us_record_per_draw": 0.104,
+      "us_gpu_per_draw": 0.373,
+      "us_record_per_draw_switching": 0.549,
+      "us_gpu_per_draw_switching": 0.51,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "baseline",
+      "repeat": 5,
+      "candidate": "log_guard",
+      "role": "baseline",
+      "samples": [
+        [
+          0,
+          0,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          0,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          52,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          92,
+          400000,
+          38.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          20,
+          400000,
+          38.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "log_guard",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 6.974,
+      "ms_instance": 1.264,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.989,
+      "us_record_per_draw": 0.092,
+      "us_gpu_per_draw": 0.375,
+      "us_record_per_draw_switching": 0.537,
+      "us_gpu_per_draw_switching": 0.503,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "log_guard",
+      "repeat": 5,
+      "candidate": "log_guard",
+      "role": "candidate",
+      "samples": [
+        [
+          0,
+          0,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          100,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          62,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          0,
+          400000,
+          38.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          0,
+          400000,
+          38.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "log_guard",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 11.792,
+      "ms_instance": 1.621,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.289,
+      "us_record_per_draw": 0.093,
+      "us_gpu_per_draw": 0.378,
+      "us_record_per_draw_switching": 0.539,
+      "us_gpu_per_draw_switching": 0.512,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "log_guard",
+      "repeat": 6,
+      "candidate": "log_guard",
+      "role": "candidate",
+      "samples": [
+        [
+          0,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          80,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          47,
+          400000,
+          37.0,
+          960000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          4,
+          400000,
+          37.0,
+          1152000,
+          1152000,
+          1152000,
+          1632000
+        ],
+        [
+          23,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1152000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    },
+    {
+      "test": "draws",
+      "driver": "baseline",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 8.443,
+      "ms_instance": 1.536,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.573,
+      "us_record_per_draw": 0.105,
+      "us_gpu_per_draw": 0.376,
+      "us_record_per_draw_switching": 0.568,
+      "us_gpu_per_draw_switching": 0.506,
+      "draws_per_run": 50000,
+      "gpu_clock_khz_after": 400000,
+      "status": "pass",
+      "progress": [
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] draws with pipeline switches",
+        "[xdtest] tearing down"
+      ],
+      "variant": "baseline",
+      "repeat": 6,
+      "candidate": "log_guard",
+      "role": "baseline",
+      "samples": [
+        [
+          0,
+          0,
+          37.0,
+          960000,
+          1536000,
+          1152000,
+          1632000
+        ],
+        [
+          25,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          72,
+          400000,
+          37.0,
+          1152000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          76,
+          400000,
+          38.0,
+          1056000,
+          1536000,
+          1536000,
+          1632000
+        ],
+        [
+          1,
+          400000,
+          38.0,
+          960000,
+          1536000,
+          1536000,
+          1632000
+        ]
+      ],
+      "sampler_errors": []
+    }
+  ]
+}

@@ -448,6 +448,22 @@ GameNative's wrapper supplies Xlib/XCB surfaces for Wine. The library exports th
 points, but changing the JSON alone would not provide those missing surface extensions. The
 official GameNative submodule and installed app remain the unchanged reference baseline.
 
+### Call-site logging guards
+
+Driver source `01f09ed` moves the verbose log-level guard to the call site, so disabled draw
+logging no longer prepares its variadic arguments. It preserves the existing levels and the
+unconditional error path. No shader or synchronization behavior changes.
+`results/2026-10-12_160836` passes render, descriptors, queries, transform feedback, graphics
+scratch and compute scratch. `results/2026-10-12_160846-compare` has six valid AB/BA pairs:
+CPU draw recording drops **0.1055 to 0.0905 microseconds** (14.2% less time; paired throughput
+gain median 17.68%, all pairs positive). Pipeline-switch recording improves about 2%; GPU draw
+timings are unchanged within the observed variation. Active GPU is 400 MHz, X4 1632 MHz, with
+zero GPU events. This is a native CPU improvement, not yet a game FPS claim. Manifest:
+`experiments/2026-10-12/log-guard.json`; ELF SHA256
+`9d00f8100328c33726fa0a4b95e1be2856dbf91d9d7974cfffff09f11a082d9d`.
+Also corrected the Windows build invocation in `run.py`: literal relative batch paths avoid
+Python's escaped quotes being interpreted as part of a command name by `cmd.exe`.
+
 ## Next steps
 
 1. Stock still needs a working D24 path on the updated app before a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.

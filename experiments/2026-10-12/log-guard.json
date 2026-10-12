@@ -1,0 +1,21 @@
+{
+  "purpose": "Measure call-site log guards, no shader or synchronization changes",
+  "variants": [
+    {
+      "name": "baseline",
+      "library": "tools/driver-fc066b9-reference.so",
+      "sha256": "62f186db960ad64c161118687513a73a560b5a2ac15f3628ac4700a52f5534aa",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0"
+      }
+    },
+    {
+      "name": "log_guard",
+      "library": "tools/driver-01f09ed.so",
+      "sha256": "9d00f8100328c33726fa0a4b95e1be2856dbf91d9d7974cfffff09f11a082d9d",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0"
+      }
+    }
+  ]
+}

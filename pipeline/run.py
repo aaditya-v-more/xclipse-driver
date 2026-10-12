@@ -144,14 +144,16 @@ def build_driver() -> None:
     dirty = run(["git", "-C", str(ROOT), "status", "--porcelain", "--", "driver"]).stdout.strip()
     env = dict(os.environ, PACKAGE_TAG=f"xd-{head}{'-dirty' if dirty else ''}")
     if WINDOWS:
-        cmd = ["cmd.exe", "/c", f'call "{TOOLS / "env.cmd"}" && "{ROOT / "driver" / "build.cmd"}"']
+        # subprocess.list2cmdline backslash-escapes embedded quotes, which cmd.exe does not
+        # unescape. Relative script paths plus cwd avoid nested quoting (including spaced roots).
+        cmd = ["cmd.exe", "/d", "/c", r"call tools\env.cmd && driver\build.cmd"]
     else:
         env["ANDROID_NDK_HOME"] = str(TOOLS / "android-ndk-r29")
         env["PATH"] = os.pathsep.join([str(TOOLS / "python" / "bin"), str(TOOLS / "glslang" / "bin"),
                                        env.get("PATH", "")])
         cmd = ["sh", str(ROOT / "driver" / "build.sh")]
     with log.open("w", encoding="utf-8") as out:
-        r = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, env=env)
+        r = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, env=env, cwd=ROOT)
     if r.returncode:
         sys.exit(f"driver build failed; see {log}")
 
