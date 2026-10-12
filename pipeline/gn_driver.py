@@ -21,6 +21,7 @@ usage: python pipeline/gn_driver.py install ZIP GAME [GAME...]
        python pipeline/gn_driver.py get GAME LABEL [--tab Graphics|Emulation]
        python pipeline/gn_driver.py options GAME LABEL [--tab Graphics|Emulation]
        python pipeline/gn_driver.py set GAME LABEL VALUE [--tab Graphics|Emulation]
+       python pipeline/gn_driver.py import-content WCP
 
 install copies ZIP (a build from driver/dist) to the phone's Download/xclipse folder, imports it in
 Driver Manager unless it's there already, and makes it the Graphics Driver Version of each GAME (a
@@ -31,13 +32,18 @@ Arguments to game.py's EXEC_ARGS for it (GAME is <bench>-<driver>, such as Gravi
 get reads the value under LABEL; options prints its dropdown choices; set picks VALUE, saves, and
 reads it back. These use the Graphics tab by default (such as "BCn Emulation"); --tab Emulation
 reaches "FEXCore Preset" and "Box64 Preset". get and options change nothing.
+import-content copies a DXVK WCP to Download/xclipse, verifies its checksum, imports it through
+Contents Manager, and reopens the installed list to verify it. It does not select a DXVK version.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shlex
 import sys
+import tarfile
 import time
 import zipfile
 from pathlib import Path
@@ -129,6 +135,15 @@ def screen_height() -> int:
 
 def open_library() -> None:
     """Restarts GameNative and gets past the sign-in screen and the update offer."""
+    # A document picker from an interrupted import survives force-stopping GameNative. Cancel
+    # it first, otherwise am start can leave that picker covering the relaunched activity.
+    for _ in range(6):
+        if not front_app().endswith("documentsui"):
+            break
+        shell("input keyevent KEYCODE_BACK")
+        time.sleep(1)
+    else:
+        sys.exit("the document picker stayed open after cancelling; not restarting GameNative")
     shell(f"am force-stop {APP}")
     shell(f"am start -n {APP}/.MainActivity")
     calm = 0
@@ -378,6 +393,63 @@ def install(zip_path: Path, games: list[str]) -> None:
         select(entry, game)
 
 
+def copy_content(path: Path) -> None:
+    """Keep existing phone files; accept a matching checksum, refuse a name collision."""
+    expected = hashlib.sha256(path.read_bytes()).hexdigest()
+    remote = shlex.quote(f"{PHONE_DIR}/{path.name}")
+    exists = shell(f"if [ -e {remote} ]; then echo exists; fi") == "exists"
+    if exists:
+        actual = shell(f"sha256sum {remote}").split()
+        if not actual or actual[0] != expected:
+            sys.exit(f"{PHONE_DIR}/{path.name} already exists with different content; keeping it")
+    else:
+        shell(f"mkdir -p {shlex.quote(PHONE_DIR)}")
+        if adb("push", str(path), f"{PHONE_DIR}/{path.name}", timeout=300).returncode:
+            sys.exit(f"couldn't copy {path.name}")
+    actual = shell(f"sha256sum {remote}").split()
+    if not actual or actual[0] != expected:
+        sys.exit(f"checksum mismatch after copying {path.name}")
+    print(f"{PHONE_DIR}/{path.name}: SHA256 {expected} (read back)", flush=True)
+
+
+def import_content(path: Path) -> None:
+    with tarfile.open(path) as archive:
+        profile = json.load(archive.extractfile("profile.json"))
+    if profile.get("type") != "DXVK":
+        sys.exit("import-content currently supports DXVK profiles only")
+    entry = f"{profile['versionName']} ({profile['versionCode']})"
+    copy_content(path)
+    open_library()
+    go("Menu", "Downloads & Storage")
+    go("Settings", "Customize your experience")
+    nodes = go("Contents Manager", "Import .wcp from device")
+    if not find(nodes, "DXVK"):
+        sys.exit("Contents Manager is not showing the DXVK list")
+    height = screen_height()
+    if not find(nodes, entry):
+        go("Import .wcp from device", f"Files in {Path(PHONE_DIR).name}")
+        found = scroll_to(path.name, 540, 1900, 1000, height)
+        if not found:
+            sys.exit(f"{path.name} isn't in the picker at {PHONE_DIR}")
+        tap_node(*found)
+        # GameNative installs trusted profiles immediately after validation. Never accept an
+        # untrusted-file override or infer success from merely returning to the dialog.
+        state, _, _ = wait_for(entry, "Untrusted files detected", "Content already exists",
+                               "File cannot be recognized", "Profile not found in content",
+                               "Profile cannot be recognized", "Content is incomplete",
+                               "Content cannot be trusted", "Not enough space",
+                               "Failed to install content", limit_s=90)
+        if state != entry:
+            sys.exit(f"{path.name} wasn't installed: {state}")
+    go("Close", "Customize your experience")
+    nodes = go("Contents Manager", "Import .wcp from device")
+    if not find(nodes, "DXVK") or not find(nodes, entry):
+        sys.exit(f"{entry} missing after reopening Contents Manager")
+    print(f"DXVK {entry} installed (read back after reopening)", flush=True)
+    go("Close", "Customize your experience")
+    go("Back", "Menu")
+
+
 def wait_awake_unlocked(limit_s: float = 300) -> None:
     deadline = time.monotonic() + limit_s
     asked = False
@@ -398,6 +470,8 @@ def main() -> None:
     install_parser = commands.add_parser("install", help="import a driver zip and select it")
     install_parser.add_argument("zip", type=Path)
     install_parser.add_argument("games", nargs="+")
+    commands.add_parser("import-content", help="import a DXVK WCP and verify the installed list").add_argument(
+        "wcp", type=Path)
     select_parser = commands.add_parser("select", help="select an installed graphics driver")
     select_parser.add_argument("entry")
     select_parser.add_argument("games", nargs="+")
@@ -424,6 +498,8 @@ def main() -> None:
         wait_awake_unlocked()
         if args.command == "install":
             install(args.zip, args.games)
+        elif args.command == "import-content":
+            import_content(args.wcp)
         elif args.command == "select":
             for game in args.games:
                 select(args.entry, game)

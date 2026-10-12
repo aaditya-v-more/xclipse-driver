@@ -322,6 +322,12 @@ The user reported the error dialog and asked that automation handle failures. Th
 
 Validation: five offline regression tests cover recorded Wine names, unrelated-app log filtering, failures after sustained frames, bounded retries, and report checkpoints. Compilation, command help, and diff checks passed. On the phone, `results/2026-10-12_123434-game` recognized Heaven's process at 6 seconds and caught the known stock fatal dialog as **`error-box`**, saving its screenshot and bounds `[934, 418, 1401, 658]`; zero GPU faults. This verifies the actual dialog path, while crash/exit paths are covered by simulated lifecycle checks. GameNative's normal force-stop between runs remains intentional.
 
+## DXVK content import on GameNative 0.9.2 (2026-10-12)
+
+With the user's approval, packaged the unmodified upstream DXVK 2.7.1 x86/x64 DLLs as a Winlator content package. `pipeline/package_dxvk.py` checks the release archive and license SHA256, checks PE architectures, and verifies every packaged byte. The initial archive lacked explicit directory entries: GameNative's extractor returned ENOENT opening `x32/d3d10core.dll`. Adding `x32/` and `x64/` directory entries fixed the import. The working `dxvk-2.7.1-gamenative.wcp` is 4,322,028 bytes, SHA256 `62a29ba39e38c2c150030c4872ce1191473e1d4cdaa9909b61ae61fc7c83d903`.
+
+`gn_driver.py import-content` copies and checksum-verifies the file, refuses to overwrite a different existing phone file, imports through Contents Manager, and reopens that screen to verify installation. It also cancels a leftover document picker before restarting GameNative. The phone successfully listed **DXVK 2.7.1 (1)** after reopening. Both WCP attempts remain in `/sdcard/Download/xclipse/` as instructed. No new DXVK version has been selected or benchmarked: the user then requested updating GameNative from the latest GitHub release APK and pinning its matching source as a submodule. Both Heaven containers remain on bundled `async-1.10.3` and their original emulator presets; stock BCn is `full`, RADV BCn is `none`.
+
 ## Next steps
 
 1. FEXCore and Box64 preset A/B on Heaven, the same preset on both containers (`docs/HANDOFF.md`, resume item 1).

@@ -58,6 +58,12 @@ touch the phone or run another phone script during these commands.
 
 ## Running
 
+For GameNative 0.9.2, an unbundled DXVK version must first be installed in Contents Manager.
+`pipeline/package_dxvk.py` builds a WCP from the verified upstream 2.7.1 release archive and LICENSE;
+`pipeline/gn_driver.py import-content tools/dxvk-2.7.1-gamenative.wcp` imports and reads it back.
+The importer verifies the phone copy's checksum and keeps existing files. Selecting a version in
+the container dropdown alone does not install its DLLs. See the progress log for exact checksums.
+
 ```sh
 tools/python/bin/python3 pipeline/game.py --runs 3
 ```
