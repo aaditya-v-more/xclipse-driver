@@ -151,11 +151,16 @@ def open_library() -> None:
     shell(f"am start -n {APP}/.MainActivity")
     calm = 0
     while calm < 2:  # the update offer can show up a moment after the library
-        t, n, nodes = wait_for("Skip login", "Later", "Menu", limit_s=40)
+        t, n, nodes = wait_for("Skip login", "Later", "Enjoying GameNative?", "Menu", limit_s=40)
         if t == "Menu":
             calm += 1
         else:
             calm = 0
+            if t == "Enjoying GameNative?":
+                n = find(nodes, "Close")
+                if not n:
+                    sys.exit("GameNative membership prompt has no Close button")
+                print("dismissing GameNative's membership prompt", flush=True)
             tap_node(n, nodes)
         time.sleep(2)
 

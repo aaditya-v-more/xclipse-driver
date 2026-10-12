@@ -346,10 +346,20 @@ Post-upgrade Heaven/RADV smoke checks used the existing `xd-fc066b9` driver and 
 
 End state verified: GameNative stopped, Do Not Disturb restored off (`zen_mode=0`), USB stay-awake remains 2, temporary min/peak refresh-rate overrides are removed (`null`), and RADV diagnostic logging is off.
 
+## DXVK 2.7.1 fault and continuous monitoring (2026-10-12)
+
+The user clarified the product goal: a usable performance package for this S24 FE, similar to ExynosTools. Recorded this in `AGENTS.md`; performance claims still require correct rendering and repeatable measurements.
+
+Selected the installed DXVK 2.7.1 in Heaven-radv, with readback after saving. `results/2026-10-12_135017-game` confirms extraction of `dxvk-2.7.1`, unchanged FEXCore 2603 Intermediate / Box64 0.3.6 Compatibility, and the RADV driver loading. Heaven remained black and the kernel recorded **153 GPU page faults** during the 120-second diagnostic run. It was excluded as `gpu-fault`. The first RADV VM fault was at page `0x800000200000`, outside the recorded live BO ranges, near a command-buffer allocation at `0x8000001c0000–0x8000001e0000`; later fault addresses varied widely. This establishes invalid GPU accesses, not their cause. Driver, newer DXVK feature paths, and wrapper memory handling remain candidates. DXVK was restored to `async-1.10.3` and read back before further testing; stock was never switched to 2.7.1.
+
+The run exposed a monitoring gap: `game.py` checked GPU fault counters only after its timer ended. It now polls the kernel counters during every sampling iteration, force-stops GameNative on the first observed increase, records the detection time, and avoids delaying shutdown for UI dumps or capturing the home screen afterward. Existing logic skips later attempts for the affected container. Added regression coverage for both page faults and resets occurring while frame statistics claim a valid run; all six tests pass. Reports now retain `--radv-log` and repeatable `--note` annotations. A GameNative membership prompt also blocked navigation; `gn_driver.py` recognizes its exact title and closes it through its labeled Close button.
+
+`results/2026-10-12_135643-game` checked the restored configuration and the updated runner on the phone. Stock, BCn `full`, still fails Heaven's **D24 2048×2048 depth-texture creation** on the new app; the runner caught the error dialog and excluded it, with zero GPU faults. RADV, BCn `none`, completed **88.7 steady seconds at 57.4 FPS**, zero faults and sampling gaps; the inspected 90-second screenshot renders correctly. Both runs used the original emulator presets, DXVK `async-1.10.3`, and diagnostic RADV logging. These are validation runs, not evidence of a stock/RADV speed advantage. Early fault shutdown is covered by simulated counter changes; the subsequent live run verifies the fault-free path without intentionally repeating the fault storm.
+
 ## Next steps
 
-1. Establish a usable stock baseline on the updated GameNative app; previous stock texture failures prevent a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.
-2. Select the imported DXVK 2.7.1 in the Heaven containers and test runtime behavior. The updated app's launch log still finds profile `DXVK-2.7.1-1`, confirming the import survived. The package import and the app upgrade are already authorized and complete; 2.7.1 has not yet been selected or benchmarked.
+1. Stock still needs a working D24 path on the updated app before a fair driver comparison. The FEXCore/Box64 Performance preset test is complete and showed no gain; both Heaven containers are restored to their original presets.
+2. Isolate DXVK 2.7.1's RADV GPU fault with a focused driver-feature or wrapper-memory experiment under the new early-stop monitor. Keep `async-1.10.3` as the working configuration meanwhile.
 3. The wrapper env A/Bs on Heaven-radv, then decide on the GameNative fork with a direct-ICD "RADV (Xclipse)" option, Game Mode performance declared and ADPF hints.
 4. `--fixed-clocks` in `game.py` and `run.py` for driver-only comparisons.
 5. Report Winlator-style results upstream on JimVulkan/radv-xclipse PR #6, as the maintainer asked. Posting there needs the user's go-ahead.

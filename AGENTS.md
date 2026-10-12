@@ -4,6 +4,10 @@ Shared project instructions for Claude Code and Codex. Keep repository-wide guid
 
 Goal: an open-source Vulkan driver for the Samsung Xclipse 940 GPU (Galaxy S24 FE, Exynos 2400e), doing for Xclipse what Mesa's Turnip does for Adreno, so Windows games run measurably faster in Winlator-style emulators. Approach: Mesa RADV on Samsung's amdgpu-derived `sgpu` kernel driver, building on the existing radv-xclipse port.
 
+Product direction (user, 2026-10-12): make a usable performance package for this phone, similar to
+ExynosTools. Its importable driver or compatibility-layer bundle should deliver repeatable gains
+with correct rendering. Research and benchmarks support that deliverable; they are not the end goal.
+
 **Start here:**
 
 1. `docs/HANDOFF.md`: current state, what's on the phone, new-PC setup, and the exact next step.

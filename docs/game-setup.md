@@ -98,8 +98,12 @@ For each run, the script:
   and GPU faults; saves a failure screenshot and excludes that attempt from the FPS medians
 - saves the completed results after every attempt, and skips a benchmark/driver after two
   consecutive failures (`--max-failures` changes the limit) or immediately after a GPU fault
+- polls GPU fault/reset counters during each run and stops GameNative on the first observed
+  increase; this does not wait for the run timer or a failure screenshot
 
 Drivers alternate order from run to run. Results go to `results/<time>-game/`.
+Use repeatable `--note "..."` arguments to record experiment settings in both reports.
+The metadata and summary also record when `--radv-log` was enabled.
 
 Notes:
 

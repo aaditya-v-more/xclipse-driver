@@ -406,6 +406,19 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             result["status"] = "phone-lost"
             break
         elapsed = time.monotonic() - started
+        # New DXVK paths can fault continuously while the compositor still presents a few
+        # frames. Check the kernel counters during the run, not just when its timer expires.
+        faults_now = gpu_faults()
+        deltas = {f"gpu_{name}": max(0, faults_now[name] - faults_before[name])
+                  for name in faults_before.keys() & faults_now.keys()}
+        if any(deltas.values()):
+            result.update(deltas)
+            result["status"] = "gpu-fault"
+            result["gpu_fault_detected_s"] = round(elapsed, 1)
+            shell(f"am force-stop {APP}")
+            # Do not delay stopping for screenshots/UI dumps, or capture the home screen
+            # afterwards. The log and any screenshots already taken remain available.
+            break
         while shots_left and elapsed >= shots_left[0]:
             shot = run_dir / f"{tag}-{bench}-{driver}-{shots_left.pop(0)}s.png"
             if screenshot(shot):
@@ -498,7 +511,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         result["gpu_temp_c_mean"] = statistics.mean(s[3] for s in after_warmup)
         result["cpu_clock_mhz"] = [statistics.mean(s[4 + i] for s in after_warmup) / 1000
                                    for i in range(len(CPU_POLICIES))]
-    if result.get("status") != "phone-lost":
+    if result.get("status") not in {"phone-lost", "gpu-fault"}:
         crash = runtime_crash(since, processes)
         if crash:
             result["status"], result["crash_log"] = "crashed", crash
@@ -507,7 +520,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         result["status"] = "launch-failed"
     # A run that stopped early or without enough frames has usually stopped at a message box, from
     # the game or from Wine.
-    if result.get("status") != "phone-lost" and ("status" in result or not counts):
+    if result.get("status") not in {"phone-lost", "gpu-fault"} and ("status" in result or not counts):
         if "message_box" not in result:
             box = message_box()
             if box:
@@ -540,7 +553,8 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     result.setdefault("status", "ran" if counts else "too-short" if "fps_avg" in stats else "no-frames")
     faults_after = gpu_faults()
     for name in faults_before.keys() & faults_after.keys():
-        result[f"gpu_{name}"] = faults_after[name] - faults_before[name]
+        key = f"gpu_{name}"
+        result[key] = max(result.get(key, 0), faults_after[name] - faults_before[name])
     if result.get("gpu_page_faults", 0) > 0 or result.get("gpu_resets", 0) > 0:
         result["status"] = "gpu-fault"
     result["gpu_temp_c_after"] = gpu_temp()
@@ -549,6 +563,10 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
 
 def summarize(meta: dict, results: list[dict]) -> str:
     out = [f"# Game benchmark run {meta['started']}", ""]
+    if meta.get("radv_log"):
+        out += ["RADV diagnostic logging enabled; this adds CPU work.", ""]
+    for note in meta.get("notes", []):
+        out += [note, ""]
     if meta.get("props"):
         out += ["Android properties set: " + ", ".join(f"`{k}={v}`" for k, v in meta["props"].items()),
                 ""]
@@ -637,6 +655,8 @@ def main() -> None:
     ap.add_argument("--radv-log", action="store_true",
                     help="turn on RADV's diagnostic log (debug.radv_xclipse_log=1) so radv runs "
                          "prove our driver loaded; it adds CPU work, so leave it off for timing")
+    ap.add_argument("--note", action="append", default=[],
+                    help="record an experiment setting or validation note in both reports; repeatable")
     ap.add_argument("--shots", default="",
                     help="seconds after launch to save screenshots at, comma-separated")
     ap.add_argument("--seconds", type=int, help="end each run this many seconds after launch")
@@ -686,6 +706,7 @@ def main() -> None:
         meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
                 "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline,
                 "props": props, "display_hz": args.hz or None,
+                "radv_log": args.radv_log, "notes": args.note,
                 "max_consecutive_failures": args.max_failures,
                 "battery_start": battery_sample()}
         shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")

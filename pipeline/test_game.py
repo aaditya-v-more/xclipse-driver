@@ -48,7 +48,8 @@ class FailureDetectionTests(unittest.TestCase):
             "shell": lambda *a, **k: "",
             "gpu_temp": lambda: 40,
             "free_memory": lambda user: 1024,
-            "gpu_faults": lambda: {"page_faults": 0, "resets": 0},
+            "gpu_faults": lambda: {"page_faults": int(failure == "gpu-fault" and clock[0] >= 20),
+                                   "resets": int(failure == "gpu-reset" and clock[0] >= 20)},
             "logcat_start": lambda path: None,
             "logcat_stop": lambda: None,
             "phone_state": lambda: "device",
@@ -80,6 +81,16 @@ class FailureDetectionTests(unittest.TestCase):
                 result["run"] = 1
                 report = game.summarize({"started": "test"}, [result])
                 self.assertIn("no valid runs", report)
+
+    def test_gpu_faults_and_resets_stop_before_time_limit_or_ui_capture(self):
+        for failure, counter in (("gpu-fault", "page_faults"), ("gpu-reset", "resets")):
+            with self.subTest(failure=failure):
+                result = self.simulate_run(failure)
+                self.assertEqual(result["status"], "gpu-fault")
+                self.assertEqual(result[f"gpu_{counter}"], 1)
+                self.assertEqual(result["gpu_fault_detected_s"], 20)
+                self.assertNotIn("screenshot", result)
+                self.assertNotIn("message_box", result)
 
     def test_repeated_failures_skip_only_affected_container_and_checkpoint(self):
         args = argparse.Namespace(runs=3, max_failures=2, shots="", seconds=90)
