@@ -314,6 +314,14 @@ Baseline checks, before changing emulator presets:
 
 The preset comparison will use the valid RADV baseline and separately report whether stock launches. In this GameNative version, [FEXCore Performance](https://github.com/utkarshdalal/GameNative/blob/v0.9.2/app/src/main/java/com/winlator/fexcore/FEXCorePresetManager.java) disables TSO and half-barrier TSO; [Box64 Performance](https://github.com/utkarshdalal/GameNative/blob/v0.9.2/app/src/main/java/com/winlator/box86_64/Box86_64PresetManager.java) changes several emulation settings, so the combined preset test cannot isolate one knob's contribution.
 
+## Preset result and reliable failure detection (2026-10-12)
+
+`results/2026-10-12_122122-game`: FEXCore and Box64 Performance together measured **44.60 and 44.55 FPS** on RADV (median **44.57**, about 2.3% below the earlier Intermediate/Compatibility median of 45.60). Both runs had zero GPU faults and sampling gaps. The inspected RADV screenshot rendered normally. Stock, still at BCn `full`, failed both attempts with the D24 depth-texture error. This small sample demonstrates no preset speed gain; it does not support a stock/RADV speed comparison. Both containers were restored to FEXCore `Intermediate` and Box64 `Compatibility`, with all four settings read back after saving.
+
+The user reported the error dialog and asked that automation handle failures. The old runner's executable check expected `Heaven.exe`, but Android reported `A:\\bin\\Heaven.exe`, leaving `seconds_to_game_process` unset and the early dialog/stall checks inactive. `game.py` now recognizes Windows paths and truncated process basenames. It detects GameNative exits, game exits, lost rendering surfaces, fatal GameNative/Wine log lines, and GPU faults; none count as successful runs merely because frames were captured. A process exit without verified benchmark completion is conservatively excluded. Two consecutive failed attempts skip the remaining runs for that benchmark/driver (`--max-failures`); a GPU fault skips it immediately. Reports are checkpointed after each completed run and on interruption.
+
+Validation: five offline regression tests cover recorded Wine names, unrelated-app log filtering, failures after sustained frames, bounded retries, and report checkpoints. Compilation, command help, and diff checks passed. On the phone, `results/2026-10-12_123434-game` recognized Heaven's process at 6 seconds and caught the known stock fatal dialog as **`error-box`**, saving its screenshot and bounds `[934, 418, 1401, 658]`; zero GPU faults. This verifies the actual dialog path, while crash/exit paths are covered by simulated lifecycle checks. GameNative's normal force-stop between runs remains intentional.
+
 ## Next steps
 
 1. FEXCore and Box64 preset A/B on Heaven, the same preset on both containers (`docs/HANDOFF.md`, resume item 1).

@@ -70,6 +70,10 @@ For each run, the script:
 - records SurfaceFlinger present times of GameNative's SurfaceView, skipping the first 10 s
 - pulls GravityMark's `-times` and `-image` files
 - force-stops the app, then cools the GPU down before the next run
+- detects Wine error dialogs, fatal app logs, unexpected process exits, lost rendering surfaces,
+  and GPU faults; saves a failure screenshot and excludes that attempt from the FPS medians
+- saves the completed results after every attempt, and skips a benchmark/driver after two
+  consecutive failures (`--max-failures` changes the limit) or immediately after a GPU fault
 
 Drivers alternate order from run to run. Results go to `results/<time>-game/`.
 
@@ -77,3 +81,5 @@ Notes:
 
 - GameNative's compositor uses fifo (vsync) present mode by default, so SurfaceFlinger FPS is capped at the display refresh rate. That's fine for benchmarks running below it.
 - Heaven runs with `-extern_define PHORONIX`, which should start the benchmark automatically and exit at the end (the Phoronix Test Suite's method). If it doesn't exit, the run stops at the time limit.
+- An early game exit is recorded as `game-exited` and excluded because completion has not been
+  independently verified. Use a fixed measurement window such as `--seconds 90` for Heaven.

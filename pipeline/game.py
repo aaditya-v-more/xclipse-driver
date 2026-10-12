@@ -14,7 +14,9 @@ a run that the low-memory killer ends is reported as such, not as a finished ben
 
 A run stops early, with a screenshot, when the game shows a message box (an error from the game or
 from Wine, found in a raw screenshot while frames are scarce) or presents no new frame for a minute.
-The later runs still go ahead: stock Heaven's fatal error on its D24 depth texture comes and goes.
+Unexpected process exits and Android crashes also invalidate a run, even after sustained frames.
+Two consecutive failures skip the remaining attempts for that benchmark/driver. Finished results
+are saved after every run, before cooling down; screenshots and logcat remain beside the report.
 
 To see what a driver renders, --shots saves screenshots at set times after launch, and --seconds
 ends each run early. --prop sets Android properties for the whole session, which is how RADV's
@@ -79,6 +81,7 @@ MEMORY_EVERY_S = 5
 # own; RADV logs [BUILD] only with debug.radv_xclipse_log >= 1 (--radv-log).
 DRIVER_MARKERS = {"samsung": "Samsung::Vulkan::OpenDevice", "radv": "RADV_BUILD"}
 LOW_MEMORY_KILL = f"Reclaim '{APP}'|Kill '{APP}'"
+CRASH_MARKERS = r"Fatal signal|FATAL EXCEPTION|Unhandled exception|ANR in "
 # GameNative logs the settings it launches a container with; kept per run to show that the stock
 # and radv containers differ only in the driver.
 LAUNCH_SETTINGS = ("Graphics Driver:|DX Wrapper:|Box64 Version:|Box64 Preset:|FEXCore Preset:|"
@@ -296,6 +299,24 @@ def message_box() -> list[int] | None:
     return find_box(w, h, raw[len(raw) - w * h * 4:])  # after a 12- or 16-byte header
 
 
+def is_game_process(name: str, exe: str) -> bool:
+    """Android can report a Wine path, a basename, or a 15-character process name."""
+    name = re.split(r"[\\/]", name.strip())[-1].lower()
+    exe = exe.lower()
+    return name == exe or (len(name) == 15 and exe.startswith(name))
+
+
+def runtime_crash(since: str, processes: dict[str, str]) -> list[str]:
+    """Fatal log lines belonging to GameNative/Wine, never another Android app."""
+    evidence = []
+    for line in logcat_since(since, CRASH_MARKERS):
+        fields = line.split()
+        if ((len(fields) > 2 and fields[2] in processes)
+                or re.search(rf"ANR in {re.escape(APP)}(?:\s|$)", line)):
+            evidence.append(line.strip())
+    return evidence
+
+
 CPU_POLICIES = (0, 4, 7, 9)  # the Exynos 2400e's clusters: 4x A520, 3x A720, 2x A720, 1x X4
 
 
@@ -374,7 +395,8 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
 
     frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
     holes, last_seen, periods = [], 0, Counter()  # lost-frame windows; newest frame; refresh periods
-    exe_seen = exe_gone = 0
+    exe_seen = exe_gone = app_gone = 0
+    app_seen = False
     history, last_new, checked = [], 0.0, 0.0  # (seconds, frames so far); when the count last grew
     shots_left = sorted(shots)
     exe = cfg["exe"].lower()
@@ -396,18 +418,30 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             memory.append({"t": round(elapsed), **memory_sample(user, now), **battery_sample()})
             processes.update(now)
             sampled = elapsed
+            crash = runtime_crash(since, processes)
+            if crash:
+                result["status"], result["crash_log"] = "crashed", crash
+                break
+            if APP in now.values():
+                app_seen, app_gone = True, 0
+            else:
+                app_gone += 1
+                if app_gone >= 2 and (app_seen or elapsed >= 20):
+                    result["status"] = "app-exited" if app_seen else "launch-failed"
+                    result["app_exited_s"] = round(elapsed)
+                    break
             # GameNative keeps showing Wine's desktop after the game exits, so the game's own
-            # process tells when it's over.
-            # ps truncates names to 15 characters, so match on that prefix.
-            if any(exe.startswith(name.lower()) and len(name) >= min(15, len(exe))
-                   for name in now.values()):
+            # process tells when it's over. An exit alone is not proof of benchmark completion.
+            if any(is_game_process(name, exe) for name in now.values()):
                 exe_seen, exe_gone = exe_seen or round(elapsed), 0
             elif exe_seen:
                 exe_gone += 1
                 if exe_gone >= 2:
+                    result["status"] = "game-exited"
                     result["game_exited_s"] = round(elapsed)
                     break
-        if exe_seen and elapsed - exe_seen >= CHECK_AFTER_S:
+        check_start = exe_seen or seen_at
+        if check_start is not None and elapsed - check_start >= CHECK_AFTER_S:
             before = next((n for t, n in history if t >= elapsed - CHECK_EVERY_S), len(frames))
             if (len(frames) - before < CHECK_BELOW_FPS * CHECK_EVERY_S
                     and elapsed - checked >= CHECK_EVERY_S):
@@ -416,13 +450,14 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
                 if box:
                     result["status"], result["message_box"] = "error-box", box
                     break
-            if elapsed - max(exe_seen, last_new) >= STUCK_S:
+            if elapsed - max(check_start, last_new) >= STUCK_S:
                 result["status"] = "stalled"
                 break
         layers = game_layers()
         if not layers:
             gone_for = gone_for + 1 if seen_at else 0
-            if seen_at and gone_for >= 5:  # the game closed itself (benchmark finished)
+            if seen_at and gone_for >= 5:
+                result["status"] = "surface-lost"
                 break
             continue
         gone_for = 0
@@ -463,10 +498,20 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         result["gpu_temp_c_mean"] = statistics.mean(s[3] for s in after_warmup)
         result["cpu_clock_mhz"] = [statistics.mean(s[4 + i] for s in after_warmup) / 1000
                                    for i in range(len(CPU_POLICIES))]
+    if result.get("status") != "phone-lost":
+        crash = runtime_crash(since, processes)
+        if crash:
+            result["status"], result["crash_log"] = "crashed", crash
     counts = stats.get("steady_seconds", 0) >= MIN_STEADY_S
+    if not exe_seen and "status" not in result:
+        result["status"] = "launch-failed"
     # A run that stopped early or without enough frames has usually stopped at a message box, from
     # the game or from Wine.
     if result.get("status") != "phone-lost" and ("status" in result or not counts):
+        if "message_box" not in result:
+            box = message_box()
+            if box:
+                result["status"], result["message_box"] = "error-box", box
         shot = run_dir / f"{tag}-{bench}-{driver}-screen.png"
         if screenshot(shot):
             result["screenshot"] = shot.name
@@ -496,6 +541,8 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     faults_after = gpu_faults()
     for name in faults_before.keys() & faults_after.keys():
         result[f"gpu_{name}"] = faults_after[name] - faults_before[name]
+    if result.get("gpu_page_faults", 0) > 0 or result.get("gpu_resets", 0) > 0:
+        result["status"] = "gpu-fault"
     result["gpu_temp_c_after"] = gpu_temp()
     return result
 
@@ -508,7 +555,8 @@ def summarize(meta: dict, results: list[dict]) -> str:
     out += [
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
            f"first {WARMUP_S} s after the first frame. A run counts (`ran`) only with {MIN_STEADY_S} s "
-           f"of frames in a row, none more than {STALL_S} s apart; the medians use only those. "
+           f"of frames in a row, none more than {STALL_S} s apart, with no detected failure or "
+           "early process exit; the medians use only those. "
            "\"Lost windows\" counts gaps where SurfaceFlinger's 128-frame ring overflowed between two "
            "reads; those intervals are left out of every figure. Hz is the compositor's refresh rate "
            "during the run. GPU MHz, GPU C and X4 MHz (the big core's clock) are means after warm-up.",
@@ -551,6 +599,13 @@ def summarize(meta: dict, results: list[dict]) -> str:
            "no-frames": "no frames from the game",
            "too-short": f"under {MIN_STEADY_S} s of steady frames",
            "killed-low-memory": "Android's low-memory killer stopped GameNative",
+           "crashed": "a fatal GameNative/Wine error was captured in logcat",
+           "app-exited": "GameNative exited before the requested measurement ended",
+           "game-exited": "the game exited; benchmark completion was not verified",
+           "surface-lost": "GameNative's rendering surface disappeared before the run ended",
+           "launch-failed": "GameNative or the game's executable did not start",
+           "gpu-fault": "the GPU reported a page fault or reset",
+           "skipped": "remaining attempt skipped after repeated failures or a GPU fault",
            "phone-lost": "the phone dropped off adb (a GPU hang can reboot it)"}
     failed = [r for r in results if r["status"] != "ran"]
     if failed:
@@ -562,12 +617,23 @@ def summarize(meta: dict, results: list[dict]) -> str:
     return "\n".join(out) + "\n"
 
 
+def write_report(run_dir: Path, meta: dict, results: list[dict]) -> None:
+    """Checkpoint completed runs so a later interruption cannot lose them."""
+    for name, data in (("results.json", json.dumps({"meta": meta, "results": results}, indent=2)),
+                       ("summary.md", summarize(meta, results))):
+        temporary = run_dir / (name + ".tmp")
+        temporary.write_text(data, encoding="utf-8", newline="\n")
+        temporary.replace(run_dir / name)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bench", default="gravitymark,heaven")
     ap.add_argument("--drivers", default="stock,radv")
     ap.add_argument("--runs", type=int, default=3)
+    ap.add_argument("--max-failures", type=int, default=2,
+                    help="skip a benchmark/driver after this many consecutive failures (default 2)")
     ap.add_argument("--radv-log", action="store_true",
                     help="turn on RADV's diagnostic log (debug.radv_xclipse_log=1) so radv runs "
                          "prove our driver loaded; it adds CPU work, so leave it off for timing")
@@ -582,6 +648,8 @@ def main() -> None:
                     help="pin the display to this refresh rate for the session (0 leaves it alone); "
                          "GameNative presents with vsync, so the panel's rate caps the FPS")
     args = ap.parse_args()
+    if args.runs < 1 or args.max_failures < 1:
+        ap.error("--runs and --max-failures must be positive")
     benches, drivers = args.bench.split(","), args.drivers.split(",")
     if any("=" not in p for p in args.prop):
         ap.error("--prop takes NAME=VALUE")
@@ -618,14 +686,16 @@ def main() -> None:
         meta = {"started": started.isoformat(timespec="seconds"), "benches": benches,
                 "drivers": drivers, "runs": args.runs, "gpu_temp_c_start": baseline,
                 "props": props, "display_hz": args.hz or None,
+                "max_consecutive_failures": args.max_failures,
                 "battery_start": battery_sample()}
         shell(f"setprop debug.radv_xclipse_log {1 if args.radv_log else 0}")
         for name, value in props.items():
             shell(f"setprop {name} '{value}'")
             if shell(f"getprop {name}") != value:
                 sys.exit(f"couldn't set {name}")
-        results = run_all(args, benches, drivers, run_dir, app_user(), baseline)
+        results = run_all(args, benches, drivers, run_dir, app_user(), baseline, meta)
     finally:
+        shell(f"am force-stop {APP}")
         if stay_on.isdigit():  # "null" when unset, "" when adb hiccuped: then leave it alone
             shell(f"settings put global stay_on_while_plugged_in {stay_on}")
         else:
@@ -639,9 +709,7 @@ def main() -> None:
         for name in props:
             shell(f"setprop {name} ''")
 
-    (run_dir / "results.json").write_text(json.dumps({"meta": meta, "results": results}, indent=2),
-                                          encoding="utf-8", newline="\n")
-    (run_dir / "summary.md").write_text(summarize(meta, results), encoding="utf-8", newline="\n")
+    write_report(run_dir, meta, results)
     print(f"report: {run_dir / 'summary.md'}")
 
 
@@ -659,12 +727,20 @@ def wait_unlocked(limit_s: float) -> bool:
 
 
 def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: str,
-            baseline: float) -> list[dict]:
+            baseline: float, meta: dict) -> list[dict]:
     results = []
+    failures, blocked = Counter(), set()
     try:
         for n in range(1, args.runs + 1):
             for bench in benches:
                 for driver in (drivers if n % 2 else list(reversed(drivers))):
+                    key = bench, driver
+                    if key in blocked or failures[key] >= args.max_failures:
+                        print(f"run {n} {bench:<12} {driver:<5} skipped after failures", flush=True)
+                        results.append({"bench": bench, "driver": driver, "run": n,
+                                        "status": "skipped", "surfaceflinger": {}})
+                        write_report(run_dir, meta, results)
+                        continue
                     print(f"run {n} {bench:<12} {driver:<5}", end=" ", flush=True)
                     r = run_once(bench, driver, run_dir, f"run{n}", user,
                                  [int(t) for t in args.shots.split(",") if t], args.seconds)
@@ -674,6 +750,10 @@ def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: s
                           f"{s.get('seconds', 0):.0f} s, {r.get('gpu_page_faults', '?')} GPU faults"
                           + (f", screen {r['screenshot']}" if r.get("screenshot") else ""), flush=True)
                     results.append(r)
+                    failures[key] = 0 if r["status"] == "ran" else failures[key] + 1
+                    if r.get("gpu_page_faults", 0) > 0 or r.get("gpu_resets", 0) > 0:
+                        blocked.add(key)
+                    write_report(run_dir, meta, results)
                     if r["status"] == "phone-lost":
                         print("lost the phone; stopping")
                         return results
@@ -682,6 +762,8 @@ def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: s
         # Ctrl+C keeps the finished runs; the one in progress is dropped.
         print("\ninterrupted; saving the finished runs", flush=True)
         shell(f"am force-stop {APP}")
+    finally:
+        write_report(run_dir, meta, results)
     return results
 
 
