@@ -1,6 +1,12 @@
 # Game benchmark setup (GameNative)
 
-The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`, 0.9.2 on the test phone). Each benchmark is installed twice, as two custom games with identical containers except for the Vulkan driver: "System" (Samsung) or our RADV build. `pipeline/game.py` runs them over adb.
+The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`). Each benchmark is installed twice, as two custom games with matching emulator presets and driver-specific graphics settings: "System" (Samsung) or our RADV build. `pipeline/game.py` runs them over adb.
+
+On 2026-10-12 the test phone was updated in place from 0.9.2 to the official GitHub
+`v1.3.0-prerelease` APK. Its installed SHA256 matches the release asset; its source is pinned at
+`231d1365cf1a09b7f1763cfaebd3906628ec1381`. Upstream still labels this APK `1.2.1` (versionCode 23).
+Use [`../third_party/gamenative-release.json`](../third_party/gamenative-release.json) to identify
+the exact build, rather than the app's displayed version. Earlier results remain 0.9.2 results.
 
 ## Already done over USB
 
@@ -8,7 +14,10 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
   - GravityMark 1.89 MSI with `pymsi`.
   - Unigine Heaven 4.0 with innoextract 1.9, verified by GPG signature and MD5.
   - `Browser.exe`, `browser_x86.exe`, and `vc_redist.x64.exe` were left out, so each copy has exactly one `.exe` for GameNative to auto-detect.
-- The four game folders are pushed to `/sdcard/GameNative/CustomGames/`, which GameNative scans automatically:
+- The four game folders were pushed to `/sdcard/GameNative/CustomGames/` and registered as
+  custom games. The `v1.3.0-prerelease` upgrade automatically migrated them to
+  `/data/user/0/app.gamenative/CustomGames/` when opening their containers; exported drive
+  mappings confirm all four new locations. Their appIds are unchanged:
 
   | Folder | `.gamenative` appId |
   |---|---|
@@ -18,7 +27,7 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
   | `Heaven-radv` | 2000940202 |
 
 - These files are in `/sdcard/Download/xclipse/` (`D:\xclipse\` inside containers):
-  - the driver zips, `radv-xclipse-26.3.0-devel-xd-<sha>.zip`. The newest is `xd-3e88e3e`.
+  - the driver zips, `radv-xclipse-26.3.0-devel-xd-<sha>.zip`. The selected build is `xd-fc066b9`.
   - `EXEC-ARGS.txt`
   - `vc_redist.x64.exe`, in case GravityMark needs the Visual C++ runtime
   - `out/`, where the benchmarks write their results
@@ -38,6 +47,15 @@ The game-level A/B test runs Windows benchmarks in GameNative (`app.gamenative`,
    - Save.
 
 ## Inspecting and changing emulator presets
+
+Before an app update, export each container to a new filename and keep the local and phone copies:
+
+```sh
+python pipeline/gn_driver.py export-config Heaven-radv tools/Heaven-radv-backup.json
+```
+
+The helper requires the Android file picker to be in `Download/xclipse`, refuses to overwrite
+existing files, waits for GameNative's asynchronous JSON write, then pulls and verifies the copy.
 
 `pipeline/gn_driver.py` reads dropdowns with `get`, lists their choices with `options`, and changes
 them with `set`. It reopens the container after saving and verifies the value. The default tab is

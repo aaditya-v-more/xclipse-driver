@@ -22,6 +22,7 @@ usage: python pipeline/gn_driver.py install ZIP GAME [GAME...]
        python pipeline/gn_driver.py options GAME LABEL [--tab Graphics|Emulation]
        python pipeline/gn_driver.py set GAME LABEL VALUE [--tab Graphics|Emulation]
        python pipeline/gn_driver.py import-content WCP
+       python pipeline/gn_driver.py export-config GAME DESTINATION
 
 install copies ZIP (a build from driver/dist) to the phone's Download/xclipse folder, imports it in
 Driver Manager unless it's there already, and makes it the Graphics Driver Version of each GAME (a
@@ -34,6 +35,7 @@ reads it back. These use the Graphics tab by default (such as "BCn Emulation"); 
 reaches "FEXCore Preset" and "Box64 Preset". get and options change nothing.
 import-content copies a DXVK WCP to Download/xclipse, verifies its checksum, imports it through
 Contents Manager, and reopens the installed list to verify it. It does not select a DXVK version.
+export-config saves a container's JSON to Download/xclipse and pulls it to DESTINATION on the PC.
 """
 
 from __future__ import annotations
@@ -44,6 +46,7 @@ import json
 import shlex
 import sys
 import tarfile
+import tempfile
 import time
 import zipfile
 from pathlib import Path
@@ -450,6 +453,55 @@ def import_content(path: Path) -> None:
     go("Back", "Menu")
 
 
+def save_export_config(destination: Path) -> None:
+    """Finish an already-open Create Document picker, then verify/pull the exported JSON."""
+    remote = f"{PHONE_DIR}/{destination.name}"
+    if destination.exists() or shell(f"if [ -e {shlex.quote(remote)} ]; then echo exists; fi"):
+        sys.exit(f"export destination already exists; keeping it: {destination.name}")
+    _, _, nodes = wait_for("SAVE")
+    if not find(nodes, f"Files in {Path(PHONE_DIR).name}"):
+        sys.exit(f"export picker is not in {PHONE_DIR}")
+    fields = [n for n in nodes if n["cls"] == "EditText"]
+    if len(fields) != 1:
+        sys.exit(f"expected one export filename field, found {len(fields)}")
+    tap_node(fields[0], nodes)
+    if clear() or type_text(destination.name) != destination.name:
+        sys.exit("export filename did not read back correctly")
+    _, n, nodes = wait_for("SAVE")
+    tap_node(n, nodes)
+    wait_for("Game Information", "Quick Actions")
+    # The picker returns before GameNative's export coroutine writes the file. An existing
+    # zero-byte document is not success; wait for a complete, nonempty JSON object first.
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            config = json.loads(shell(f"cat {shlex.quote(remote)} 2>/dev/null"))
+        except json.JSONDecodeError:
+            config = None
+        if isinstance(config, dict) and config:
+            break
+        if time.monotonic() >= deadline:
+            sys.exit(f"GameNative did not finish exporting valid JSON to {remote} within 30 s")
+        time.sleep(1)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".gamenative-export-", dir=destination.parent) as temp:
+        pulled = Path(temp) / destination.name
+        if adb("pull", remote, str(pulled)).returncode:
+            sys.exit(f"couldn't pull exported config from {remote}")
+        if json.loads(pulled.read_text(encoding="utf-8")) != config:
+            sys.exit("export changed while copying it; not saving an unverified local config")
+        pulled.replace(destination)
+    print(f"exported and verified {destination} (phone copy kept)", flush=True)
+
+
+def export_config(game: str, destination: Path) -> None:
+    open_library()
+    go(game, "Game Information")
+    go("Options", "Quick Actions")
+    go("Export config", "SAVE")
+    save_export_config(destination)
+
+
 def wait_awake_unlocked(limit_s: float = 300) -> None:
     deadline = time.monotonic() + limit_s
     asked = False
@@ -472,6 +524,9 @@ def main() -> None:
     install_parser.add_argument("games", nargs="+")
     commands.add_parser("import-content", help="import a DXVK WCP and verify the installed list").add_argument(
         "wcp", type=Path)
+    export_parser = commands.add_parser("export-config", help="export a container JSON and pull it to the PC")
+    export_parser.add_argument("game")
+    export_parser.add_argument("destination", type=Path)
     select_parser = commands.add_parser("select", help="select an installed graphics driver")
     select_parser.add_argument("entry")
     select_parser.add_argument("games", nargs="+")
@@ -500,6 +555,8 @@ def main() -> None:
             install(args.zip, args.games)
         elif args.command == "import-content":
             import_content(args.wcp)
+        elif args.command == "export-config":
+            export_config(args.game, args.destination)
         elif args.command == "select":
             for game in args.games:
                 select(args.entry, game)

@@ -34,7 +34,11 @@ Check the latest dated entries in `docs/PROGRESS.md` for work since the last han
 - `pipeline/game.py` runs the GameNative benchmark A/B. `pipeline/phone_ui.py` provides adb UI helpers: `dump`, `tap-text`, `type`.
 - `docs/` holds the handoff, progress, findings, research, and game setup.
 - `recon/` holds the read-only device survey scripts and their raw output (summarized in `docs/findings.md`).
-- `third_party/` holds reference clones, kept out of git; re-clone them with `third_party/MANIFEST.md`.
+- `third_party/` holds pinned source submodules; see `third_party/MANIFEST.md`. Restore them with
+  `python pipeline/sync_sources.py` using the portable Python. It preserves the kernel's sparse
+  checkout for Windows and initializes GameNative's and DXVK's nested pins. Never follow remote tips when
+  reproducing an experiment. `third_party/gamenative-release.json` records the GameNative release
+  commit and official APK checksum matching the phone.
 - `tools/` holds the portable toolchain, kept out of git. Recreate it with `tools\setup.ps1` (Windows) or `tools/setup.sh` (macOS, Linux), described in `tools/README.md`.
 
 ## Build and test

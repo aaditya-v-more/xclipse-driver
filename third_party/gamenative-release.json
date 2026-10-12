@@ -1,0 +1,21 @@
+{
+  "repository": "https://github.com/utkarshdalal/GameNative.git",
+  "tag": "v1.3.0-prerelease",
+  "commit": "231d1365cf1a09b7f1763cfaebd3906628ec1381",
+  "release_url": "https://github.com/utkarshdalal/GameNative/releases/tag/v1.3.0-prerelease",
+  "published_at": "2026-10-04T15:49:59Z",
+  "prerelease": true,
+  "package_name": "app.gamenative",
+  "apk": {
+    "name": "gamenative-v1.3.0-prerelease.apk",
+    "url": "https://github.com/utkarshdalal/GameNative/releases/download/v1.3.0-prerelease/gamenative-v1.3.0-prerelease.apk",
+    "size_bytes": 572505268,
+    "sha256": "90cb39b8ff546265a37b0b66b42d9ab92b5a361aa8ab6af188dd26878aed0d32"
+  },
+  "android_package": {
+    "version_name": "1.2.1",
+    "version_code": 23,
+    "target_sdk": 28
+  },
+  "note": "The v1.3.0-prerelease tag retains versionName 1.2.1 upstream. The installed APK SHA256 was verified against the release asset; the tag commit, not the display version, is the source pin."
+}

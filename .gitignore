@@ -1,7 +1,17 @@
 # Big or re-creatable things stay out of git.
-# third_party/MANIFEST.md lists how to re-clone the reference repos; tools/README.md lists the toolchain.
+# Named reference submodules are pinned in Git; other checkouts and portable tools stay local.
 /third_party/*
 !/third_party/MANIFEST.md
+!/third_party/gamenative
+!/third_party/gamenative-release.json
+!/third_party/ExynosTools
+!/third_party/Xclipse940-RADV
+!/third_party/dxvk
+!/third_party/gamenative-mesa
+!/third_party/kernel-r12s
+!/third_party/mesa-unified-drivers
+!/third_party/radv-xclipse
+!/third_party/radv-xclipse940
 /tools/*
 !/tools/env.cmd
 !/tools/README.md

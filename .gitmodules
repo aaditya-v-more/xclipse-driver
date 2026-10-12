@@ -1,0 +1,27 @@
+[submodule "third_party/ExynosTools"]
+	path = third_party/ExynosTools
+	url = https://github.com/WearyConcern1165/ExynosTools.git
+[submodule "third_party/kernel-r12s"]
+	path = third_party/kernel-r12s
+	url = https://github.com/Elchanz3/android_kernel_samsung_r12s.git
+[submodule "third_party/gamenative"]
+	path = third_party/gamenative
+	url = https://github.com/utkarshdalal/GameNative.git
+[submodule "third_party/mesa-unified-drivers"]
+	path = third_party/mesa-unified-drivers
+	url = https://github.com/JimVulkan/mesa-unified-drivers.git
+[submodule "third_party/radv-xclipse"]
+	path = third_party/radv-xclipse
+	url = https://github.com/JimVulkan/radv-xclipse.git
+[submodule "third_party/Xclipse940-RADV"]
+	path = third_party/Xclipse940-RADV
+	url = https://github.com/Matheus-TestUser1/Xclipse940-RADV.git
+[submodule "third_party/gamenative-mesa"]
+	path = third_party/gamenative-mesa
+	url = https://github.com/GameNative/mesa.git
+[submodule "third_party/dxvk"]
+	path = third_party/dxvk
+	url = https://github.com/doitsujin/dxvk.git
+[submodule "third_party/radv-xclipse940"]
+	path = third_party/radv-xclipse940
+	url = https://github.com/yoro1836/radv-xclipse.git
