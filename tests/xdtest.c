@@ -8,7 +8,7 @@
  *
  * usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]
  *   correctness: info device submit compute render tess scratch scratchcs queries xfb xfbmany
- *                xfbmanygs textures mips mrt vertex depth storage bcn descriptors culling
+ *                xfbmanygs textures mips mrt vertex depth storage bcn descriptors placed culling
  *   performance: alu bandwidth fill draws compile
  */
 #define VK_NO_PROTOTYPES
@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -475,7 +476,7 @@ static void run_info(void)
 /* What a test needs enabled beyond the basics. */
 enum {
    NEED_QUERIES = 1, NEED_XFB = 2, NEED_GS = 4, NEED_TESS = 8, NEED_BC = 16, NEED_VERTEX = 32,
-   NEED_STORAGE = 64, NEED_DESCRIPTORS = 128
+   NEED_STORAGE = 64, NEED_DESCRIPTORS = 128, NEED_PLACED = 256
 };
 
 /* Set by start_device for the tests with needs: what the driver has of what they use. */
@@ -544,8 +545,28 @@ static void start_device(bool dynamic_rendering, unsigned needs)
    VkPhysicalDeviceBufferDeviceAddressFeatures address_features = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES,
    };
-   const char *exts[4];
+   VkPhysicalDeviceMapMemoryPlacedFeaturesEXT placed_features = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_FEATURES_EXT,
+   };
+   const char *exts[6];
    void **chain = &f13.pNext; /* where the next enabled feature struct goes */
+   if (needs & NEED_PLACED) {
+      if (!has_device_extension(VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME) ||
+          !has_device_extension(VK_KHR_MAP_MEMORY_2_EXTENSION_NAME))
+         finish("skip", "placed mapping or map_memory2 is not exposed");
+      VkPhysicalDeviceFeatures2 f2 = {
+         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+         .pNext = &placed_features,
+      };
+      vkGetPhysicalDeviceFeatures2(pdev, &f2);
+      if (!placed_features.memoryMapPlaced || !placed_features.memoryUnmapReserve)
+         finish("skip", "placed mapping or unmap reservation is unsupported");
+      placed_features.memoryMapRangePlaced = VK_FALSE;
+      *chain = &placed_features;
+      chain = &placed_features.pNext;
+      exts[dci.enabledExtensionCount++] = VK_EXT_MAP_MEMORY_PLACED_EXTENSION_NAME;
+      exts[dci.enabledExtensionCount++] = VK_KHR_MAP_MEMORY_2_EXTENSION_NAME;
+   }
    if (needs & NEED_DESCRIPTORS) {
       const char *ext = VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME;
       if (!has_device_extension(ext))
@@ -1291,6 +1312,158 @@ static void run_submit(void)
    VkCommandBuffer cb = begin_cmd();
    VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
    jnum("ms_empty_cmdbuf", submit_and_wait(cb, "empty command buffer submit"));
+}
+
+/* A reserved unmap must leave the entire address range inaccessible and occupied. Reading maps
+ * avoids probing it with a fault or replacing memory that another allocation might now own. */
+static bool host_range_reserved(void *address, size_t size)
+{
+   FILE *maps = fopen("/proc/self/maps", "r");
+   if (!maps)
+      finish("fail", "cannot inspect placed-map reservation");
+   uintptr_t next = (uintptr_t)address, end = next + size;
+   char line[512], perms[5];
+   unsigned long lo, hi;
+   while (next < end && fgets(line, sizeof(line), maps)) {
+      if (sscanf(line, "%lx-%lx %4s", &lo, &hi, perms) != 3 || hi <= next)
+         continue;
+      if (lo > next || strncmp(perms, "---", 3))
+         break;
+      next = hi;
+   }
+   fclose(maps);
+   return next >= end;
+}
+
+/* Native coverage of the low-address mapping used by 32-bit Wine. This does not exercise Wine's
+ * allocator or X11 presentation. Only our own mmap reservation can be replaced by Vulkan.
+ * Contract: https://docs.vulkan.org/refpages/latest/refpages/source/VkMemoryMapInfo.html */
+static void run_placed(void)
+{
+   PFN_vkMapMemory2KHR map2 = (PFN_vkMapMemory2KHR)vkGetDeviceProcAddr(dev, "vkMapMemory2KHR");
+   PFN_vkUnmapMemory2KHR unmap2 = (PFN_vkUnmapMemory2KHR)vkGetDeviceProcAddr(dev, "vkUnmapMemory2KHR");
+   if (!map2 || !unmap2)
+      finish("fail", "enabled map_memory2 entry points missing");
+   VkPhysicalDeviceMapMemoryPlacedPropertiesEXT placed = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAP_MEMORY_PLACED_PROPERTIES_EXT,
+   };
+   VkPhysicalDeviceProperties2 p2 = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, .pNext = &placed,
+   };
+   vkGetPhysicalDeviceProperties2(pdev, &p2);
+   size_t alignment = placed.minPlacedMemoryMapAlignment;
+   if (!alignment || (alignment & (alignment - 1)) || alignment > 16 * 1024 * 1024)
+      finish("fail", "invalid or excessive placed-map alignment: %zu", alignment);
+   jint("min_placed_alignment", alignment);
+   long host_page_size = sysconf(_SC_PAGESIZE);
+   if (host_page_size <= 0 || (host_page_size & (host_page_size - 1)))
+      finish("fail", "cannot determine host page size");
+   size_t page_size = (size_t)host_page_size;
+   if (alignment < page_size)
+      alignment = page_size;
+
+   enum { N = 65536, ROUNDS = 3 };
+   const size_t bytes = N * sizeof(uint32_t);
+   struct buffer b = {0};
+   VkBufferCreateInfo bci = {
+      .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, .size = bytes,
+      .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+      .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+   };
+   VKCHECK("vkCreateBuffer", vkCreateBuffer(dev, &bci, NULL, &b.buf));
+   VkMemoryRequirements req;
+   vkGetBufferMemoryRequirements(dev, b.buf, &req);
+   req.size = (req.size + alignment - 1) & ~(VkDeviceSize)(alignment - 1);
+   b.mem = alloc_memory(req, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+   VKCHECK("vkBindBufferMemory", vkBindBufferMemory(dev, b.buf, b.mem, 0));
+   jint("allocation_bytes", req.size);
+
+   /* Non-fixed hints cannot replace unrelated mappings, even if a hinted address is occupied. */
+   size_t reserve_size = req.size + 3 * alignment;
+   void *reservation = MAP_FAILED;
+   for (uintptr_t hint = 0x10000000; hint <= 0xe0000000; hint += 0x10000000) {
+      void *p = mmap((void *)hint, reserve_size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+      if (p == MAP_FAILED)
+         continue;
+      if ((uintptr_t)p > 0 && (uintptr_t)p + reserve_size <= UINT64_C(0x100000000)) {
+         reservation = p;
+         break;
+      }
+      munmap(p, reserve_size);
+   }
+   if (reservation == MAP_FAILED)
+      finish("fail", "could not reserve host memory below 4 GiB");
+   void *address = (void *)(((uintptr_t)reservation + 2 * alignment - 1) & ~(alignment - 1));
+   jhex("placed_address", (uint32_t)(uintptr_t)address);
+   struct buffer copy = make_buffer(bytes, VK_BUFFER_USAGE_TRANSFER_DST_BIT, true);
+   VkMemoryMapPlacedInfoEXT placement = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_PLACED_INFO_EXT, .pPlacedAddress = address,
+   };
+   VkMemoryMapInfoKHR mi = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_MAP_INFO_KHR, .pNext = &placement,
+      .flags = VK_MEMORY_MAP_PLACED_BIT_EXT, .memory = b.mem, .size = VK_WHOLE_SIZE,
+   };
+   VkMemoryUnmapInfoKHR ui = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_UNMAP_INFO_KHR,
+      .memory = b.mem, .flags = VK_MEMORY_UNMAP_RESERVE_BIT_EXT,
+   };
+   for (uint32_t round = 0; round < ROUNDS; round++) {
+      step("mapping below 4 GiB");
+      VKCHECK("vkMapMemory2KHR placed", map2(dev, &mi, &b.map));
+      if (b.map != address)
+         finish("fail", "placed mapping returned a different address");
+      uint32_t *data = b.map, *copied = copy.map;
+      for (uint32_t i = 0; i < N; i++) {
+         uint32_t old = i == 0 || i == N - 1 ? (i * 3u + 7u) ^ ((round - 1) << 24)
+                                            : 0x5a000000u | (round - 1);
+         if (round && data[i] != old)
+            finish("fail", "remap lost data at round %u word %u", round, i);
+         data[i] = (i * 3u + 7u) ^ (round << 24);
+         copied[i] = 0xeeeeeeee;
+      }
+      VkCommandBuffer cb = begin_cmd();
+      VkMemoryBarrier barrier = {
+         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+         .srcAccessMask = VK_ACCESS_HOST_WRITE_BIT,
+         .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT,
+      };
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           0, 1, &barrier, 0, NULL, 0, NULL);
+      VkBufferCopy region = {.size = bytes};
+      vkCmdCopyBuffer(cb, b.buf, copy.buf, 1, &region);
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                           0, 1, &barrier, 0, NULL, 0, NULL);
+      vkCmdFillBuffer(cb, b.buf, sizeof(uint32_t), bytes - 2 * sizeof(uint32_t), 0x5a000000u | round);
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      barrier.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+      vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                           0, 1, &barrier, 0, NULL, 0, NULL);
+      VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+      submit_and_wait(cb, "placed-map copy and fill");
+      for (uint32_t i = 0; i < N; i++) {
+         uint32_t original = (i * 3u + 7u) ^ (round << 24);
+         uint32_t want = i == 0 || i == N - 1 ? original : 0x5a000000u | round;
+         if (copied[i] != original || data[i] != want)
+            finish("fail", "placed CPU/GPU mismatch at round %u word %u", round, i);
+      }
+      VKCHECK("vkUnmapMemory2KHR reserve", unmap2(dev, &ui));
+      b.map = NULL;
+      if (!host_range_reserved(address, req.size))
+         finish("fail", "reserved unmap left a hole or accessible memory at round %u", round);
+      if (!host_range_reserved((char *)address - alignment, alignment) ||
+          !host_range_reserved((char *)address + req.size, alignment))
+         finish("fail", "placed mapping changed an adjacent guard reservation");
+   }
+   jint("rounds", ROUNDS);
+   jint("words_per_round", N);
+   jint("mismatches", 0);
+   jbool("unmap_reservation_verified", true);
+   free_buffer(&copy);
+   free_buffer(&b);
+   if (munmap(reservation, reserve_size))
+      finish("fail", "could not release host reservation");
 }
 
 /* ---- compute: a dispatch that writes a pattern the host checks element by element ---- */
@@ -5665,7 +5838,7 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: xdtest --driver stock|PATH --test NAME [--out DIR] [--tag NAME]\n"
                       "  correctness: info device submit compute render tess scratch scratchcs\n"
                       "               queries xfb xfbmany xfbmanygs textures mips mrt vertex depth\n"
-                      "               storage bcn descriptors culling\n"
+                      "               storage bcn descriptors placed culling\n"
                       "  performance: alu bandwidth fill draws compile\n");
       return 2;
    }
@@ -5691,6 +5864,7 @@ int main(int argc, char **argv)
       {"storage", run_storage, false, NEED_STORAGE},
       {"bcn", run_bcn, false, NEED_STORAGE},
       {"descriptors", run_descriptors, false, NEED_DESCRIPTORS},
+      {"placed", run_placed, false, NEED_PLACED},
       {"culling", run_culling, true, 0},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},

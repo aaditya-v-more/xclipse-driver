@@ -665,3 +665,41 @@ This conservative check uses samples after the first surface frame plus warm-up,
 exactly align with the frame-statistics window. It is an additional timing filter, not proof of
 correct rendering or a general FPS gain. An offline regression verifies different clocks, a
 mid-run CPU change, missing telemetry and the normal-mode distinction.
+
+### Final study review, placed-memory coverage and requested stop
+
+`results/2026-10-13_173942-game-compare` used a declared 50 C limit, six planned 90-second pairs
+and the restored fc066b9/DXVK 2.7.1 container. It completed two warm-ups, three full pairs and one
+rejected candidate. Pair 4's window was 89.745288593 s, below the existing 89.75 s requirement;
+the runner stopped automatically and completed cleanup. All starts met the limit, no samples
+were lost, and GPU fault/reset counts stayed zero. Do not relax the threshold retroactively.
+This is **not a completed six-pair study**.
+
+The post-run clock filter excludes pair 1 (400/1632 MHz baseline versus 252/1056 MHz candidate).
+Pair 2 matches at 252/1056: 24.81 / 33.03 FPS (+33.13%); pair 3 at 400/1632: 38.35 / 49.55 FPS
+(+29.21%). These are different operating points, not repeatability at one state. Reviewed all
+18 screenshots and recorded hashes. Unexplained blue streaks/lines occur in baseline pair 1 at
+65 s and pair 3 at 35/65 s; a fine dotted blue line also occurs in candidate pair 3 at 65 s.
+Cause unproven; `nonggc` has not established a quality fix. Both pair 2 runs and pair 4's candidate
+show loading at 35 s: first SurfaceView activity plus ten seconds can precede true benchmark
+rendering. Resolve this boundary before another long study. The results are diagnostic only;
+no normal-mode gain is claimed.
+
+Scored baseline RSS peaks span 948-958 MiB and candidate peaks 942-956 MiB; no established RAM
+saving. USB battery/HUD readings do not establish efficiency. Fixed-mode release returned 0;
+RADV debug read back empty and USB stay-awake 2. DND was explicitly restored off and read back 0
+before the final native test.
+
+Added `xdtest --test placed` and registered it in the runner. It enables placed mapping and
+reservation features when supported, reserves its own host range below 4 GiB with non-fixed
+mmap hints, and checks exact placement, CPU-to-GPU copies, GPU fills, guards, reservation
+permissions and data persistence across three remaps. `results/2026-10-13_180339`: RADV passes
+three rounds of 65536 words at `0x10001000`, allocation 262144 bytes, alignment 4096. Samsung skips
+the unavailable extension path. Descriptors/culling pass on both, with no events. Test source/
+binary hashes are recorded. The X11 ELF has not run this probe; it does not reproduce Wine's
+allocator or prove direct presentation. Native compilation had no warnings; Python compilation,
+runner help and diff checks passed.
+
+The user then requested **stop work, update handoff, commit and push**. No experiment remained
+active. Updated `docs/HANDOFF.md` with artifact hashes, restored settings, broader optimization
+direction and exact next steps. No new driver default was enabled or phone artifact removed.
