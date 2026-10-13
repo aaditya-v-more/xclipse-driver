@@ -557,3 +557,27 @@ No further phone tests or driver builds were run after the stop request.
 5. Deliver a package only from repeatably correct improvements. Any upstream message requires
    explicit user instruction to send. See the rewritten `docs/HANDOFF.md` for exact state,
    source/artifact hashes, portable commands and remaining limitations.
+
+## Resumed checkpoint validation and launch-temperature fix (2026-10-13)
+
+Pulled `main` before resuming; `17785a9` was already the remote tip and the checkout was clean.
+Rebuilt its normal driver with the portable Windows toolchain: package
+`radv-xclipse-26.3.0-devel-xd-17785a9.zip`, ELF SHA256
+`8a18f2883927cb3087a520a364c69544303ca6020902b10c7f64e8a918c7a38d` (retained as
+`tools/driver-17785a9.so`). `results/2026-10-13_165717` passes all 22 attempts on Samsung/RADV:
+render, descriptors, culling transitions, queries, transform feedback (including multi-draw
+and geometry variants), tessellation, graphics/compute scratch, and draws. No GPU events.
+
+`results/2026-10-13_165855` then passes the same 11 RADV tests with
+`RADV_XCLIPSE_CULL_MIN=128` and `RADV_XCLIPSE_CULL_NOFLUSH=1`, again with no GPU events.
+These are initial correctness checks, not exhaustive synchronization validation or a reason
+to enable the option by default. The paired experiment is pinned in
+`experiments/2026-10-13/culling-noflush.json`.
+
+Fixed the previous Heaven comparison's launch-temperature drift: `run_once` now cools and
+records temperature after memory/log setup, immediately before its launch intent. The comparison
+passes its limit into that check and independently rejects missing/invalid/over-limit temperature
+readings when accepting scores. An unmet limit returns a checkpointable `temperature-not-ready`
+attempt without launching GameNative. Regression coverage verifies the launch ordering, the exact
+limit, invalid readings, and score exclusion. Python compilation, all 12 offline regression tests,
+both affected CLI help commands, and `git diff --check` pass. A fresh phone comparison is still needed.

@@ -1,0 +1,25 @@
+{
+  "purpose": "Isolate the opt-in small-draw VGT no-flush experiment on checkpoint 17785a9, after native correctness passes; all options remain off by default",
+  "variants": [
+    {
+      "name": "adaptive_128",
+      "library": "tools/driver-17785a9.so",
+      "sha256": "8a18f2883927cb3087a520a364c69544303ca6020902b10c7f64e8a918c7a38d",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0",
+        "RADV_XCLIPSE_CULL_MIN": "128",
+        "RADV_XCLIPSE_CULL_NOFLUSH": "0"
+      }
+    },
+    {
+      "name": "adaptive_128_noflush",
+      "library": "tools/driver-17785a9.so",
+      "sha256": "8a18f2883927cb3087a520a364c69544303ca6020902b10c7f64e8a918c7a38d",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0",
+        "RADV_XCLIPSE_CULL_MIN": "128",
+        "RADV_XCLIPSE_CULL_NOFLUSH": "1"
+      }
+    }
+  ]
+}

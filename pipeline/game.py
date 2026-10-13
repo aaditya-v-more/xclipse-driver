@@ -378,19 +378,31 @@ def cool_down(target: float, limit_s: float = 120) -> float:
 
 def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
              shots: list[int] = (), seconds: int | None = None,
-             measure_seconds: float | None = None) -> dict:
+             measure_seconds: float | None = None,
+             max_start_temp: float | None = None) -> dict:
     cfg = BENCHES[bench]
     app_id = cfg["ids"][driver]
     shell(f"am force-stop {APP}")
     for key in ("times", "image"):
         if key in cfg:
             shell(f"rm -f {OUT_DIR}/{cfg[key].format(driver=driver)}")
-    result = {"bench": bench, "driver": driver, "app_id": app_id, "gpu_temp_c_before": gpu_temp(),
+    result = {"bench": bench, "driver": driver, "app_id": app_id,
               "available_mb_before": free_memory(user)}
     faults_before = gpu_faults()
     since = shell("date '+%m-%d %H:%M:%S.000'")
     logcat_start(run_dir / f"{tag}-{bench}-{driver}-logcat.txt")
     result["logcat_file"] = f"{tag}-{bench}-{driver}-logcat.txt"
+    # Preparation can warm the phone after a caller's cooldown. Sample (and, for controlled
+    # comparisons, cool) only after preparation, immediately before issuing the launch intent.
+    temperature = cool_down(max_start_temp, 180) if max_start_temp is not None else gpu_temp()
+    result["gpu_temp_c_before"] = temperature
+    if max_start_temp is not None:
+        result["max_start_temp_c"] = max_start_temp
+        if not 0 < temperature <= max_start_temp:
+            result.update(status="temperature-not-ready", surfaceflinger={}, gpu=[])
+            logcat_stop()
+            LOGCAT.pop("path", None)
+            return result
     memory, processes, gpu = [], {}, []
     started = time.monotonic()
     shell(f"am start -n {APP}/.MainActivity -a {APP}.LAUNCH_GAME --ei app_id {app_id} "
@@ -628,6 +640,7 @@ def summarize(meta: dict, results: list[dict]) -> str:
            "game-exited": "the game exited; benchmark completion was not verified",
            "surface-lost": "GameNative's rendering surface disappeared before the run ended",
            "launch-failed": "GameNative or the game's executable did not start",
+           "temperature-not-ready": "launch skipped: GPU temperature was missing or above the start limit",
            "gpu-fault": "the GPU reported a page fault or reset",
            "skipped": "remaining attempt skipped after repeated failures or a GPU fault",
            "phone-lost": "the phone dropped off adb (a GPU hang can reboot it)"}

@@ -45,9 +45,10 @@ def set_prop(key, value):
         raise RuntimeError(f"property readback failed: {key}")
 
 
-def accepted(r, duration):
+def accepted(r, duration, max_start_temp):
     s = r.get("surfaceflinger", {})
     return (r["status"] == "ran" and s.get("steady_seconds", 0) >= duration - .25
+            and 0 < r.get("gpu_temp_c_before", 0) <= max_start_temp
             and s.get("sampling_gaps") == 0 and s.get("covered_share", 0) > .999
             and len(r.get("screens", [])) >= 2 and r.get("gpu")
             and not r.get("gpu_page_faults", 0) and not r.get("gpu_resets", 0))
@@ -151,18 +152,16 @@ def main():
         jobs += list(compare.pairs(manifest["variants"], args.repetitions))
         for repeat, candidate, order in jobs:
             for v in order:
-                t = game.cool_down(args.max_start_temp, 180)
-                if not 0 < t <= args.max_start_temp:
-                    raise RuntimeError(f"temperature did not settle: {t} C")
                 for key, value in v["props"].items():
                     set_prop(key, value)
                 tag = f"pair{repeat}-{candidate}-{v['name']}"
-                print(f"{tag} starting at {t:.1f} C", flush=True)
+                print(f"{tag}: preparing launch (limit {args.max_start_temp:.1f} C)", flush=True)
                 r = game.run_once(manifest["bench"], manifest["driver"], folder, tag, user,
-                                  shots=[35, 65], seconds=args.seconds + 120, measure_seconds=args.seconds)
+                                  shots=[35, 65], seconds=args.seconds + 120, measure_seconds=args.seconds,
+                                  max_start_temp=args.max_start_temp)
                 r.update(repeat=repeat, candidate=candidate, variant=v["name"], warmup=repeat == 0,
                          role="baseline" if v is manifest["variants"][0] else "candidate",
-                         props=v["props"], accepted=bool(accepted(r, args.seconds)))
+                         props=v["props"], accepted=bool(accepted(r, args.seconds, args.max_start_temp)))
                 rows.append(r)
                 save(folder, meta, rows)
                 print(f"{tag}: {r['status']}, {r['surfaceflinger'].get('fps_avg', 0):.2f} FPS, "

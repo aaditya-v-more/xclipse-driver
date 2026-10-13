@@ -15,6 +15,42 @@ import game
 
 
 class FailureDetectionTests(unittest.TestCase):
+    def test_launch_temperature_is_checked_after_preparation(self):
+        for temperature in (46, 0, float("nan"), 45):
+            with self.subTest(temperature=temperature):
+                events = []
+
+                class Launched(Exception):
+                    pass
+
+                def shell(command, *args):
+                    if command.startswith("am start "):
+                        events.append("launch")
+                        raise Launched
+                    return ""
+
+                def cool(target, limit):
+                    events.append("temperature")
+                    self.assertEqual((target, limit), (45, 180))
+                    return temperature
+
+                with patch.object(game, "shell", shell), \
+                        patch.object(game, "free_memory", side_effect=lambda _: events.append("memory") or 1024), \
+                        patch.object(game, "gpu_faults", return_value={}), \
+                        patch.object(game, "logcat_start", side_effect=lambda _: events.append("logcat")), \
+                        patch.object(game, "logcat_stop") as stop, \
+                        patch.object(game, "cool_down", cool):
+                    if temperature == 45:
+                        with self.assertRaises(Launched):
+                            game.run_once("heaven", "radv", Path("unused"), "run1", "user", max_start_temp=45)
+                        self.assertEqual(events, ["memory", "logcat", "temperature", "launch"])
+                    else:
+                        result = game.run_once("heaven", "radv", Path("unused"), "run1", "user", max_start_temp=45)
+                        self.assertEqual(events, ["memory", "logcat", "temperature"])
+                        self.assertEqual(result["status"], "temperature-not-ready")
+                        self.assertEqual(result["surfaceflinger"], {})
+                        stop.assert_called_once_with()
+
     def test_recorded_wine_process_names(self):
         for name in (r"A:\bin\Heaven.exe", "Heaven.exe", "heaven.exe"):
             self.assertTrue(game.is_game_process(name, "Heaven.exe"))
