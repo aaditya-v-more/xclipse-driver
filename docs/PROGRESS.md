@@ -648,3 +648,20 @@ gate records `temperature-not-ready`, does not launch the game, excludes the att
 Thus this dataset contains **no scored pair**. Fixed performance mode release succeeds and RADV
 debug is restored empty. A fresh study will use a declared 50 C limit; it must not merge this
 rejected study or the October 12 partial comparison into its scores.
+
+### Broader optimization scope and telemetry reporting (2026-10-13)
+
+The user explicitly expanded the target to RAM/memory, speed, efficiency and visual quality.
+Recorded this in `AGENTS.md`. `game_compare.py` now reports 1% lows beside average FPS, whole-attempt
+RSS/swap peaks, driver-accounted GPU memory, minimum available memory, memory pressure and battery
+temperature. Summed RSS can double-count shared pages, and the GPU accounting omits some imported
+DMA-BUF memory; neither is a total working-set measurement. USB charge/voltage readings cannot
+establish system power or energy per frame, so the report does not derive efficiency from them.
+
+The active Heaven study exposed a fixed-mode transition from GPU/X4 400/1632 MHz to 252/1056 MHz.
+The report now retains raw attempts but excludes a fixed-mode pair unless both runs have the same
+single GPU/X4 clock profile with at least ten active samples each. Other CPU clusters still vary.
+This conservative check uses samples after the first surface frame plus warm-up, which need not
+exactly align with the frame-statistics window. It is an additional timing filter, not proof of
+correct rendering or a general FPS gain. An offline regression verifies different clocks, a
+mid-run CPU change, missing telemetry and the normal-mode distinction.

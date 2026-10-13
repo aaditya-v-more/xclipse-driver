@@ -129,6 +129,13 @@ Drivers alternate order from run to run. Results go to `results/<time>-game/`.
 Use repeatable `--note "..."` arguments to record experiment settings in both reports.
 The metadata and summary also record when `--radv-log` was enabled.
 
+`game_compare.py` also reports 1% lows, RSS/swap peaks, memory pressure and battery temperature.
+RSS is the sum across app/Wine processes and can count shared pages more than once; GPU accounting
+can omit imported DMA-BUF allocations. Battery readings while USB is attached do not establish
+power consumption. Fixed-mode pairs are excluded from timing comparisons when their observed
+GPU/X4 clocks differ or change during a run. Inspect the reported clock profiles and screenshots
+before treating any timing gain as usable; memory, frame-time and image-quality tradeoffs matter.
+
 Notes:
 
 - GameNative's compositor uses fifo (vsync) present mode by default, so SurfaceFlinger FPS is capped at the display refresh rate. That's fine for benchmarks running below it.

@@ -7,6 +7,24 @@ import game_compare
 
 
 class GameComparisonTests(unittest.TestCase):
+    def test_fixed_mode_cannot_score_different_or_changing_clocks(self):
+        def row(role, clock):
+            return {"repeat": 1, "candidate": "option", "role": role, "accepted": True,
+                    "seconds_to_first_frame": 0, "surfaceflinger": {"fps_avg": 40},
+                    "gpu": [[t, 100, clock, 55, 1, 1, 1, 1632000] for t in range(10, 30)]}
+        rows = [row("baseline", 400000), row("candidate", 252000)]
+        fixed = {"fixed_clocks": True}
+        self.assertEqual([r["status"] for r in game_compare.scored_rows(fixed, rows)],
+                         ["clock-excluded", "clock-excluded"])
+        self.assertTrue(all(r["accepted"] for r in rows))  # raw measurements remain intact
+        rows[1] = row("candidate", 400000)
+        self.assertTrue(all(r["status"] == "pass" for r in game_compare.scored_rows(fixed, rows)))
+        rows[1]["gpu"][0][7] = 1056000
+        self.assertTrue(all(r["status"] == "clock-excluded" for r in game_compare.scored_rows(fixed, rows)))
+        self.assertTrue(all(r["status"] == "pass" for r in game_compare.scored_rows({"fixed_clocks": False}, rows)))
+        rows[1]["gpu"] = []
+        self.assertTrue(all(r["status"] == "clock-excluded" for r in game_compare.scored_rows(fixed, rows)))
+
     def test_fixed_measurement_window_excludes_slow_tail(self):
         # 60 FPS for the ten-second warm-up plus 60 measured seconds; then a 10 FPS tail.
         times = [1_000_000_000 + round(n * 1e9 / 60) for n in range(70 * 60)]

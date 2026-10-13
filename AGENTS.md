@@ -8,6 +8,11 @@ Product direction (user, 2026-10-12): make a usable performance package for this
 ExynosTools. Its importable driver or compatibility-layer bundle should deliver repeatable gains
 with correct rendering. Research and benchmarks support that deliverable; they are not the end goal.
 
+Optimization scope (user, 2026-10-13): pursue useful gains in RAM/memory use, speed, efficiency,
+and visual quality. Average FPS is only one outcome; report frame-time stability, memory pressure,
+and rendering defects too. State tradeoffs and distinguish measured energy use from USB charging
+or temperature readings.
+
 **Start here:**
 
 1. `docs/HANDOFF.md`: current state, what's on the phone, new-PC setup, and the exact next step.

@@ -10,6 +10,7 @@ Fixed performance mode is released in finally; begin with the phone in normal mo
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import datetime as dt
 import hashlib
 import json
@@ -54,22 +55,73 @@ def accepted(r, duration, max_start_temp):
             and not r.get("gpu_page_faults", 0) and not r.get("gpu_resets", 0))
 
 
+def active_clocks(r):
+    """Observed GPU/X4 clocks after the first surface frame plus warm-up; omit GPU-off samples.
+
+    This is a conservative launch-relative telemetry window, not exact alignment with the
+    SurfaceFlinger frame window. Other CPU clusters can still change frequency in fixed mode.
+    """
+    first = r.get("seconds_to_first_frame")
+    if first is None:
+        return Counter()
+    return Counter((s[2], s[7]) for s in r.get("gpu", [])
+                   if len(s) >= 8 and s[0] >= first + game.WARMUP_S and s[2] > 0 and s[7] > 0)
+
+
+def scored_rows(meta, rows):
+    """Keep raw attempts, but never attribute a fixed-mode clock mismatch to the driver."""
+    adapted = [{**r, "test": "fps", "status": "pass" if r.get("accepted") and not r.get("warmup") else "excluded",
+                "fps": r.get("surfaceflinger", {}).get("fps_avg", 0),
+                "low": r.get("surfaceflinger", {}).get("fps_1pct_low", 0)} for r in rows]
+    if meta["fixed_clocks"]:
+        groups = {}
+        for r in adapted:
+            if r["status"] == "pass":
+                groups.setdefault((r["repeat"], r["candidate"]), []).append(r)
+        for group in groups.values():
+            clocks = [active_clocks(r) for r in group]
+            matched = (len(group) == 2 and {r["role"] for r in group} == {"baseline", "candidate"}
+                       and all(len(c) == 1 and sum(c.values()) >= 10 for c in clocks)
+                       and set(clocks[0]) == set(clocks[1]))
+            if not matched:
+                for r in group:
+                    r["status"] = "clock-excluded"
+    return adapted
+
+
+def resource_stats(r):
+    """Whole-attempt peaks include launch; RSS is summed processes, not unique physical RAM."""
+    memory = r.get("memory", [])
+    fields = {"rss_peak_mb": ("app_rss_mb", max), "swap_peak_mb": ("app_swap_mb", max),
+              "gpu_peak_mb": ("app_gpu_mb", max), "available_min_mb": ("available_mb", min),
+              "pressure_peak_pct": ("pressure_full_avg10", max),
+              "battery_peak_dc": ("battery_temperature_dc", max)}
+    out = {}
+    for name, (key, aggregate) in fields.items():
+        values = [s[key] for s in memory if s.get(key) is not None]
+        out[name] = aggregate(values) if values else None
+    return out
+
+
 def summary(meta, rows):
     out = [f"# Game comparison {meta['started']}", "", meta["manifest"].get("purpose", ""), "",
            f"Same container: {meta['manifest']['bench']}-{meta['manifest']['driver']}. "
            f"Fixed mode: {meta['fixed_clocks']}; {meta['seconds']} s measured per run after warm-up.",
            "Each variant has an unscored warm-up run; persistent shader caches are retained.",
-           "Only complete accepted pairs count. Positive gain means faster; range is observed, not a confidence interval.",
+           "Only complete accepted pairs count. Fixed-mode scores additionally require identical single GPU/X4 clocks",
+           "with at least ten active samples per run. This does not lock every CPU cluster or establish normal-mode performance.",
+           "Positive gain means faster; range is observed, not a confidence interval.",
            f"Visual review: {meta.get('visual_review', 'PENDING; timings remain provisional')}", "",
-           "| Candidate | Valid pairs | Baseline FPS median | Candidate FPS median | Paired gain median | Paired range |",
-           "|---|---:|---:|---:|---:|---:|"]
+           f"Clock review: {meta.get('clock_review', 'See observed GPU/X4 profiles below.')}", "",
+           "| Candidate | Metric | Timing pairs | Baseline median | Candidate median | Paired gain median | Paired range |",
+           "|---|---|---:|---:|---:|---:|---:|"]
+    adapted = scored_rows(meta, rows)
     for v in meta["manifest"]["variants"][1:]:
-        adapted = [{**r, "test": "fps", "status": "pass" if r.get("accepted") and not r.get("warmup") else "excluded",
-                    "fps": r.get("surfaceflinger", {}).get("fps_avg", 0)} for r in rows]
-        values = compare.compare_values(adapted, "fps", v["name"], "fps", True)
-        if values:
-            n, b, c, gain, lo, hi = values
-            out.append(f"| {v['name']} | {n} | {b:.2f} | {c:.2f} | {gain:+.2f}% | {lo:+.2f}..{hi:+.2f}% |")
+        for metric, label in (("fps", "Average FPS"), ("low", "1% low FPS")):
+            values = compare.compare_values(adapted, "fps", v["name"], metric, True)
+            if values:
+                n, b, c, gain, lo, hi = values
+                out.append(f"| {v['name']} | {label} | {n} | {b:.2f} | {c:.2f} | {gain:+.2f}% | {lo:+.2f}..{hi:+.2f}% |")
     out += ["", "| Pair | Variant | Accepted | FPS | 1% low | GPU MHz | GPU C | Start C |",
             "|---|---|---|---:|---:|---:|---:|---:|"]
     for r in rows:
@@ -79,6 +131,26 @@ def summary(meta, rows):
                    f"{s.get('fps_avg', 0):.2f} | {s.get('fps_1pct_low', 0):.2f} | "
                    f"{r.get('gpu_clock_mhz', 0):.1f} | {r.get('gpu_temp_c_mean', 0):.1f} | "
                    f"{r.get('gpu_temp_c_before', 0):.1f} |")
+    out += ["", "Whole-attempt memory peaks include launch. Summed process RSS can double-count shared pages;",
+            "driver-accounted GPU memory can omit imported DMA-BUF allocations. Neither is total physical RAM.",
+            "USB battery charge/voltage readings do not measure system power or energy per frame.", "",
+            "| Pair | Variant | Peak RSS MiB | Peak swap MiB | Accounted GPU MiB | Min available MiB | Peak memory PSI % | Peak battery C |",
+            "|---|---|---:|---:|---:|---:|---:|---:|"]
+    for r in rows:
+        p = resource_stats(r)
+        def value(key, scale=1):
+            return f"{p[key] / scale:.1f}" if p[key] is not None else "missing"
+        pair = "warm-up" if r.get("warmup") else f"{r['repeat']}/{r['candidate']}"
+        out.append(f"| {pair} | {r['variant']} | {value('rss_peak_mb')} | {value('swap_peak_mb')} | "
+                   f"{value('gpu_peak_mb')} | {value('available_min_mb')} | {value('pressure_peak_pct')} | "
+                   f"{value('battery_peak_dc', 10)} |")
+    out += ["", "Observed GPU/X4 profiles after first surface frame + warm-up, excluding GPU-off samples.",
+            "Profiles need not align exactly with the measured frame window. Missing or changing clocks exclude fixed-mode pairs.", "",
+            "| Pair | Variant | GPU/X4 MHz: samples | Timing status |", "|---|---|---|---|"]
+    for r, scored in zip(rows, adapted):
+        profile = ", ".join(f"{gpu / 1000:g}/{cpu / 1000:g}: {count}" for (gpu, cpu), count in sorted(active_clocks(r).items()))
+        pair = "warm-up" if r.get("warmup") else f"{r['repeat']}/{r['candidate']}"
+        out.append(f"| {pair} | {r['variant']} | {profile or 'missing'} | {scored['status']} |")
     if meta.get("error"):
         out += ["", f"Stopped: {meta['error']}"]
     return "\n".join(out) + "\n"
