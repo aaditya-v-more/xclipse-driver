@@ -637,3 +637,14 @@ imports, ICD JSONs and backups are retained. Added `gn_driver.py envs GAME NAME=
 batch environment updates with one save and readback of every value after reopening. The
 three-value restoration is its on-device validation; Python compilation, the 12 offline
 regression checks, help/invalid-argument checks, and diff checks pass.
+
+### Actual-launch thermal gate verified on the phone
+
+`results/2026-10-13_173017-game-compare` uses the restored fc066b9 container and the original
+45 C limit. Both unscored warm-ups complete (38.30 / 49.69 FPS, starts 44 / 45 C, no lost samples
+or GPU events; all four sampled screenshots render normally). Before the first scored launch,
+the phone fails to reach the limit within 180 seconds: the final reading is **46 C**. The new
+gate records `temperature-not-ready`, does not launch the game, excludes the attempt and stops.
+Thus this dataset contains **no scored pair**. Fixed performance mode release succeeds and RADV
+debug is restored empty. A fresh study will use a declared 50 C limit; it must not merge this
+rejected study or the October 12 partial comparison into its scores.
