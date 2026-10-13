@@ -80,6 +80,13 @@ Text environment variables can be added or updated through the Environment tab:
 python pipeline/gn_driver.py env Heaven-radv DXVK_CONFIG "dxvk.enableDescriptorBuffer=False"
 ```
 
+For several changes, `envs` opens the container once, saves once, then reopens it and verifies
+every value. Quote an entire `NAME=VALUE` argument when its value contains spaces:
+
+```sh
+python pipeline/gn_driver.py envs Heaven-radv DXVK_LOG_LEVEL=none WRAPPER_DISABLE_PLACED=0
+```
+
 The helper scrolls the tab row, uses the Add dialog to insert or replace the named value, saves,
 and verifies it after reopening. It never deletes a variable. Record the old value before changing
 it; this command replaces the entire value, so preserve any other settings in an existing

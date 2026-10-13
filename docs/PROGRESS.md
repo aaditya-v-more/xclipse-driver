@@ -602,3 +602,38 @@ and culling checks (24 X11, 23 normal Android). It stops at the 45 C cooldown li
 last normal-build culling attempt; this is an incomplete comparison, not a test failure. The phone
 subsequently read 38 C, zero fault/reset/timeout counters. Manifest: `x11-native.json` beside the
 no-flush manifest. Loading is proven; X11 presentation is still untested at this milestone.
+
+### Direct X11 reaches swapchain creation, but not a displayed frame
+
+Backed up Heaven-radv as `tools/Heaven-radv-before-x11-20261013.json`, keeping the matching
+phone export. Imported the X11 ZIP (SHA256
+`cf943bd574ae1e32207ba3fb062891ae9cc23cbac0865038e90219166da2d485`) with phone checksum verification
+and driver selection readback. The tracked `experiments/2026-10-13/radv-x11-17785a9.json` points
+to that imported library; its phone copy is under `/sdcard/Download/xclipse/`. Set
+`VK_ICD_FILENAMES` to this JSON and `RADV_XCLIPSE_GAMENATIVE_WSI=1` through the container UI.
+Kept descriptor buffers disabled and retained the original emulator presets.
+
+Three diagnostic attempts (`171447-game`, `171735-game`, `172115-game` on 2026-10-13) all end
+`game-exited`, with no captured frames and no GPU faults or resets. The first coincided with
+an incoming call; the repeat with DND `none` behaves the same. The third enables DXVK
+info logging. Final guest environment confirms the ICD override; RADV's instance entry and
+texture-upload submissions appear in the log. DXVK reports successful creation of a 1280x720
+BGRA8 swapchain with five images. This proves direct loading and swapchain creation on the
+official APK without an app rebuild, **not working presentation**.
+
+GameNative reports `BadImplementation` for Present's major opcode 153. Its pinned source
+does not implement QueryCapabilities, which Mesa calls, but Mesa already tolerates an absent
+capability reply; this alone does not prove the exit cause. Later GameNative reports
+`processes_exited` and terminates the remaining guest processes (status 137). That cleanup
+status is not evidence of an OOM or GPU hang. No driver change is justified by the logs yet;
+the next direct-path investigation needs focused acquire/submit/present tracing or a small
+X11 presentation probe. No X11 performance claim is made.
+
+Restored and read back the original `xd-fc066b9` driver, `RADV_XCLIPSE_GAMENATIVE_WSI=0`,
+`DXVK_LOG_LEVEL=none`, and `VK_ICD_FILENAMES` pointing to GameNative's original
+`/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json`.
+Those last three variables remain as explicit defaults; no environment row was deleted. All
+imports, ICD JSONs and backups are retained. Added `gn_driver.py envs GAME NAME=VALUE ...` to
+batch environment updates with one save and readback of every value after reopening. The
+three-value restoration is its on-device validation; Python compilation, the 12 offline
+regression checks, help/invalid-argument checks, and diff checks pass.

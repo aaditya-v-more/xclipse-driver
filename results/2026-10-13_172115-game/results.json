@@ -1,0 +1,523 @@
+{
+  "meta": {
+    "started": "2026-10-13T17:21:15",
+    "benches": [
+      "heaven"
+    ],
+    "drivers": [
+      "radv"
+    ],
+    "runs": 1,
+    "gpu_temp_c_start": 41.0,
+    "props": {},
+    "display_hz": 120,
+    "radv_log": true,
+    "notes": [
+      "Direct X11 diagnostic with DXVK info logging: identify repeatable exit before rendering; descriptor buffers remain disabled"
+    ],
+    "max_consecutive_failures": 2,
+    "battery_start": {
+      "battery_charge_uah": 980875,
+      "battery_level": 41,
+      "battery_voltage_mv": 3857,
+      "battery_temperature_dc": 378
+    }
+  },
+  "results": [
+    {
+      "bench": "heaven",
+      "driver": "radv",
+      "app_id": 2000940202,
+      "available_mb_before": 3171,
+      "logcat_file": "run1-heaven-radv-logcat.txt",
+      "gpu_temp_c_before": 42.0,
+      "screens": [
+        "run1-heaven-radv-15s.png"
+      ],
+      "status": "game-exited",
+      "game_exited_s": 33,
+      "seconds_to_game_process": 6,
+      "seconds_to_first_frame": null,
+      "layer": null,
+      "surfaceflinger": {
+        "frames": 0
+      },
+      "refresh_period_ns": null,
+      "memory": [
+        {
+          "t": 1,
+          "available_mb": 2863,
+          "swap_free_mb": 9989,
+          "app_rss_mb": 252,
+          "app_swap_mb": 35,
+          "gpu_total_mb": 197,
+          "app_gpu_mb": 19,
+          "pressure_full_avg10": 0.14,
+          "battery_charge_uah": 980875,
+          "battery_level": 41,
+          "battery_voltage_mv": 3849,
+          "battery_temperature_dc": 377
+        },
+        {
+          "t": 6,
+          "available_mb": 2776,
+          "swap_free_mb": 9995,
+          "app_rss_mb": 527,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 236,
+          "app_gpu_mb": 60,
+          "pressure_full_avg10": 0.09,
+          "battery_charge_uah": 983250,
+          "battery_level": 41,
+          "battery_voltage_mv": 3835,
+          "battery_temperature_dc": 377
+        },
+        {
+          "t": 11,
+          "available_mb": 2553,
+          "swap_free_mb": 9832,
+          "app_rss_mb": 702,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 355,
+          "app_gpu_mb": 179,
+          "pressure_full_avg10": 1.08,
+          "battery_charge_uah": 983250,
+          "battery_level": 41,
+          "battery_voltage_mv": 3835,
+          "battery_temperature_dc": 377
+        },
+        {
+          "t": 17,
+          "available_mb": 2449,
+          "swap_free_mb": 9833,
+          "app_rss_mb": 767,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 451,
+          "app_gpu_mb": 275,
+          "pressure_full_avg10": 0.59,
+          "battery_charge_uah": 983250,
+          "battery_level": 41,
+          "battery_voltage_mv": 3831,
+          "battery_temperature_dc": 380
+        },
+        {
+          "t": 23,
+          "available_mb": 2339,
+          "swap_free_mb": 9803,
+          "app_rss_mb": 308,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 579,
+          "app_gpu_mb": 403,
+          "pressure_full_avg10": 0.32,
+          "battery_charge_uah": 983250,
+          "battery_level": 41,
+          "battery_voltage_mv": 3831,
+          "battery_temperature_dc": 380
+        },
+        {
+          "t": 28,
+          "available_mb": 3090,
+          "swap_free_mb": 9811,
+          "app_rss_mb": 190,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 196,
+          "app_gpu_mb": 2,
+          "pressure_full_avg10": 0.21,
+          "battery_charge_uah": 983250,
+          "battery_level": 41,
+          "battery_voltage_mv": 3845,
+          "battery_temperature_dc": 382
+        },
+        {
+          "t": 33,
+          "available_mb": 3121,
+          "swap_free_mb": 9812,
+          "app_rss_mb": 190,
+          "app_swap_mb": 32,
+          "gpu_total_mb": 195,
+          "app_gpu_mb": 2,
+          "pressure_full_avg10": 0.11,
+          "battery_charge_uah": 983250,
+          "battery_level": 41,
+          "battery_voltage_mv": 3845,
+          "battery_temperature_dc": 382
+        }
+      ],
+      "gpu": [
+        [
+          0.6,
+          22,
+          400000,
+          47.0,
+          1824000,
+          2304000,
+          2784000,
+          2688000
+        ],
+        [
+          1.7,
+          13,
+          400000,
+          51.0,
+          1824000,
+          2304000,
+          2688000,
+          2688000
+        ],
+        [
+          2.6,
+          17,
+          252000,
+          50.0,
+          1824000,
+          2208000,
+          2784000,
+          2016000
+        ],
+        [
+          3.4,
+          17,
+          252000,
+          50.0,
+          1824000,
+          2304000,
+          2016000,
+          2016000
+        ],
+        [
+          4.2,
+          0,
+          252000,
+          50.0,
+          1632000,
+          1824000,
+          1824000,
+          1920000
+        ],
+        [
+          5.1,
+          0,
+          0,
+          49.0,
+          1152000,
+          1344000,
+          672000,
+          1920000
+        ],
+        [
+          6.0,
+          0,
+          252000,
+          48.0,
+          1152000,
+          1632000,
+          672000,
+          1920000
+        ],
+        [
+          7.5,
+          0,
+          252000,
+          49.0,
+          576000,
+          1632000,
+          960000,
+          1632000
+        ],
+        [
+          8.4,
+          0,
+          252000,
+          48.0,
+          1056000,
+          1440000,
+          1632000,
+          1632000
+        ],
+        [
+          9.4,
+          0,
+          252000,
+          49.0,
+          1152000,
+          1632000,
+          1632000,
+          1632000
+        ],
+        [
+          10.3,
+          0,
+          0,
+          49.0,
+          1536000,
+          1632000,
+          1632000,
+          1632000
+        ],
+        [
+          11.2,
+          0,
+          0,
+          49.0,
+          1536000,
+          1632000,
+          1632000,
+          1632000
+        ],
+        [
+          12.5,
+          0,
+          252000,
+          48.0,
+          1152000,
+          1344000,
+          1632000,
+          1632000
+        ],
+        [
+          13.4,
+          0,
+          252000,
+          49.0,
+          1152000,
+          1248000,
+          1632000,
+          1632000
+        ],
+        [
+          14.4,
+          0,
+          650000,
+          49.0,
+          768000,
+          1248000,
+          1632000,
+          1632000
+        ],
+        [
+          15.4,
+          0,
+          252000,
+          48.0,
+          1536000,
+          1632000,
+          1632000,
+          1632000
+        ],
+        [
+          16.9,
+          0,
+          0,
+          48.0,
+          1152000,
+          1536000,
+          1536000,
+          1536000
+        ],
+        [
+          18.6,
+          0,
+          0,
+          48.0,
+          960000,
+          1248000,
+          1536000,
+          1536000
+        ],
+        [
+          19.6,
+          0,
+          0,
+          48.0,
+          1152000,
+          1248000,
+          1536000,
+          1536000
+        ],
+        [
+          20.6,
+          0,
+          0,
+          48.0,
+          864000,
+          1248000,
+          1536000,
+          1536000
+        ],
+        [
+          21.6,
+          0,
+          0,
+          47.0,
+          1152000,
+          1344000,
+          1536000,
+          1536000
+        ],
+        [
+          22.5,
+          0,
+          252000,
+          47.0,
+          1152000,
+          1440000,
+          1536000,
+          1536000
+        ],
+        [
+          23.9,
+          0,
+          400000,
+          48.0,
+          1536000,
+          1920000,
+          2688000,
+          2688000
+        ],
+        [
+          24.6,
+          0,
+          0,
+          47.0,
+          1728000,
+          2304000,
+          2304000,
+          2304000
+        ],
+        [
+          25.3,
+          0,
+          400000,
+          47.0,
+          1536000,
+          1920000,
+          2304000,
+          2304000
+        ],
+        [
+          26.0,
+          0,
+          0,
+          46.0,
+          1152000,
+          1536000,
+          672000,
+          672000
+        ],
+        [
+          26.8,
+          0,
+          0,
+          46.0,
+          1152000,
+          1344000,
+          672000,
+          672000
+        ],
+        [
+          27.6,
+          1,
+          252000,
+          45.0,
+          1152000,
+          1248000,
+          672000,
+          672000
+        ],
+        [
+          28.8,
+          0,
+          0,
+          44.0,
+          1152000,
+          1536000,
+          672000,
+          672000
+        ],
+        [
+          29.6,
+          0,
+          0,
+          44.0,
+          1152000,
+          1344000,
+          672000,
+          672000
+        ],
+        [
+          30.3,
+          0,
+          0,
+          44.0,
+          1152000,
+          1344000,
+          672000,
+          672000
+        ],
+        [
+          31.1,
+          0,
+          0,
+          43.0,
+          1152000,
+          1344000,
+          672000,
+          672000
+        ],
+        [
+          32.0,
+          0,
+          0,
+          44.0,
+          1152000,
+          1536000,
+          672000,
+          672000
+        ],
+        [
+          32.8,
+          0,
+          0,
+          43.0,
+          1152000,
+          1440000,
+          672000,
+          672000
+        ]
+      ],
+      "present_ns": [],
+      "screenshot": "run1-heaven-radv-screen.png",
+      "vulkan_drivers_seen": [
+        "radv"
+      ],
+      "launch_settings": [
+        "Screen Size: 1280x720",
+        "Graphics Driver: Wrapper",
+        "DX Wrapper: dxvk (Config: 'version=2.7.1,framerate=0,maxDeviceMemory=0,async=0,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+        "WoW64 Mode: true",
+        "Box64 Version: 0.3.6",
+        "Box64 Preset: COMPATIBILITY",
+        "FEXCore Preset: INTERMEDIATE",
+        "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WINEDLLOVERRIDES=msvcr100,msvcp100=b WRAPPER_NATIVE_BCN=1 WRAPPER_DISABLE_PLACED=0 DXVK_CONFIG=dxvk.enableDescriptorBuffer=False RADV_XCLIPSE_GAMENATIVE_WSI=1 VK_ICD_FILENAMES=/sdcard/Download/xclipse/radv-x11-17785a9.json DXVK_LOG_LEVEL=info",
+        "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=info DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=dxvk.enableDescriptorBuffer=False VK_ICD_FILENAMES=/sdcard/Download/xclipse/radv-x11-17785a9.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-17785a9-x11)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 WRAPPER_EMULATE_BCN=0 WRAPPER_USE_BCN_CACHE=0 WRAPPER_BCN_GPU=0 WRAPPER_ASTC_BLOCK=8x8 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=-all WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact,deck_emu MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform,deck_emu VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 WINEDLLOVERRIDES=msvcr100,msvcp100=b WRAPPER_NATIVE_BCN=1 WRAPPER_DISABLE_PLACED=0 RADV_XCLIPSE_GAMENATIVE_WSI=1 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+      ],
+      "processes": [
+        "A:\\bin\\Heaven.exe",
+        "C:\\windows\\system32\\explorer.exe",
+        "C:\\windows\\system32\\services.exe",
+        "C:\\windows\\system32\\tabtip.exe",
+        "C:\\windows\\system32\\winedevice.exe",
+        "app.gamenative",
+        "libpulseaudio.so",
+        "logcat",
+        "start.exe",
+        "wineserver",
+        "winhandler.exe"
+      ],
+      "gpu_page_faults": 0,
+      "gpu_resets": 0,
+      "gpu_temp_c_after": 43.0,
+      "run": 1
+    }
+  ]
+}

@@ -24,6 +24,7 @@ usage: python pipeline/gn_driver.py install ZIP GAME [GAME...]
        python pipeline/gn_driver.py import-content WCP
        python pipeline/gn_driver.py export-config GAME DESTINATION
        python pipeline/gn_driver.py env GAME NAME VALUE
+       python pipeline/gn_driver.py envs GAME NAME=VALUE [NAME=VALUE...]
 
 install copies ZIP (a build from driver/dist) to the phone's Download/xclipse folder, imports it in
 Driver Manager unless it's there already, and makes it the Graphics Driver Version of each GAME (a
@@ -38,6 +39,7 @@ import-content copies a DXVK WCP to Download/xclipse, verifies its checksum, imp
 Contents Manager, and reopens the installed list to verify it. It does not select a DXVK version.
 export-config saves a container's JSON to Download/xclipse and pulls it to DESTINATION on the PC.
 env adds or updates a text-valued environment variable, saves, and verifies its value after reopening.
+envs does the same for several variables with one save and one verification pass.
 """
 
 from __future__ import annotations
@@ -232,44 +234,50 @@ def open_environment(game: str, from_library: bool = True) -> list[dict]:
 
 
 def set_env(game: str, name: str, value: str) -> None:
-    """Use the add dialog's EnvVars.put operation to insert/update one value; never delete rows."""
-    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
-        sys.exit(f"invalid environment variable name: {name!r}")
+    set_envs(game, {name: value})
+
+
+def set_envs(game: str, values: dict[str, str]) -> None:
+    """Update text values through Add, save once, then read all back; never delete rows."""
+    if not values or any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in values):
+        sys.exit("provide at least one valid environment variable name")
     open_environment(game)
     h = screen_height()
-    found = scroll_to("Add environment variable", 600, h - 500, h - 1300, h)
-    if not found:
-        sys.exit("Add environment variable was not found")
-    tap_node(*found)
-    _, _, nodes = wait_for("New Environment Variable")
-    for index, text in enumerate((name, value)):
-        fields = sorted((n for n in nodes if n["cls"] == "EditText"), key=lambda n: n["y"])
-        if len(fields) != 2:
-            sys.exit(f"expected Name and Value text fields; found {len(fields)}")
-        tap_node(fields[index], nodes)
-        if clear() or type_text(text) != text:
-            sys.exit(f"environment variable field did not read back as {text!r}; not saved")
-        nodes = dump()
-    _, confirm, nodes = wait_for("Ok", "OK")
-    if not find(nodes, "New Environment Variable"):
-        sys.exit("not confirming an unexpected dialog")
-    tap_node(confirm, nodes)
-    state, _, nodes = wait_for(f"{game} Config*", f"{game} Config")
+    for name, value in values.items():
+        found = scroll_to("Add environment variable", 600, h - 500, h - 1300, h)
+        if not found:
+            sys.exit("Add environment variable was not found")
+        tap_node(*found)
+        _, _, nodes = wait_for("New Environment Variable")
+        for index, text in enumerate((name, value)):
+            fields = sorted((n for n in nodes if n["cls"] == "EditText"), key=lambda n: n["y"])
+            if len(fields) != 2:
+                sys.exit(f"expected Name and Value text fields; found {len(fields)}")
+            tap_node(fields[index], nodes)
+            if clear() or type_text(text) != text:
+                sys.exit(f"environment variable field did not read back as {text!r}; not saved")
+            nodes = dump()
+        _, confirm, nodes = wait_for("Ok", "OK")
+        if not find(nodes, "New Environment Variable"):
+            sys.exit("not confirming an unexpected dialog")
+        tap_node(confirm, nodes)
+        state, _, nodes = wait_for(f"{game} Config*", f"{game} Config")
     if state.endswith("*"):
         tap_node(title_buttons(nodes)[1], nodes)
         wait_for("Game Information")
     else:  # EnvVars.put may have set the value it already had.
         close_container(nodes)
     open_environment(game, from_library=False)
-    found = scroll_to(name, 600, h - 500, h - 1300, h)
-    if not found:
-        sys.exit(f"{name} is missing after saving and reopening")
-    lab, nodes = found
-    fields = [n for n in nodes if n["cls"] == "EditText" and abs(n["y"] - lab["y"]) < 80]
-    if len(fields) != 1 or fields[0]["text"] != value:
-        sys.exit(f"{name} did not read back as the text value {value!r}")
+    for name, value in values.items():
+        found = scroll_to(name, 600, h - 500, h - 1300, h)
+        if not found:
+            sys.exit(f"{name} is missing after saving and reopening")
+        lab, nodes = found
+        fields = [n for n in nodes if n["cls"] == "EditText" and abs(n["y"] - lab["y"]) < 80]
+        if len(fields) != 1 or fields[0]["text"] != value:
+            sys.exit(f"{name} did not read back as the text value {value!r}")
+        print(f"{game}: {name}={value} (read back after saving)", flush=True)
     close_container(nodes)
-    print(f"{game}: {name}={value} (read back after saving)", flush=True)
 
 
 def args_field(nodes: list[dict]) -> dict:
@@ -599,6 +607,9 @@ def main() -> None:
     env_parser.add_argument("game")
     env_parser.add_argument("name")
     env_parser.add_argument("value")
+    envs_parser = commands.add_parser("envs", help="update several environment values, save once, and verify all")
+    envs_parser.add_argument("game")
+    envs_parser.add_argument("entries", nargs="+", metavar="NAME=VALUE")
     select_parser = commands.add_parser("select", help="select an installed graphics driver")
     select_parser.add_argument("entry")
     select_parser.add_argument("games", nargs="+")
@@ -612,6 +623,14 @@ def main() -> None:
             sub.add_argument("value")
         sub.add_argument("--tab", choices=TAB_MARKERS, default="Graphics")
     args = parser.parse_args()
+    if args.command == "envs":
+        if any("=" not in entry for entry in args.entries):
+            parser.error("envs takes NAME=VALUE entries")
+        env_values = dict(entry.split("=", 1) for entry in args.entries)
+        if len(env_values) != len(args.entries):
+            parser.error("envs requires distinct variable names")
+        if any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) for name in env_values):
+            parser.error("invalid environment variable name")
     if args.command == "args":
         texts = {}
         for game in args.games:
@@ -631,6 +650,8 @@ def main() -> None:
             export_config(args.game, args.destination)
         elif args.command == "env":
             set_env(args.game, args.name, args.value)
+        elif args.command == "envs":
+            set_envs(args.game, env_values)
         elif args.command == "select":
             for game in args.games:
                 select(args.entry, game)
