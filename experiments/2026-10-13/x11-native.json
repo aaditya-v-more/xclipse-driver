@@ -1,0 +1,21 @@
+{
+  "purpose": "Verify native loading and correctness of the rebuilt 17785a9 X11 driver using its pinned dependency closure; these offscreen tests do not validate presentation",
+  "variants": [
+    {
+      "name": "android",
+      "library": "tools/driver-17785a9.so",
+      "sha256": "8a18f2883927cb3087a520a364c69544303ca6020902b10c7f64e8a918c7a38d",
+      "env": {"RADV_XCLIPSE_LOG": "0"}
+    },
+    {
+      "name": "x11",
+      "library": "tools/driver-17785a9-x11.so",
+      "sha256": "9c54a02cb96027f672923968e8bc75e5f9defd7a73047b2caa912f3dc2caac51",
+      "env": {
+        "RADV_XCLIPSE_LOG": "0",
+        "RADV_XCLIPSE_GAMENATIVE_WSI": "1",
+        "LD_LIBRARY_PATH": "/data/local/tmp/xd/x11-9c54a02cb96027f6"
+      }
+    }
+  ]
+}

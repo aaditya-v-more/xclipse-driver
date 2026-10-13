@@ -581,3 +581,24 @@ readings when accepting scores. An unmet limit returns a checkpointable `tempera
 attempt without launching GameNative. Regression coverage verifies the launch ordering, the exact
 limit, invalid readings, and score exclusion. Python compilation, all 12 offline regression tests,
 both affected CLI help commands, and `git diff --check` pass. A fresh phone comparison is still needed.
+
+### Small-draw no-flush measurements and native X11 loading
+
+`results/2026-10-13_170025-compare` completes six AB/BA pairs for culling, draws and graphics
+scratch (36 passing attempts, zero GPU events). Fixed performance mode, CPU 9 affinity and a
+45 C start limit match the pinned manifest. Against threshold 128 with the flush retained,
+the opt-in no-flush path reduces tiny-draw GPU time **0.372 to 0.121 microseconds** (3.07x
+throughput) and CPU recording **0.091 to 0.078 microseconds**. Pipeline-switch GPU time improves
+**0.5035 to 0.4845 microseconds**. All six paired draw gains are positive. Graphics scratch shows
+no consistent benefit (paired range -4.01% to +16.89%). Fixed mode release succeeded. The change
+remains default-off: these tests do not establish game correctness or general synchronization safety.
+
+Rebuilt X11 package `radv-xclipse-26.3.0-devel-xd-17785a9-x11.zip`, ELF SHA256
+`9c54a02cb96027f672923968e8bc75e5f9defd7a73047b2caa912f3dc2caac51`, retained as
+`tools/driver-17785a9-x11.so`. `deploy_x11.py` verified and deployed its 11 pinned runtime libraries
+to `/data/local/tmp/xd/x11-9c54a02cb96027f6/`, with every phone checksum read back.
+`results/2026-10-13_170238-compare` passes all 47 attempted offscreen compute, render, descriptor
+and culling checks (24 X11, 23 normal Android). It stops at the 45 C cooldown limit before the
+last normal-build culling attempt; this is an incomplete comparison, not a test failure. The phone
+subsequently read 38 C, zero fault/reset/timeout counters. Manifest: `x11-native.json` beside the
+no-flush manifest. Loading is proven; X11 presentation is still untested at this milestone.
