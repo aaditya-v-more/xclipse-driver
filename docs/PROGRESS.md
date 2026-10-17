@@ -703,3 +703,68 @@ runner help and diff checks passed.
 The user then requested **stop work, update handoff, commit and push**. No experiment remained
 active. Updated `docs/HANDOFF.md` with artifact hashes, restored settings, broader optimization
 direction and exact next steps. No new driver default was enabled or phone artifact removed.
+
+## Resumed on the Mac over wireless debugging; Heaven window boundary fixed (2026-10-17)
+
+Resumed from the handoff's next step 2 on the Mac. The S24 FE connects over wireless debugging
+(this Mac is paired; another phone was on USB). `run.py` now selects the transport whose
+`ro.serialno` is `RZCY90ZYQXZ` and reconnects after a Wi-Fi drop: one mid-run drop on this day
+ended a run as `phone-lost` without a reboot or GPU event (all six counters 0). Per the user, the
+screen now stays on while on AC or USB power (`stay_on_while_plugged_in=3`), because the phone
+charges from a wall charger; the scripts set that value and still restore whatever they found.
+The battery reached about 42 C while fast-charging, so record battery temperature with results.
+
+Set up the portable Mac toolchain (`tools/setup.sh`). The offline suites pass under its Python
+3.13; macOS's system Python 3.9 cannot run them. Rebuilt `driver/` at `17785a9` as
+`radv-xclipse-26.3.0-devel-xd-1d3d990.zip` (SHA256 `197676275a37b901...`), ELF SHA256
+`84f229742c545252c75e37f95e4fd2630b5475262f9df285fbe16c6dcc2c5a23`. That differs from the
+Windows build of the same source (`8a18f288...`), so record which ELF a result used.
+`results/2026-10-17_145444`: placed, descriptors, culling, render, queries, transform feedback,
+graphics and compute scratch all pass on RADV and stock (stock skips `placed`). No GPU events.
+
+### What the measurement window was really measuring
+
+The handoff asked to verify the true game start before another six-pair study. Dense screenshots
+(`results/2026-10-17_143324-game`) and per-read SurfaceFlinger timestamps aligned to the phone's
+CLOCK_MONOTONIC (scratch probes, not kept) show Heaven's launch:
+
+1. GameNative's booting frames, sparse, from about 4 s after launch.
+2. Heaven's own LOADING screen (title, key help) as a burst of about 100 frames at up to 45 FPS.
+3. A real 3 to 6.5 s presentation stall.
+4. Continuous rendering of the benchmark scene (village, then airship).
+
+The old detector started the clock at the LOADING burst (10 frames within 2 s), so its 10 s
+warm-up ended 0 to 4.5 s into real rendering, by a different amount in each run. Heaven's
+flythrough is timed, so this misaligns which scenes each paired run measures. It also explains
+the 2026-10-13 pair 4 rejection: the window began at the end of the stall and fell 5 ms short.
+The earlier "loading at 35 s" screenshots were slow launches photographed before rendering, not
+evidence that the window contained loading.
+
+Two capture bugs compounded it. SurfaceFlinger's ring holds 128 records but prints at most 124 to
+127 on this phone, so the overflow check (`rows >= 128`) never fired. Frames lost while a poll was
+slow (screenshots over wireless take 1.3 to 3 s, longer than the ring's ~2.1 s at 60 FPS) were
+counted as single long frames, lowering FPS and 1% lows without any sampling gap being reported.
+While GameNative boots, the ring also drops old records before it fills.
+
+Fixes (`185fcc5`, regression tests in `test_game.py` and `test_game_compare.py`):
+
+- The start is the first 10-frames-in-2-s burst inside a stretch with no real stall (gap over 2 s
+  that is not a sampling hole) lasting 30 s. Games without a loading stall start as before.
+- A read that doesn't overlap the newest frame already seen records a hole.
+- `seconds_to_rendering` maps the start to launch time using the smallest read latency (within an
+  adb round trip). GPU telemetry and the fixed-clock filter use that window instead of the first
+  surface frame plus 10 s.
+- Scheduled screenshots are written on the phone in the background and copied after the run.
+
+Validation, `results/2026-10-17_window-check` (one Heaven RADV run through the `game_compare`
+capture path: 90 s window, 50 C start limit, normal clocks, not fixed mode): rendering starts at
+22.2 s, right after a 2.95 s stall that follows a 101-frame LOADING burst. The 90 s window has
+no sampling gaps, its longest frame interval is 0.19 s, and it measures 38.59 FPS with a
+9.89 FPS 1% low. Both screenshots show the scene and arrived without interrupting frame reads. The only recorded hole is
+before loading. No GPU faults or resets. The 65 s screenshot again shows thin blue lines across
+the sky: the artifact remains unexplained.
+
+Re-scoring the 2026-10-13 study with the new start is not possible: those runs stopped capturing
+at the end of the old window, and their holes were never recorded. Its numbers stay diagnostic.
+The next step is a fresh six-pair study with the fixed window (preferably over USB, which avoids
+Wi-Fi drops), then the blue-line investigation with matched reference captures.
