@@ -72,6 +72,7 @@ struct radv_image {
 
    /* For VK_ANDROID_native_buffer, the WSI image owns the memory, */
    VkDeviceMemory owned_memory;
+   uint8_t xclipse_mem_kind; /* 1 + kind in the [IMG_MEM] tally, 0 when not counted */
 
    unsigned plane_count;
    bool disjoint;

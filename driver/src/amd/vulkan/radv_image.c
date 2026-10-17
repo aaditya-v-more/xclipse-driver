@@ -1478,6 +1478,8 @@ radv_image_create_layout(struct radv_device *device, struct radv_image_create_in
    return VK_SUCCESS;
 }
 
+static void radv_xclipse_image_tally(struct radv_image *image, bool created);
+
 static void
 radv_destroy_image(struct radv_device *device, const VkAllocationCallbacks *pAllocator, struct radv_image *image)
 {
@@ -1500,9 +1502,62 @@ radv_destroy_image(struct radv_device *device, const VkAllocationCallbacks *pAll
                                 VK_DEVICE_ADDRESS_BINDING_TYPE_UNBIND_EXT);
    }
 
+   radv_xclipse_image_tally(image, false);
    radv_rmv_log_resource_destroy(device, (uint64_t)radv_image_to_handle(image));
    vk_image_finish(&image->vk);
    vk_free2(&device->vk.alloc, pAllocator, image);
+}
+
+/* Live image bytes per kind, with debug.radv_xclipse_log >= 1, to show what fills a game's memory:
+ * colour targets, depth/stencil, storage, block-compressed and other sampled images. A line goes out
+ * when the total moves 64 MB from the last line, and each image of 16 MB or more gets its own. */
+static void
+radv_xclipse_image_tally(struct radv_image *image, bool created)
+{
+#ifdef __ANDROID__
+   enum { K_RT, K_DS, K_STORAGE, K_BC, K_TEX, K_COUNT };
+   static const char *const kname[K_COUNT] = {"rt", "ds", "storage", "bc", "tex"};
+   static uint64_t kind_bytes[K_COUNT], total, last_total;
+   static uint32_t count;
+
+   unsigned kind;
+   if (created) {
+      if (ac_xclipse_log_level() < 1)
+         return;
+      const VkImageUsageFlags2KHR usage = image->vk.usage;
+      kind = (usage & VK_IMAGE_USAGE_2_COLOR_ATTACHMENT_BIT_KHR)           ? K_RT
+             : (usage & VK_IMAGE_USAGE_2_DEPTH_STENCIL_ATTACHMENT_BIT_KHR) ? K_DS
+             : (usage & VK_IMAGE_USAGE_2_STORAGE_BIT_KHR)                  ? K_STORAGE
+             : vk_format_is_block_compressed(image->vk.format)             ? K_BC
+                                                                           : K_TEX;
+      image->xclipse_mem_kind = kind + 1;
+      p_atomic_add(&kind_bytes[kind], image->size);
+      p_atomic_add(&total, image->size);
+      p_atomic_inc(&count);
+      if (image->size >= (16ull << 20))
+         AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[IMG_BIG] +%" PRIu64 " MB %s fmt=%u %ux%ux%u layers=%u mips=%u",
+                         image->size >> 20, kname[kind], image->vk.format, image->vk.extent.width,
+                         image->vk.extent.height, image->vk.extent.depth, image->vk.array_layers,
+                         image->vk.mip_levels);
+   } else {
+      if (!image->xclipse_mem_kind)
+         return;
+      kind = image->xclipse_mem_kind - 1;
+      p_atomic_add(&kind_bytes[kind], -(int64_t)image->size);
+      p_atomic_add(&total, -(int64_t)image->size);
+      p_atomic_dec(&count);
+   }
+
+   const uint64_t t = p_atomic_read(&total), l = p_atomic_read(&last_total);
+   if ((t > l ? t - l : l - t) < (64ull << 20))
+      return;
+   p_atomic_set(&last_total, t);
+   AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN",
+                   "[IMG_MEM] MB total=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64
+                   " %s=%" PRIu64 " images=%u",
+                   t >> 20, kname[0], kind_bytes[0] >> 20, kname[1], kind_bytes[1] >> 20, kname[2],
+                   kind_bytes[2] >> 20, kname[3], kind_bytes[3] >> 20, kname[4], kind_bytes[4] >> 20, count);
+#endif
 }
 
 static void
@@ -1678,6 +1733,9 @@ radv_image_create(VkDevice _device, const struct radv_image_create_info *create_
 
       image->bindings[0].addr = radv_buffer_get_va(image->bindings[0].bo);
    }
+
+   if (!is_internal)
+      radv_xclipse_image_tally(image, true);
 
    if (instance->debug_flags & RADV_DEBUG_IMG) {
       radv_image_print_info(device, image);
