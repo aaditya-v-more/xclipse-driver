@@ -921,3 +921,35 @@ reads data another GPU client left in, or never wrote through, L2. UC on all no-
 costs 18% FPS. `7ca5e18` adds `debug.radv_xclipse_ringuc` (UC for internal rings: 1 = tess,
 2 = GE attribute/pos/prim, 4 = ES-GS/GS-VS, 8 = scratch; ring1..ring8 labels), and `bbd5df5`
 adds `debug.radv_xclipse_bufl2` (L2 writeback+invalidate in every buffer barrier, label bufl2).
+
+Ring and barrier screen (same setup; `xd-7ca5e18`, ring16/ring32 on `xd-039187f`, which splits
+the tess factor ring into its own BO so either half can be uncached alone):
+
+| Flag | Folder | FPS | Blue streaks |
+|---|---|---:|---|
+| ring1 (both tess rings UC) | `results/2026-10-17_182533-game` | 33.3 | **none** |
+| ring2 (GE rings UC) | `results/2026-10-17_182809-game` | 39.6 | yes |
+| bufl2 (L2 wb+inv in buffer barriers) | `results/2026-10-17_183030-game` | 39.2 | yes |
+| ring16 (tess factor ring UC) | `results/2026-10-17_183645-game` | 39.7 | yes |
+| ring32 (tess offchip ring UC) | `results/2026-10-17_183917-game` | 33.4 | **none** |
+
+The stale data is the tess offchip ring: HS outputs that the TES reads back. Those loads are
+`ACCESS_COHERENT` (device scope). The 940 runs a GFX11 shader core (ACO compiles with
+`gfx_level = GFX11`), and on GFX11 `ac_get_hw_cache_flags` gives device-scope loads GLC only.
+But the 940's caches behave like GFX10.3's, where GLC alone is shader-array scope, so GL1 serves
+lines written by HS waves on another shader array. GFX10.3 needs GLC|DLC to bypass GL1.
+
+**Fix (`288a2c6`):** ACO adds DLC to coherent and volatile loads when `gfx10_cache_scope` is set.
+RADV sets it for GFX11-ISA Xclipse unless `debug.radv_xclipse_gl1scope=0` (or
+`RADV_XCLIPSE_GL1SCOPE=0`). Screen on `xd-288a2c6`:
+
+| Flag | Folder | FPS | Blue streaks |
+|---|---|---:|---|
+| baseline (fix on) | `results/2026-10-17_184821-game` | 39.6 | **none** in 9 shots |
+| gl1scope0 (fix off) | `results/2026-10-17_185118-game` | 39.3 | yes, 7 of 9 shots |
+
+Contact sheets: `docs/img/streaks-fix.jpg`, `docs/img/streaks-gl1scope0.jpg`. The fix costs no
+FPS, where UC on the offchip ring cost 16%. It also covers every other coherent load
+(ring descriptors, NGG/GS rings, app `Coherent` buffers), not just tessellation. Still to check:
+`run.py` on-device correctness tests on `xd-288a2c6`, a normal-clock Heaven A/B and other games.
+The ucmask, ringuc and bufl2 knobs stay as debug props for now; they are off by default.
