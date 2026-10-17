@@ -1077,3 +1077,10 @@ container settings and the driver's switches.
 **Subgroup test.** `xdtest subgroup` checks shuffles to the other half of the wave, reversed and
 XOR shuffles, shuffle-down across lane 31, and subgroup sums, against host-computed values. It
 targets the `[W64XLANE]` warning. Not yet run on the phone.
+
+**SSIM screenshot comparison.** `pipeline/ssim.py <game-compare folder>` scores each variant's
+screenshots against the baseline from the same pair, with the baseline's own run-to-run SSIM as
+the noise floor. On `results/2026-10-17_163705-game-compare` that floor is 0.35–0.54 at 35 s and
+0.53–0.97 at 75 s: Heaven's camera moves enough between shots taken "at the same second" to swamp
+any rendering difference. SSIM on Heaven fly-through shots therefore can't separate drivers; it
+needs a static scene. The exact image readbacks in `xdtest` remain the correctness check.
