@@ -1027,3 +1027,53 @@ Next ways to cut the cost:
 - Issue gathers one component at a time to lower the slow path's VGPR peak.
 
 `gn_driver.py` now scrolls up to 15 swipes for installed drivers; the list outgrew 4.
+
+### Filter emulation as a texel loop; NGG culling off by default; persistent shader cache (2026-10-17)
+
+Advice from a Fable subagent set the order of work: measure the emulation's register cost first,
+default NGG culling off on the 940, ship an installable package, then frame-time stability.
+
+**The emulation is now a loop** (`xd-5701dfa`): one explicit-LOD sample at each texel center, 4
+texels for bilinear and 8 for trilinear, instead of unrolled gathers. A sample at an exact texel
+center returns that texel, so this avoids the gather-footprint rounding. Fragment shaders without
+an explicit LOD or gradients take their LOD from `ddx`/`ddy` of the coordinate.
+`textures,mips,depth` pass (`results/2026-10-17_205905`).
+
+New `[SHADER]` log lines (`debug.radv_xclipse_log=1`) give each shader's registers and code size.
+They also print on cache loads, so compare whole runs. Heaven fragment shaders, mean per shader:
+
+| Build | VGPRs | Code bytes | Waves |
+|---|---|---|---|
+| gather version, emulation on | 38.7 | 4242 | 26.25 |
+| loop (`xd-5701dfa`), emulation on | 35.1 | 3959 | 28.43 |
+| emulation off | 28.6 | 888 | 31.4 |
+
+The loop gives back about a third of the lost occupancy. At normal clocks Heaven is CPU-bound,
+and the emulation costs nothing measurable there: 58.7 on against 57.3 off on the gather build,
+59.0 against 58.4 on the loop build (one run each). The 2% cost exists only in fixed performance
+mode, where the GPU limits.
+
+**NGG culling is now opt-in on the 940** (`RADV_PERFTEST=nggc`). The six-pair studies above
+measured it slower, and it doubles vertex-shader code (1445 bytes to 770 without it).
+
+**Stale properties.** A run killed mid-way left `debug.radv_xclipse_filteremu=0` and
+`debug.radv_xclipse_log=1` on the phone; the next tests then failed exactly as if the emulation
+were off. `run.py` now warns when any `debug.radv*` property is set.
+
+**Frame-time metrics.** `game.py` now reports p95 and p99 frame times and frames over 50 ms (also
+per minute), and `game_compare.py` shows p99 and stutters per minute per run.
+
+**The shader disk cache did not persist in GameNative.** The driver put Mesa's disk cache in
+`$TMPDIR`, which GameNative sets to `imagefs/usr/tmp` and empties at every container launch
+(`FileUtils.clear(imageFs.getTmpDir())`, `XServerScreen.kt` at the pinned commit). DXVK 2.x has no
+state cache of its own, so every launch recompiled every pipeline. The driver now prefers
+`$XDG_CACHE_HOME`, then `$HOME/.cache` (`imagefs/home/xuser/.cache`, where GameNative also points
+`DXVK_STATE_CACHE_PATH`), then its own directory, with `$TMPDIR` last (`08dedee`). Not yet
+measured on the phone.
+
+**Package.** `docs/package.md` covers installing the zip in GameNative, the validated Heaven
+container settings and the driver's switches.
+
+**Subgroup test.** `xdtest subgroup` checks shuffles to the other half of the wave, reversed and
+XOR shuffles, shuffle-down across lane 31, and subgroup sums, against host-computed values. It
+targets the `[W64XLANE]` warning. Not yet run on the phone.
