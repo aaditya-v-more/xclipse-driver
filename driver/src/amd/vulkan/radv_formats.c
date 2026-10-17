@@ -294,15 +294,17 @@ radv_bc_emulation_format(VkFormat format)
    /* BC7_UNORM is decoded and re-encoded into BC3 instead of an RGBA8 plane (64 bytes per block):
     * 85.9% of texels within 10 LSB on the RE7 corpus, for ~10% more work than the RGBA8 decode.
     * ETC2 (82.8%) and ASTC 4x4 (79.4%, ~13x the encode cost) carriers were measured and dropped.
-    * See bc_decoder.glsl. */
+    * See bc_decoder.glsl. BC7_SRGB uses the same carrier as BC3_SRGB: the encoder works on the stored
+    * (sRGB-encoded) values and the texture unit linearises after the BC3 decode, as for native BC7
+    * SRGB. The RGBA8_SRGB plane it replaces cost 4x the BC7 data (memreq test). */
    case VK_FORMAT_BC7_UNORM_BLOCK:
       return VK_FORMAT_BC3_UNORM_BLOCK;
+   case VK_FORMAT_BC7_SRGB_BLOCK:
+      return VK_FORMAT_BC3_SRGB_BLOCK;
    case VK_FORMAT_BC4_SNORM_BLOCK:
       return VK_FORMAT_R8_SNORM;
    case VK_FORMAT_BC5_SNORM_BLOCK:
       return VK_FORMAT_R8G8_SNORM;
-   case VK_FORMAT_BC7_SRGB_BLOCK:
-      return VK_FORMAT_R8G8B8A8_SRGB;
    /* BC6H decodes to RGBA16F (8 bytes/texel). E5B9G9R9 was tried and reverted: small channels
     * quantise to zero under a shared exponent (measured). */
    case VK_FORMAT_BC6H_UFLOAT_BLOCK:

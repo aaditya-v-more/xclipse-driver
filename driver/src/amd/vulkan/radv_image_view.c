@@ -726,9 +726,20 @@ radv_image_view_init(struct radv_image_view *iview, struct radv_device *device,
       assert(radv_is_format_emulated(pdev, image->vk.format));
       /* Note the BC3 carrier BEFORE the format is overwritten below. */
       bc4_on_bc3 = iview->vk.format == VK_FORMAT_BC4_UNORM_BLOCK;
+      const bool view_srgb = vk_format_is_srgb(iview->vk.format);
       iview->plane_id = 1;
-      iview->vk.view_format = image->planes[iview->plane_id].format;
-      iview->vk.format = image->planes[iview->plane_id].format;
+      VkFormat plane_format = image->planes[iview->plane_id].format;
+      /* A mutable image's view may differ from the image in sRGB-ness only (DXVK creates D3D11
+       * typeless textures as UNORM and samples them through _SRGB views). Keep the view's colour
+       * space on the hidden plane; otherwise sRGB views of UNORM images skip linearisation. */
+      if (view_srgb != vk_format_is_srgb(plane_format)) {
+         VkFormat alt = view_srgb ? vk_format_from_pipe_format(util_format_srgb(vk_format_to_pipe_format(plane_format)))
+                                  : vk_format_srgb_to_linear(plane_format);
+         if (alt != VK_FORMAT_UNDEFINED)
+            plane_format = alt;
+      }
+      iview->vk.view_format = plane_format;
+      iview->vk.format = plane_format;
       plane_count = 1;
    }
 

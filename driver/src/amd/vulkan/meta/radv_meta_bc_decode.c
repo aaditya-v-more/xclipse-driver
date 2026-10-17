@@ -288,6 +288,7 @@ bc_variant(VkFormat format)
       return BC_VARIANT_F16;
    /* The hidden plane is itself compressed: transcode, do not decode. */
    case VK_FORMAT_BC3_UNORM_BLOCK:
+   case VK_FORMAT_BC3_SRGB_BLOCK:
       /* BC3 planes come from BC4 (byte shuffle) or BC7 (decode + re-encode): dispatch on the source
        * format. */
       return (format == VK_FORMAT_BC7_UNORM_BLOCK || format == VK_FORMAT_BC7_SRGB_BLOCK)
@@ -314,7 +315,8 @@ bc_store_format(VkFormat format)
    /* A compressed destination plane is viewed as one uint texel per block (16 bytes).
     * Every compressed carrier must be listed here: otherwise the compressed format is returned, it
     * is not a legal storage format, and imageStore is silently discarded. */
-   if (emulation == VK_FORMAT_BC3_UNORM_BLOCK || emulation == VK_FORMAT_EAC_R11G11_UNORM_BLOCK)
+   if (emulation == VK_FORMAT_BC3_UNORM_BLOCK || emulation == VK_FORMAT_BC3_SRGB_BLOCK ||
+       emulation == VK_FORMAT_EAC_R11G11_UNORM_BLOCK)
       return VK_FORMAT_R32G32B32A32_UINT;
    return emulation == VK_FORMAT_R8G8B8A8_SRGB ? VK_FORMAT_R8G8B8A8_UNORM : emulation;
 }

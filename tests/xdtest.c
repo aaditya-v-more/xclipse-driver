@@ -2560,6 +2560,13 @@ static void bc7_texel(int b, int t, float w[4])
 }
 
 static void fill_bc7(uint8_t *d, float want[64][4]) { fill_bc(d, want, BC7); }
+static void fill_bc7_srgb(uint8_t *d, float want[64][4])
+{
+   fill_bc(d, want, BC7);
+   for (int i = 0; i < 64; i++)
+      for (int c = 0; c < 3; c++)
+         want[i][c] = srgb_to_linear(want[i][c]);
+}
 
 static const struct texture_format {
    const char *name;
@@ -2599,7 +2606,13 @@ static const struct texture_format {
     * (radv_bc_emulation_format), losing a few steps of 255 on BC5 and tens on BC7 by design. */
    {"BC5", VK_FORMAT_BC5_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.04f, fill_bc5},
    {"BC7", VK_FORMAT_BC7_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.2f, fill_bc7},
+   {"BC7_SRGB", VK_FORMAT_BC7_SRGB_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.2f, fill_bc7_srgb},
 };
+
+static float linear_to_srgb(float c)
+{
+   return c <= 0.0031308f ? c * 12.92f : 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
+}
 
 static bool texel_close(const float *got, const float *want, int channels, float tolerance)
 {
@@ -2609,6 +2622,18 @@ static bool texel_close(const float *got, const float *want, int channels, float
          return false;
    }
    return true;
+}
+
+/* Compares an sRGB format's texels in the encoded space, where its storage and any re-encoding
+ * error live: near white, linearising magnifies an encoded error about 2.4 times. */
+static bool texel_close_srgb(const float *got, const float *want, int channels, float tolerance)
+{
+   float g[4], w[4];
+   for (int c = 0; c < 4; c++) {
+      g[c] = c < 3 ? linear_to_srgb(got[c]) : got[c];
+      w[c] = c < 3 ? linear_to_srgb(want[c]) : want[c];
+   }
+   return texel_close(g, w, channels, tolerance);
 }
 
 /* 64 RGBA texels, with null for what isn't a number. */
@@ -2845,9 +2870,10 @@ static void run_textures(void)
          for (int c = 0; c < 4; c++)
             avg[c] = (want[i][c] + want[y * 8 + x1][c] + want[y1 * 8 + x][c] +
                       want[y1 * 8 + x1][c]) / 4;
-         const bool fetch_ok = texel_close(got[i], want[i], tf->channels, tf->tolerance);
-         const bool filter_ok =
-            !filters || texel_close(got[N + i], avg, tf->channels, tf->tolerance);
+         bool (*close)(const float *, const float *, int, float) =
+            tf->format == VK_FORMAT_BC7_SRGB_BLOCK ? texel_close_srgb : texel_close;
+         const bool fetch_ok = close(got[i], want[i], tf->channels, tf->tolerance);
+         const bool filter_ok = !filters || close(got[N + i], avg, tf->channels, tf->tolerance);
          const float *g = fetch_ok ? got[N + i] : got[i], *w = fetch_ok ? avg : want[i];
          if ((!fetch_ok || !filter_ok) && !first[0])
             snprintf(first, sizeof(first), "%s at (%d,%d): got (%g, %g, %g, %g), want (%g, %g, %g, %g)",
@@ -3385,11 +3411,6 @@ static const struct mrt_format {
     * in linear near 1. */
    {"RGBA8_SRGB", VK_FORMAT_R8G8B8A8_SRGB, 4, MRT_SRGB8, 0.01f},
 };
-
-static float linear_to_srgb(float c)
-{
-   return c <= 0.0031308f ? c * 12.92f : 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
-}
 
 /* What channel i of a target in this format keeps of a written v. Float formats round within the
  * tolerance. */
