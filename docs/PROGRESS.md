@@ -1186,3 +1186,17 @@ larger. Samsung sizes BC4-BC7 natively. This is the lead for Life is Strange's s
   2048 MB. At the title screen, surface repeat fell to 12%, at 47 FPS.
 - Ran 2.7 GB through the song scene with no lmkd kill. The later "crash" was my `am force-stop`
   for driver tests (01:23:58 in logcat), not the game.
+
+### 2026-10-18: BC4 on EAC_R11 rejected; driver-memory tally added
+
+- BC4_UNORM through the shader's EAC_R11 encoder (aliasable, 3x to 1x) misses by up to 8/255:
+  1.0 read as 0.975, 0.143 as 0.111 (results/2026-10-18_014324, textures and mips fail). BC5's
+  EAC path has the same error, which its 0.04 tolerance hides. BC4 often holds masks and heights,
+  so it stays on the exact BC3 carrier (3x memory). Reverted.
+- Max Device Memory 2048 MB: Life is Strange held 2.85 GB on loading into gameplay, and lmkd killed
+  GameNative at 01:37:03 ("min2x watermark is breached even after kill"). At 1024 MB it held 2.7 GB
+  and survived the song scene. A larger DXGI budget only lets UE4 keep more.
+- gpumem minus DXVK's HUD chunk total was about 35 MiB at the title screen and about 200 MiB in
+  play. New `[BO_KIND]` line (RADV_CHURN tag, `debug.radv_xclipse_log 1`) gives live MB per kind:
+  app, query, desc/upload, shader arenas, scratch/rings, command buffers (the IB reuse cache parks up
+  to 64 MiB of these).

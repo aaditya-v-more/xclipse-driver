@@ -62,8 +62,23 @@ radv_xclipse_size_bucket(uint64_t size)
 }
 
 static void
-radv_xclipse_bo_churn(struct radv_amdgpu_winsys *ws, uint64_t size, bool created)
+radv_xclipse_bo_churn(struct radv_amdgpu_winsys *ws, uint64_t size, unsigned priority, enum radeon_bo_flag flags,
+                      bool created)
 {
+   /* Live bytes per kind, to explain GPU memory outside the app's allocations: app (priority <= 28),
+    * query pools, descriptors/uploads/fences (30), and priority 31 split by flags into shader
+    * arenas (32-bit VA), scratch/rings (no CPU access) and command buffers. */
+   enum { K_APP, K_QUERY, K_DESC, K_SHADER, K_SCRATCH, K_CS, K_COUNT };
+   static const char *const kname[K_COUNT] = {"app", "query", "desc/upload", "shader", "scratch", "cs"};
+   static uint64_t kind_bytes[K_COUNT];
+   const unsigned kind = priority <= RADV_BO_PRIORITY_APPLICATION_MAX ? K_APP
+                         : priority == RADV_BO_PRIORITY_QUERY_POOL  ? K_QUERY
+                         : priority < RADV_BO_PRIORITY_SHADER       ? K_DESC
+                         : (flags & RADEON_FLAG_32BIT)              ? K_SHADER
+                         : (flags & RADEON_FLAG_NO_CPU_ACCESS)      ? K_SCRATCH
+                                                                    : K_CS;
+   p_atomic_add(&kind_bytes[kind], created ? (int64_t)size : -(int64_t)size);
+
    static uint32_t n_create, n_destroy;
    static uint64_t bytes_created;
    /* Live footprint (bytes_created is cumulative). */
@@ -125,6 +140,10 @@ radv_xclipse_bo_churn(struct radv_amdgpu_winsys *ws, uint64_t size, bool created
                        radv_xclipse_bo_hist_name[5], radv_xclipse_bo_hist[5],
                        radv_xclipse_bo_hist_name[6], radv_xclipse_bo_hist[6],
                        radv_xclipse_bo_hist_name[7], radv_xclipse_bo_hist[7]);
+   AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[BO_KIND] MB %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64
+                       " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64,
+                       kname[0], kind_bytes[0] >> 20, kname[1], kind_bytes[1] >> 20, kname[2], kind_bytes[2] >> 20,
+                       kname[3], kind_bytes[3] >> 20, kname[4], kind_bytes[4] >> 20, kname[5], kind_bytes[5] >> 20);
 }
 
 /* Memory guard: the sgpu kernel hard-locks the phone when GPU-pinned GTT across all processes
@@ -772,7 +791,7 @@ radv_amdgpu_winsys_bo_destroy(struct radeon_winsys *_ws, struct radeon_winsys_bo
    radv_amdgpu_log_bo(ws, bo, true);
    /* Only un-count what was counted: imports never passed through the allocate path. */
    if (bo->churn_counted)
-      radv_xclipse_bo_churn(ws, bo->base.size, false);
+      radv_xclipse_bo_churn(ws, bo->base.size, bo->churn_priority, bo->flags, false);
 
    if (bo->base.is_virtual) {
       radv_amdgpu_winsys_virtual_bo_destroy(_ws, _bo);
@@ -1096,8 +1115,9 @@ radv_amdgpu_winsys_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned 
       }
    }
 
-   radv_xclipse_bo_churn(ws, size, true);
+   radv_xclipse_bo_churn(ws, size, priority, flags, true);
    bo->churn_counted = true;
+   bo->churn_priority = priority;
 
    bo->bo = buf_handle;
    bo->bo_handle = kms_handle;

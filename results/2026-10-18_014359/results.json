@@ -1,0 +1,725 @@
+{
+  "meta": {
+    "started": "2026-10-18T01:43:59",
+    "driver": {
+      "commit": "49804f2+changes",
+      "so_sha256": "6f10e56920fe3c9c4534a4c87e70b088e5e6856afcf91e1179fcbd43e93272a4"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "35.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 96 temperature: 336"
+    },
+    "tests": [
+      "textures",
+      "mips"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "37.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 96 temperature: 336"
+    }
+  },
+  "results": [
+    {
+      "test": "textures",
+      "driver": "stock",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 25.871,
+      "ms_instance": 39.675,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.273,
+      "has_bc": false,
+      "formats": [
+        {
+          "format": "RGBA8",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BGRA8",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "features": "0xdd81",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16F",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGB10A2",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R32F",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RG32F",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RGBA32F",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "R8",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "R16F",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG16",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RGBA16",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "R16_SNORM",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RGBA16_SNORM",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "D16",
+          "features": "0xce01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D24S8",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "D32F",
+          "features": "0xce01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D32FS8",
+          "features": "0xc601",
+          "supported": true,
+          "fetch_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "BC1",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC2",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC3",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC4",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "BC5",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "BC7",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "BC7_SRGB",
+          "features": "0x0",
+          "supported": false
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] sampling D32FS8",
+        "[xdtest] PCF on D32FS8",
+        "[xdtest] sampling BC1",
+        "[xdtest] sampling BC2",
+        "[xdtest] sampling BC3",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "textures",
+      "driver": "radv",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 8.38,
+      "ms_instance": 1.794,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.989,
+      "has_bc": true,
+      "formats": [
+        {
+          "format": "RGBA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BGRA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "features": "0x1dd81",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGB10A2",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R32F",
+          "features": "0x1dd87",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "D16",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D24S8",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "D32F",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D32FS8",
+          "features": "0x1d601",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "BC1",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC2",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC3",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC4",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC5",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC7",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC7_SRGB",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] sampling BC3",
+        "[xdtest] sampling BC4",
+        "[xdtest] sampling BC5",
+        "[xdtest] sampling BC7",
+        "[xdtest] sampling BC7_SRGB",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "mips",
+      "driver": "radv",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 19.752,
+      "ms_instance": 3.452,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.616,
+      "texture_compression_bc": true,
+      "cases": [
+        {
+          "case": "RGBA8 64x64",
+          "supported": true,
+          "levels": 7,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 2048x2048",
+          "supported": true,
+          "levels": 12,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 640x360",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 cube 128",
+          "supported": true,
+          "levels": 8,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC3 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC4 512x512",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC5 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC7 512x512",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 cube 256",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "R32F 256x256 trilinear",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "R16 640x360 trilinear",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] BC5 1024x1024",
+        "[xdtest] BC7 512x512",
+        "[xdtest] BC1 cube 256",
+        "[xdtest] R32F 256x256 trilinear",
+        "[xdtest] R16 640x360 trilinear",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "mips",
+      "driver": "stock",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 25.048,
+      "ms_instance": 38.224,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.222,
+      "texture_compression_bc": false,
+      "cases": [
+        {
+          "case": "RGBA8 64x64",
+          "supported": true,
+          "levels": 7,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 2048x2048",
+          "supported": true,
+          "levels": 12,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 640x360",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 cube 128",
+          "supported": true,
+          "levels": 8,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC3 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC4 512x512",
+          "supported": false
+        },
+        {
+          "case": "BC5 1024x1024",
+          "supported": false
+        },
+        {
+          "case": "BC7 512x512",
+          "supported": false
+        },
+        {
+          "case": "BC1 cube 256",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "R32F 256x256 trilinear",
+          "supported": false
+        },
+        {
+          "case": "R16 640x360 trilinear",
+          "supported": false
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] RGBA8 640x360",
+        "[xdtest] RGBA8 cube 128",
+        "[xdtest] BC1 1024x1024",
+        "[xdtest] BC3 1024x1024",
+        "[xdtest] BC1 cube 256",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}
