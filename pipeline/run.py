@@ -42,6 +42,11 @@ TEST_BUILD = TEST_SRC / "build"
 DRIVER_SO = ROOT / "driver" / "build-android" / "vulkan.radeon.so"
 RESULTS = ROOT / "results"
 ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / f"adb{EXE}")
+# adb 37.0.1's mDNS bridge panics on some service names seen on the Wi-Fi network and aborts the
+# whole server (2026-10-17, five crashes in an hour), dropping every connection mid-run. A server
+# these scripts start has mDNS off; reconnect_wireless() uses the remembered IP:port instead. A
+# server that is already running keeps its setting: restart it with ADB_MDNS=0 adb start-server.
+os.environ.setdefault("ADB_MDNS", "0")
 PHONE_SERIAL = "RZCY90ZYQXZ"  # the Galaxy S24 FE's ro.serialno, also its USB serial
 # Holds the screen on while on AC or USB power (1 | 2), so a wall charger works with wireless adb.
 STAY_ON_CMD = "settings put global stay_on_while_plugged_in 3"
