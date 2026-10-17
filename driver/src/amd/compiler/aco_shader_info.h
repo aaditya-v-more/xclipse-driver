@@ -171,6 +171,11 @@ struct aco_compiler_options {
     * does, so without this every scratch access faults until the kernel's 5 s job timeout
     * (probe/gfx/rt/scratchprobe). */
    bool gfx10_scratch_init;
+   /* Device-scope loads set DLC as well as GLC, as on GFX10.3, although the ISA is GFX11. The
+    * Xclipse 940's caches are GFX10.3's: GLC alone is shader-array scope, so GL1 serves stale
+    * lines that another shader array wrote to L2 (tess offchip data read by the TES: blue
+    * streaks in Heaven). */
+   bool gfx10_cache_scope;
    /* Transform feedback on chips with GFX11's streamout counters but no GDS ordered append (the
     * Xclipse 530 and 940): take the buffer space with the counter adds alone, without the
     * ds_ordered_count lock around them. */

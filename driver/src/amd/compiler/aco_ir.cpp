@@ -82,6 +82,7 @@ init_program(Program* program, Stage stage, const struct aco_shader_info* info,
    program->gfx10_4_fmask = xclipse_920;
    program->gfx10_sendmsg = xclipse_920;
    program->gfx10_nsa = xclipse_920;
+   program->gfx10_cache_scope = options->gfx10_cache_scope;
    program->wave_size = info->wave_size;
    program->lane_mask = program->wave_size == 32 ? s1 : s2;
    program->preserve_s2 = info->vs.preserve_s2;

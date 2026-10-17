@@ -188,6 +188,10 @@ struct radv_physical_device {
    /* Xclipse: map these internal rings uncached (debug.radv_xclipse_ringuc, RADV_XCLIPSE_RING_UC_*).
     * Blue-streak investigation. */
    uint32_t xclipse_ring_uc;
+   /* Xclipse: compile device-scope loads with GFX11's GLC alone instead of GLC|DLC
+    * (RADV_XCLIPSE_GL1SCOPE=0 / debug.radv_xclipse_gl1scope 0; A/B only, brings back the blue
+    * streaks). */
+   bool xclipse_gfx11_cache_scope;
 
    /* Whether to emulate ASTC image support on HW without support. */
    bool emulate_astc;

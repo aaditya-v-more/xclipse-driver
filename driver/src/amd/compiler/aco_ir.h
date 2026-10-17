@@ -2361,6 +2361,8 @@ public:
     * with textureGrad). Use NSA only when every operand gets its own slot, as on GFX10.3.
     * See lower_image_sample(). */
    bool gfx10_nsa = false;
+   /* aco_compiler_options::gfx10_cache_scope */
+   bool gfx10_cache_scope = false;
    bool is_prolog = false;
    bool is_epilog = false;
 

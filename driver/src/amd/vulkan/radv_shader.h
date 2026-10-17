@@ -544,7 +544,9 @@ struct radv_compiler_info {
       uint32_t ngg_streamout : 1;
       /* enum radv_xclipse_xfb */
       uint32_t xclipse_xfb : 2;
-      uint32_t padding : 10;
+      /* GFX11 cache scope bits on a gfx11_isa chip (aco gfx10_cache_scope off; A/B only). */
+      uint32_t xclipse_gfx11_cache_scope : 1;
+      uint32_t padding : 9;
    } hw;
 
    /* Misc values included as part of the cache key */

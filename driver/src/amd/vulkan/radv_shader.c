@@ -3603,6 +3603,7 @@ radv_aco_fill_compiler_options(struct aco_compiler_options *aco_info, const stru
       scratch_init = e && e[0] ? atoi(e) != 0 : 1;
    }
    aco_info->gfx10_scratch_init = compiler_info->hw.gfx11_isa && scratch_init;
+   aco_info->gfx10_cache_scope = compiler_info->hw.gfx11_isa && !compiler_info->hw.xclipse_gfx11_cache_scope;
    aco_info->xfb_unordered = compiler_info->hw.xclipse_xfb == RADV_XCLIPSE_XFB_UNORDERED;
    aco_info->ds_ordered_count_gs_type = compiler_info->hw.xclipse_xfb == RADV_XCLIPSE_XFB_ORDERED_GFX10;
 }

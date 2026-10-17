@@ -1439,7 +1439,14 @@ visit_load_per_vertex_input(isel_context* ctx, nir_intrinsic_instr* instr)
 ac_hw_cache_flags
 get_cache_flags(isel_context* ctx, unsigned access, enum ac_access_type type)
 {
-   return ac_get_hw_cache_flags(ctx->program->gfx_level, (gl_access_qualifier)access, type);
+   ac_hw_cache_flags cache =
+      ac_get_hw_cache_flags(ctx->program->gfx_level, (gl_access_qualifier)access, type);
+   /* GFX10.3 device scope for loads is GLC|DLC (GLC alone is shader-array scope). On GFX11 DLC
+    * only means MALL no-alloc. */
+   if (ctx->program->gfx10_cache_scope && type == ac_access_type_load &&
+       (access & (ACCESS_COHERENT | ACCESS_VOLATILE)))
+      cache.value |= ac_dlc;
+   return cache;
 }
 
 ac_hw_cache_flags
