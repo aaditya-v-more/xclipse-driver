@@ -56,7 +56,7 @@ On macOS or Linux:
 . tools/env.sh && driver/build.sh
 ```
 
-The output is `driver/dist/radv-xclipse-*.zip`. Install it through an emulator's custom GPU driver setting.
+The output is `driver/dist/radv-xclipse-*.zip`. Install it through an emulator's custom GPU driver setting; [`docs/package.md`](docs/package.md) has the GameNative steps, the validated container settings and the driver's switches.
 
 Run the phone tests (USB debugging on, this computer authorized). The Python is `tools\python\python.exe` on Windows and `tools/python/bin/python3` on macOS and Linux (or `python3` after `. tools/env.sh`):
 
