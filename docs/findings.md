@@ -71,6 +71,7 @@ Verified facts only. Raw survey output is in `recon/device-gpu-recon.txt` and `r
   - More pixel-shader input VGPRs, more damage: with one (`LINE_STIPPLE_TEX`) only `v1` was hit; with two (`PERSP_CENTER`), `v0` and `v1`, and the GPU hung several times.
   - Not seen with a wave32 pixel shader, with 12 or 16 VGPRs allocated, or with 16 VGPRs and 8 input VGPRs.
   - The mechanism isn't known. Our driver gives every wave64 shader at least 16 VGPRs (`radv_postprocess_binary_config` in `radv_shader.c`). That costs no occupancy for shaders that small, since the SIMD's limit of 16 waves comes first.
+- **Cross-half lane operations in wave64 compute shaders work.** `xdtest subgroup` (`results/2026-10-17_213155`) checks shuffles to the other half, reversed and XOR-32 shuffles, shuffle-down across lane 31, and subgroup sums and inclusive scans at subgroup size 64: no mismatches on either driver. The `[W64XLANE]` log line's "broken on this chip" is unconfirmed; pixel and geometry stages are untested.
 
 ### Shader setup registers (probed with `xdtest`, 2026-10-11)
 

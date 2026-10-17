@@ -1071,12 +1071,21 @@ state cache of its own, so every launch recompiled every pipeline. The driver no
 `DXVK_STATE_CACHE_PATH`), then its own directory, with `$TMPDIR` last (`08dedee`). Not yet
 measured on the phone.
 
+**Normal-clock compare stopped on a load hang.** The 5-pair compare of `xd-5701dfa`
+(`results/2026-10-17_211444-game-compare`) ran its three warm-ups: baseline 58.9, `culling_on`
+58.1, `filteremu0` 58.6 FPS. Pair 1's baseline then hung on Heaven's loading screen with no new
+frames for a minute: no GPU fault, crash or driver error in logcat. The compare stops on any
+rejected run, so no pairs were scored.
+
 **Package.** `docs/package.md` covers installing the zip in GameNative, the validated Heaven
 container settings and the driver's switches.
 
 **Subgroup test.** `xdtest subgroup` checks shuffles to the other half of the wave, reversed and
 XOR shuffles, shuffle-down across lane 31, and subgroup sums, against host-computed values. It
-targets the `[W64XLANE]` warning. Not yet run on the phone.
+targets the `[W64XLANE]` warning. Both drivers pass at subgroup size 64 with no mismatches
+(`results/2026-10-17_213155`), along with `textures,mips,depth,culling,render,xfb,compute` on
+`xd-85cd575`, which has the culling default and the cache change. Wave64 lane operations in
+compute shaders are therefore correct; the warning's claim stays unconfirmed for the other stages.
 
 **SSIM screenshot comparison.** `pipeline/ssim.py <game-compare folder>` scores each variant's
 screenshots against the baseline from the same pair, with the baseline's own run-to-run SSIM as
