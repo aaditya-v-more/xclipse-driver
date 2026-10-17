@@ -1150,3 +1150,20 @@ explains it: the scene needs about 1.8 GB of GPU memory, all of it unswappable G
 was 2.6–2.9 GB at launch after `am kill-all`, so lmkd kills the foreground GameNative process
 during the load. Samsung's driver fails earlier with `CreateTexture2D` E_INVALIDARG on BC5
 textures when BCn emulation is off.
+
+### 2026-10-18: memreq test: BC emulation multiplies texture memory
+
+New `memreq` test (`tests/xdtest.c` run_memreq) compares vkGetImageMemoryRequirements with Samsung's
+driver (results/2026-10-18_010729). 1024x1024 with full mips, against Samsung's 1.41 MB (BC4 0.70 MB):
+
+| Format | RADV | vs Samsung |
+|---|---|---|
+| BC7 UNORM (BC3 carrier + original) | 2.88 MB | 2.0x |
+| BC7 SRGB (RGBA8 plane + original) | 7.08 MB | 5.0x |
+| BC6H (RGBA16F plane + original) | 12.65 MB | 9.0x |
+| BC5 SNORM (RG8 plane + original) | 4.26 MB | 3.0x |
+| BC4 UNORM (BC3 carrier + original) | 2.16 MB | 3.1x |
+| BC5 UNORM (EAC alias) | 1.44 MB | 1.0x |
+
+BC1-BC3 match. Uncompressed and render-target images align to 64 KB (Samsung: 4 KB) and run 1-7%
+larger. Samsung sizes BC4-BC7 natively. This is the lead for Life is Strange's scene-load lmkd kill.

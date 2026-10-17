@@ -1,0 +1,360 @@
+{
+  "meta": {
+    "started": "2026-10-18T01:07:29",
+    "driver": {
+      "commit": "7a21e93",
+      "so_sha256": "7ee7edb81d1500d7ead35aecf2b464d3149f6039f6d2d17ed2de03aafa60ccb2"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "38.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 98 temperature: 347"
+    },
+    "tests": [
+      "memreq"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "38.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 98 temperature: 347"
+    }
+  },
+  "results": [
+    {
+      "test": "memreq",
+      "driver": "stock",
+      "gpu_temp_c_before": "38.0",
+      "ms_load": 32.596,
+      "ms_instance": 44.489,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.259,
+      "images": [
+        {
+          "name": "BC1 64x64",
+          "size": 4096,
+          "alignment": 4096,
+          "packed": 2744,
+          "ratio": 1.493
+        },
+        {
+          "name": "BC5 64x64",
+          "size": 8192,
+          "alignment": 4096,
+          "packed": 5488,
+          "ratio": 1.493
+        },
+        {
+          "name": "BC1 128x128",
+          "size": 12288,
+          "alignment": 4096,
+          "packed": 10936,
+          "ratio": 1.124
+        },
+        {
+          "name": "BC3 256x256",
+          "size": 131072,
+          "alignment": 65536,
+          "packed": 87408,
+          "ratio": 1.5
+        },
+        {
+          "name": "BC5 512x512",
+          "size": 393216,
+          "alignment": 65536,
+          "packed": 349552,
+          "ratio": 1.125
+        },
+        {
+          "name": "BC7 1024x1024",
+          "size": 1441792,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC7 SRGB 1024x1024",
+          "size": 1441792,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC6H 1024x1024",
+          "size": 1441792,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC5 SNORM 1024x1024",
+          "size": 1441792,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC4 1024x1024",
+          "size": 720896,
+          "alignment": 65536,
+          "packed": 699064,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC5 1024x1024",
+          "size": 1441792,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC1 2048x2048",
+          "size": 2818048,
+          "alignment": 65536,
+          "packed": 2796216,
+          "ratio": 1.008
+        },
+        {
+          "name": "BC1 2048x2048 no mips",
+          "size": 2097152,
+          "alignment": 65536,
+          "packed": 2097152,
+          "ratio": 1.0
+        },
+        {
+          "name": "RGBA8 16x16",
+          "size": 4096,
+          "alignment": 4096,
+          "packed": 1364,
+          "ratio": 3.003
+        },
+        {
+          "name": "RGBA8 256x256",
+          "size": 352256,
+          "alignment": 4096,
+          "packed": 349524,
+          "ratio": 1.008
+        },
+        {
+          "name": "RGBA8 1024x1024",
+          "size": 5595136,
+          "alignment": 4096,
+          "packed": 5592404,
+          "ratio": 1.0
+        },
+        {
+          "name": "RGBA16F 1280x720 RT",
+          "size": 7409952,
+          "alignment": 4096,
+          "packed": 7372800,
+          "ratio": 1.006
+        },
+        {
+          "name": "RGBA8 1280x720 RT",
+          "size": 3793184,
+          "alignment": 4096,
+          "packed": 3686400,
+          "ratio": 1.03
+        },
+        {
+          "name": "R32F 1024x1024 RT",
+          "size": 4210976,
+          "alignment": 4096,
+          "packed": 4194304,
+          "ratio": 1.005
+        }
+      ],
+      "total_paid": 34770944,
+      "total_packed": 34235996,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "[xdtest] creating device"
+      ]
+    },
+    {
+      "test": "memreq",
+      "driver": "radv",
+      "gpu_temp_c_before": "39.0",
+      "ms_load": 16.71,
+      "ms_instance": 3.396,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.664,
+      "images": [
+        {
+          "name": "BC1 64x64",
+          "size": 4096,
+          "alignment": 4096,
+          "packed": 2744,
+          "ratio": 1.493
+        },
+        {
+          "name": "BC5 64x64",
+          "size": 8192,
+          "alignment": 4096,
+          "packed": 5488,
+          "ratio": 1.493
+        },
+        {
+          "name": "BC1 128x128",
+          "size": 12288,
+          "alignment": 4096,
+          "packed": 10936,
+          "ratio": 1.124
+        },
+        {
+          "name": "BC3 256x256",
+          "size": 131072,
+          "alignment": 65536,
+          "packed": 87408,
+          "ratio": 1.5
+        },
+        {
+          "name": "BC5 512x512",
+          "size": 393216,
+          "alignment": 65536,
+          "packed": 349552,
+          "ratio": 1.125
+        },
+        {
+          "name": "BC7 1024x1024",
+          "size": 2883584,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 2.062
+        },
+        {
+          "name": "BC7 SRGB 1024x1024",
+          "size": 7077888,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 5.062
+        },
+        {
+          "name": "BC6H 1024x1024",
+          "size": 12648448,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 9.047
+        },
+        {
+          "name": "BC5 SNORM 1024x1024",
+          "size": 4259840,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 3.047
+        },
+        {
+          "name": "BC4 1024x1024",
+          "size": 2162688,
+          "alignment": 65536,
+          "packed": 699064,
+          "ratio": 3.094
+        },
+        {
+          "name": "BC5 1024x1024",
+          "size": 1441792,
+          "alignment": 65536,
+          "packed": 1398128,
+          "ratio": 1.031
+        },
+        {
+          "name": "BC1 2048x2048",
+          "size": 2818048,
+          "alignment": 65536,
+          "packed": 2796216,
+          "ratio": 1.008
+        },
+        {
+          "name": "BC1 2048x2048 no mips",
+          "size": 2097152,
+          "alignment": 65536,
+          "packed": 2097152,
+          "ratio": 1.0
+        },
+        {
+          "name": "RGBA8 16x16",
+          "size": 4096,
+          "alignment": 4096,
+          "packed": 1364,
+          "ratio": 3.003
+        },
+        {
+          "name": "RGBA8 256x256",
+          "size": 393216,
+          "alignment": 65536,
+          "packed": 349524,
+          "ratio": 1.125
+        },
+        {
+          "name": "RGBA8 1024x1024",
+          "size": 5636096,
+          "alignment": 65536,
+          "packed": 5592404,
+          "ratio": 1.008
+        },
+        {
+          "name": "RGBA16F 1280x720 RT",
+          "size": 7901184,
+          "alignment": 65536,
+          "packed": 7372800,
+          "ratio": 1.076
+        },
+        {
+          "name": "RGBA8 1280x720 RT",
+          "size": 3956736,
+          "alignment": 65536,
+          "packed": 3686400,
+          "ratio": 1.084
+        },
+        {
+          "name": "R32F 1024x1024 RT",
+          "size": 4210688,
+          "alignment": 65536,
+          "packed": 4194304,
+          "ratio": 1.016
+        }
+      ],
+      "total_paid": 58159104,
+      "total_packed": 34235996,
+      "status": "pass",
+      "progress": [
+        "[xdtest] loading driver",
+        "[xdtest] creating instance",
+        "/usr/local/share/libdrm/amdgpu.ids: No such file or directory",
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "/usr/local/share/libdrm/amdgpu.ids: No such file or directory"
+      ]
+    }
+  ]
+}

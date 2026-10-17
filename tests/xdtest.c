@@ -5873,6 +5873,90 @@ static float bcn_alpha(const uint32_t w[2], int t)
    return bcn_mix(e0, e1, (1.0f / 5.0f) * (float)(bits - 1));
 }
 
+/* Memory each driver reserves for typical game resources, against their tightly packed size.
+ * DXVK creates D3D11 textures as optimal-tiled images and suballocates them with each image's
+ * own size and alignment, so padding here is memory a game pays for every texture. */
+static void run_memreq(void)
+{
+   static const struct {
+      const char *name;
+      VkFormat format;
+      uint32_t w, h, levels, block, bytes;
+      VkImageUsageFlags usage;
+   } cases[] = {
+#define TEX (VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+#define RT (TEX | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+      {"BC1 64x64", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 64, 64, 7, 4, 8, TEX},
+      {"BC5 64x64", VK_FORMAT_BC5_UNORM_BLOCK, 64, 64, 7, 4, 16, TEX},
+      {"BC1 128x128", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 128, 128, 8, 4, 8, TEX},
+      {"BC3 256x256", VK_FORMAT_BC3_UNORM_BLOCK, 256, 256, 9, 4, 16, TEX},
+      {"BC5 512x512", VK_FORMAT_BC5_UNORM_BLOCK, 512, 512, 10, 4, 16, TEX},
+      {"BC7 1024x1024", VK_FORMAT_BC7_UNORM_BLOCK, 1024, 1024, 11, 4, 16, TEX},
+      {"BC7 SRGB 1024x1024", VK_FORMAT_BC7_SRGB_BLOCK, 1024, 1024, 11, 4, 16, TEX},
+      {"BC6H 1024x1024", VK_FORMAT_BC6H_UFLOAT_BLOCK, 1024, 1024, 11, 4, 16, TEX},
+      {"BC5 SNORM 1024x1024", VK_FORMAT_BC5_SNORM_BLOCK, 1024, 1024, 11, 4, 16, TEX},
+      {"BC4 1024x1024", VK_FORMAT_BC4_UNORM_BLOCK, 1024, 1024, 11, 4, 8, TEX},
+      {"BC5 1024x1024", VK_FORMAT_BC5_UNORM_BLOCK, 1024, 1024, 11, 4, 16, TEX},
+      {"BC1 2048x2048", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 2048, 2048, 12, 4, 8, TEX},
+      {"BC1 2048x2048 no mips", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 2048, 2048, 1, 4, 8, TEX},
+      {"RGBA8 16x16", VK_FORMAT_R8G8B8A8_UNORM, 16, 16, 5, 1, 4, TEX},
+      {"RGBA8 256x256", VK_FORMAT_R8G8B8A8_UNORM, 256, 256, 9, 1, 4, TEX},
+      {"RGBA8 1024x1024", VK_FORMAT_R8G8B8A8_UNORM, 1024, 1024, 11, 1, 4, TEX},
+      {"RGBA16F 1280x720 RT", VK_FORMAT_R16G16B16A16_SFLOAT, 1280, 720, 1, 1, 8, RT},
+      {"RGBA8 1280x720 RT", VK_FORMAT_R8G8B8A8_UNORM, 1280, 720, 1, 1, 4, RT},
+      {"R32F 1024x1024 RT", VK_FORMAT_R32_SFLOAT, 1024, 1024, 1, 1, 4, RT},
+#undef RT
+#undef TEX
+   };
+   unsigned long long total_req = 0, total_packed = 0;
+   jopen("images", '[');
+   for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      const VkImageCreateInfo ici = {
+         .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+         .imageType = VK_IMAGE_TYPE_2D,
+         .format = cases[i].format,
+         .extent = {cases[i].w, cases[i].h, 1},
+         .mipLevels = cases[i].levels,
+         .arrayLayers = 1,
+         .samples = VK_SAMPLE_COUNT_1_BIT,
+         .tiling = VK_IMAGE_TILING_OPTIMAL,
+         .usage = cases[i].usage,
+         .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      };
+      VkImage img;
+      VkResult r = vkCreateImage(dev, &ici, NULL, &img);
+      jopen(NULL, '{');
+      jstr("name", cases[i].name);
+      if (r != VK_SUCCESS) {
+         jint("vk_result", r);
+         jclose();
+         continue;
+      }
+      VkMemoryRequirements req;
+      vkGetImageMemoryRequirements(dev, img, &req);
+      vkDestroyImage(dev, img, NULL);
+      unsigned long long packed = 0;
+      for (uint32_t l = 0; l < cases[i].levels; l++) {
+         uint32_t w = cases[i].w >> l ? cases[i].w >> l : 1, h = cases[i].h >> l ? cases[i].h >> l : 1;
+         packed += (unsigned long long)((w + cases[i].block - 1) / cases[i].block) *
+                   ((h + cases[i].block - 1) / cases[i].block) * cases[i].bytes;
+      }
+      /* What a suballocator pays: the size rounded up to the image's alignment. */
+      unsigned long long paid = (req.size + req.alignment - 1) / req.alignment * req.alignment;
+      jint("size", (long long)req.size);
+      jint("alignment", (long long)req.alignment);
+      jint("packed", (long long)packed);
+      jnum("ratio", (double)paid / (double)packed);
+      jclose();
+      total_req += paid;
+      total_packed += packed;
+   }
+   jclose();
+   jint("total_paid", (long long)total_req);
+   jint("total_packed", (long long)total_packed);
+   finish("pass", NULL);
+}
+
 static void run_bcn(void)
 {
    enum { SIZE = 512, LEVELS = 10, NFORMATS = 2, PAD = 4096 };
@@ -6171,6 +6255,7 @@ int main(int argc, char **argv)
       {"placed", run_placed, false, NEED_PLACED},
       {"culling", run_culling, true, 0},
       {"subgroup", run_subgroup, false, 0},
+      {"memreq", run_memreq, false, 0},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},

@@ -54,7 +54,7 @@ _SELECTED: dict = {}  # select_phone() state: "done", and "auto" once it set AND
 PHONE_DIR = "/data/local/tmp/xd"
 CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "tess", "scratch", "scratchcs",
                      "queries", "xfb", "xfbmany", "xfbmanygs", "textures", "mips", "mrt", "vertex", "depth",
-                     "storage", "bcn", "descriptors", "placed", "culling", "subgroup"]
+                     "storage", "bcn", "descriptors", "placed", "culling", "subgroup", "memreq"]
 PERF_TESTS = ["alu", "bandwidth", "fill", "draws", "compile"]
 # Tests that hang our driver's GPU today. They run last, because after a hang the run stops testing
 # our driver.
