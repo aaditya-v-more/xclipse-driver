@@ -1,0 +1,15 @@
+{
+  "purpose": "Normal-clock check of the xd-5701dfa defaults (NGG culling off, loop filter emulation on) against culling back on (nggc) and the filter emulation off, in the same Heaven container.",
+  "bench": "heaven",
+  "driver": "radv",
+  "container_contains": {
+    "graphicsDriverConfig": "version=RADV Xclipse (Mesa 26.3.0-devel-xd-5701dfa)",
+    "dxwrapperConfig": "version=2.7.1",
+    "envVars": "dxvk.enableDescriptorBuffer=False"
+  },
+  "variants": [
+    {"name": "baseline", "props": {"debug.radv_perftest": "", "debug.radv_xclipse_filteremu": ""}},
+    {"name": "culling_on", "props": {"debug.radv_perftest": "nggc", "debug.radv_xclipse_filteremu": ""}},
+    {"name": "filteremu0", "props": {"debug.radv_perftest": "", "debug.radv_xclipse_filteremu": "0"}}
+  ]
+}
