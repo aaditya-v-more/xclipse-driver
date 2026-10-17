@@ -205,6 +205,43 @@ radv_xclipse_mtype(struct radv_amdgpu_winsys *ws)
    return mt;
 }
 
+/* Per-class UC override for the streak investigation: BOs whose class bit is set get MTYPE_UC
+ * instead of radv_xclipse_mtype(). 1 = host-cached (CPU_ACCESS, no GTT_WC), 2 = host WC
+ * (CPU_ACCESS|GTT_WC), 4 = no CPU access, 8 = imported. Default 0. RADV_XCLIPSE_UCMASK first,
+ * then debug.radv_xclipse_ucmask. */
+static unsigned
+radv_xclipse_ucmask(void)
+{
+   static int m = -1; /* not sampled yet */
+   if (m >= 0)
+      return m;
+
+   const char *e = getenv("RADV_XCLIPSE_UCMASK");
+   int v = e ? atoi(e) : 0;
+#ifdef __ANDROID__
+   if (!e) {
+      char pbuf[PROP_VALUE_MAX] = {0};
+      if (__system_property_get("debug.radv_xclipse_ucmask", pbuf) > 0 && pbuf[0])
+         v = atoi(pbuf);
+   }
+#endif
+   m = v & 0xf;
+   AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_ARM", "[ARM] ucmask=0x%x -- UC for%s%s%s%s", m,
+                   m & 1 ? " host-cached" : "", m & 2 ? " host-WC" : "", m & 4 ? " no-CPU" : "",
+                   m & 8 ? " imported" : "");
+   return m;
+}
+
+static unsigned
+radv_xclipse_bo_class(uint32_t bo_flags)
+{
+   if (bo_flags & RADV_XCLIPSE_VA_MTYPE_DEFAULT)
+      return 8;
+   if (!(bo_flags & RADEON_FLAG_CPU_ACCESS))
+      return 4;
+   return bo_flags & RADEON_FLAG_GTT_WC ? 2 : 1;
+}
+
 static int
 radv_amdgpu_bo_va_op(struct radv_amdgpu_winsys *ws, uint32_t bo_handle, uint64_t offset, uint64_t size, uint64_t addr,
                      uint32_t bo_flags, uint64_t internal_flags, uint32_t ops)
@@ -221,7 +258,7 @@ radv_amdgpu_bo_va_op(struct radv_amdgpu_winsys *ws, uint32_t bo_handle, uint64_t
        *   RADV_XCLIPSE_MTYPE / debug.radv_xclipse_mtype
        *   0=none (default on 0x73a0)  1=NC  2=WC  3=CC (upstream)  4=UC  5=RW;  -1/unset elsewhere
        */
-      const int mt = radv_xclipse_mtype(ws);
+      const int mt = (radv_xclipse_ucmask() & radv_xclipse_bo_class(bo_flags)) ? 4 : radv_xclipse_mtype(ws);
       if (mt >= 0) {
          static const uint64_t mtv[] = {0, AMDGPU_VM_MTYPE_NC, AMDGPU_VM_MTYPE_WC,
                                         AMDGPU_VM_MTYPE_CC, AMDGPU_VM_MTYPE_UC, AMDGPU_VM_MTYPE_RW};

@@ -31,11 +31,15 @@ flags() {
     syncshaders) echo --prop debug.radv_debug=syncshaders ;;
     nggreuse0) echo --prop debug.radv_xclipse_nggreuse=0 ;;
     mtype4) echo --prop debug.radv_xclipse_mtype=4 ;;
-    nongg) echo --prop debug.radv_debug=nongg ;;
+    mtype1) echo --prop debug.radv_xclipse_mtype=1 ;;
+    mtype2) echo --prop debug.radv_xclipse_mtype=2 ;;
+    mtype3) echo --prop debug.radv_xclipse_mtype=3 ;;
+    uc1|uc2|uc4|uc8) echo --prop debug.radv_xclipse_ucmask=${1#uc} ;;  # UC for one BO class
     *) echo "unknown label $1" >&2; exit 2 ;;
   esac
 }
-[ $# -gt 0 ] || set -- baseline wave32 syncshaders nggreuse0 mtype4 nongg
+# Never add RADV_DEBUG=nongg: the legacy geometry path hangs the 940 (docs/findings.md).
+[ $# -gt 0 ] || set -- baseline wave32 syncshaders nggreuse0 mtype4
 for label in "$@"; do
   f=$(flags "$label") || exit 2
   run "$label" $f || exit 1

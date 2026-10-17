@@ -867,13 +867,13 @@ rebuild:
    `debug.radv_xclipse_nggreuse=0`.
 4. **Host-visible memory coherence.** Memory types claim HOST_CACHED|COHERENT, and MTYPE defaults
    to 0 on the 940. Test: `debug.radv_xclipse_mtype=4` (uncached, slow).
-5. Others: `has_ngg_passthru_no_msg` is set for the 940 without verification (test `nongg`);
+5. Others: `has_ngg_passthru_no_msg` is set for the 940 without verification (no runtime test: `nongg` hangs the 940);
    tessellation rings (test by disabling Heaven's tessellation); and wave64 cross-half lane ops
    (`[W64XLANE]` in the RADV log).
 
 `pipeline/artifact_screen.sh [labels]` runs one Heaven RADV run per flag. It takes screenshots
 every 10 s from 35 to 95 s after rendering starts. Labels: baseline, wave32, syncshaders,
-nggreuse0, mtype4, nongg. A flag that removes the streaks across all seven shots, when the
+nggreuse0, mtype4 (`nongg` is excluded: it hangs the 940). A flag that removes the streaks across all seven shots, when the
 baseline shows them, identifies the cause. Confirm it with a second run before changing the
 driver's defaults.
 
@@ -883,5 +883,5 @@ camera further along the benchmark path at the same time, so these shots show la
 the fixed-mode study. Only faint thin blue lines appear, in the airship rigging at 55 s and possibly
 along a roof edge at 85 s. The streaks are rarer here than in the fixed-mode airship shots, so
 screening at normal clocks needs several runs per flag or a longer shot series. Next: run
-`pipeline/artifact_screen.sh wave32 syncshaders nggreuse0 mtype4 nongg`, or repeat the screen under
+`pipeline/artifact_screen.sh wave32 syncshaders nggreuse0 mtype4`, or repeat the screen under
 `game_compare` fixed mode, where the baseline shows streaks in 7 of 12 shots.
