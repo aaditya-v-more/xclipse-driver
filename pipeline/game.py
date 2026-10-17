@@ -292,6 +292,34 @@ def drivers_seen(since: str, processes: dict[str, str]) -> list[str]:
     return seen
 
 
+def thread_states(exe: str) -> list[str]:
+    """Name, state, user and system clock ticks of every thread of the game's process."""
+    out = shell("for p in $(ps -A -o PID,NAME | grep -i '" + exe + "$' | awk '{print $1}'); do "
+                "for t in /proc/$p/task/*; do "
+                "echo \"$(cat $t/comm 2>/dev/null)|$(cut -d' ' -f3,14,15 $t/stat 2>/dev/null)\"; "
+                "done; done")
+    return [line for line in out.splitlines() if "|" in line]
+
+
+def stall_snapshot(exe: str, path: Path) -> None:
+    """Writes the game's threads twice, 5 s apart, so a hang shows which threads still run."""
+    first = thread_states(exe)
+    time.sleep(5)
+    second = thread_states(exe)
+    lines = ["# thread|state utime stime (clock ticks), 5 s apart", "## first"] + first
+    lines += ["## second"] + second + ["## busy in between"]
+    for a, b in zip(first, second):
+        name, _, old = a.partition("|")
+        _, _, new = b.partition("|")
+        try:
+            ticks = sum(map(int, new.split()[1:])) - sum(map(int, old.split()[1:]))
+        except ValueError:
+            continue
+        if ticks:
+            lines.append(f"{name}: {ticks} ticks, state {new.split()[0]}")
+    path.write_text("\n".join(lines) + "\n")
+
+
 def screenshot(path: Path) -> bool:
     png = subprocess.run([ADB, "exec-out", "screencap", "-p"], capture_output=True,
                          timeout=60).stdout
@@ -649,6 +677,10 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         shot = run_dir / f"{tag}-{bench}-{driver}-screen.png"
         if screenshot(shot):
             result["screenshot"] = shot.name
+        if result.get("status") == "stalled":
+            threads = run_dir / f"{tag}-{bench}-{driver}-threads.txt"
+            stall_snapshot(cfg["exe"], threads)
+            result["threads"] = threads.name
     shell(f"am force-stop {APP}")
     logcat_stop()
     killed = logcat_since(since, LOW_MEMORY_KILL)
