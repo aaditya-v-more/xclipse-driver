@@ -61,17 +61,21 @@ radv_xclipse_size_bucket(uint64_t size)
    return b;
 }
 
+#define RADV_XCLIPSE_CHURN_IMPORT 0xff
+
 static void
 radv_xclipse_bo_churn(struct radv_amdgpu_winsys *ws, uint64_t size, unsigned priority, enum radeon_bo_flag flags,
                       bool created)
 {
    /* Live bytes per kind, to explain GPU memory outside the app's allocations: app (priority <= 28),
     * query pools, descriptors/uploads/fences (30), and priority 31 split by flags into shader
-    * arenas (32-bit VA), scratch/rings (no CPU access) and command buffers. */
-   enum { K_APP, K_QUERY, K_DESC, K_SHADER, K_SCRATCH, K_CS, K_COUNT };
-   static const char *const kname[K_COUNT] = {"app", "query", "desc/upload", "shader", "scratch", "cs"};
+    * arenas (32-bit VA), scratch/rings (no CPU access) and command buffers. Imports (dma-buf or
+    * host pointer) pass RADV_XCLIPSE_CHURN_IMPORT as the priority. */
+   enum { K_APP, K_QUERY, K_DESC, K_SHADER, K_SCRATCH, K_CS, K_IMPORT, K_COUNT };
+   static const char *const kname[K_COUNT] = {"app", "query", "desc/upload", "shader", "scratch", "cs", "import"};
    static uint64_t kind_bytes[K_COUNT];
-   const unsigned kind = priority <= RADV_BO_PRIORITY_APPLICATION_MAX ? K_APP
+   const unsigned kind = priority == RADV_XCLIPSE_CHURN_IMPORT            ? K_IMPORT
+                         : priority <= RADV_BO_PRIORITY_APPLICATION_MAX ? K_APP
                          : priority == RADV_BO_PRIORITY_QUERY_POOL  ? K_QUERY
                          : priority < RADV_BO_PRIORITY_SHADER       ? K_DESC
                          : (flags & RADEON_FLAG_32BIT)              ? K_SHADER
@@ -99,11 +103,15 @@ radv_xclipse_bo_churn(struct radv_amdgpu_winsys *ws, uint64_t size, unsigned pri
     * approximates the flush rate. Report the first event, then every 64. */
    uint32_t nc = p_atomic_read(&n_create), nd = p_atomic_read(&n_destroy);
    uint32_t ev = nc + nd;
-   if (ev != 1 && (ev & 0x3f))
+   /* Allocations of 32 MB or more report at once: a scene load can add gigabytes in a few events. */
+   const bool big = created && size >= (32ull << 20);
+   if (ev != 1 && (ev & 0x3f) && !big)
       return;
    /* The report queries the kernel three times; only when logging. */
    if (ac_xclipse_log_level() < 1)
       return;
+   if (big)
+      AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[BO_BIG] +%" PRIu64 " MB %s", size >> 20, kname[kind]);
 
    int64_t now = os_time_get_nano();
    int64_t dt = t_last ? now - t_last : 0;
@@ -141,9 +149,10 @@ radv_xclipse_bo_churn(struct radv_amdgpu_winsys *ws, uint64_t size, unsigned pri
                        radv_xclipse_bo_hist_name[6], radv_xclipse_bo_hist[6],
                        radv_xclipse_bo_hist_name[7], radv_xclipse_bo_hist[7]);
    AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[BO_KIND] MB %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64
-                       " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64,
+                       " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64,
                        kname[0], kind_bytes[0] >> 20, kname[1], kind_bytes[1] >> 20, kname[2], kind_bytes[2] >> 20,
-                       kname[3], kind_bytes[3] >> 20, kname[4], kind_bytes[4] >> 20, kname[5], kind_bytes[5] >> 20);
+                       kname[3], kind_bytes[3] >> 20, kname[4], kind_bytes[4] >> 20, kname[5], kind_bytes[5] >> 20,
+                       kname[6], kind_bytes[6] >> 20);
 }
 
 /* Memory guard: the sgpu kernel hard-locks the phone when GPU-pinned GTT across all processes
@@ -789,7 +798,6 @@ radv_amdgpu_winsys_bo_destroy(struct radeon_winsys *_ws, struct radeon_winsys_bo
 
    radv_xclipse_vmfault_bo_remove(ws, bo);
    radv_amdgpu_log_bo(ws, bo, true);
-   /* Only un-count what was counted: imports never passed through the allocate path. */
    if (bo->churn_counted)
       radv_xclipse_bo_churn(ws, bo->base.size, bo->churn_priority, bo->flags, false);
 
@@ -1317,6 +1325,9 @@ radv_amdgpu_winsys_bo_from_ptr(struct radeon_winsys *_ws, void *pointer, uint64_
    bo->base.obj_id = (uintptr_t)(buf_handle.abo);
 
    p_atomic_add(&ws->alloc_tracker->allocated_gtt, align64(bo->base.size, ws->info.gart_page_size));
+   radv_xclipse_bo_churn(ws, size, RADV_XCLIPSE_CHURN_IMPORT, 0, true);
+   bo->churn_counted = true;
+   bo->churn_priority = RADV_XCLIPSE_CHURN_IMPORT;
 
    if (ws->debug_all_bos)
       radv_amdgpu_global_bo_list_add(ws, bo);
@@ -1430,6 +1441,9 @@ radv_amdgpu_winsys_bo_from_fd(struct radeon_winsys *_ws, int fd, unsigned priori
 
    if (bo->base.initial_domain & RADEON_DOMAIN_GTT)
       p_atomic_add(&ws->alloc_tracker->allocated_gtt, align64(bo->base.size, ws->info.gart_page_size));
+   radv_xclipse_bo_churn(ws, bo->base.size, RADV_XCLIPSE_CHURN_IMPORT, 0, true);
+   bo->churn_counted = true;
+   bo->churn_priority = RADV_XCLIPSE_CHURN_IMPORT;
 
    if (ws->debug_all_bos)
       radv_amdgpu_global_bo_list_add(ws, bo);
