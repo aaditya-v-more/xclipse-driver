@@ -7841,6 +7841,8 @@ static bool
 can_skip_buffer_l2_flushes(struct radv_device *device)
 {
    const struct radv_physical_device *pdev = radv_device_physical(device);
+   if (pdev->xclipse_buffer_l2)
+      return false;
    return pdev->info.gfx_level == GFX9 || (pdev->info.gfx_level >= GFX10 && !pdev->info.tcc_rb_non_coherent);
 }
 
@@ -8040,6 +8042,12 @@ radv_dst_access_flush(struct radv_cmd_buffer *cmd_buffer, VkPipelineStageFlags2 
       if (pdev->info.gfx_level < GFX9)
          flush_bits |= RADV_CMD_FLAG_INV_L2;
    }
+
+   /* GE (index fetch), CP (indirect) and SMEM (uniform) reads too. */
+   if (pdev->xclipse_buffer_l2 && !image_is_coherent &&
+       (dst_flags & (VK_ACCESS_2_INDEX_READ_BIT | VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT |
+                     VK_ACCESS_2_UNIFORM_READ_BIT)))
+      flush_bits |= RADV_CMD_FLAG_INV_L2;
 
    if (dst_flags & VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT) {
       if (flush_CB)

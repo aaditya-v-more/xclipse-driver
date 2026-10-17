@@ -34,6 +34,7 @@ flags() {
     mtype1) echo --prop debug.radv_xclipse_mtype=1 ;;
     mtype2) echo --prop debug.radv_xclipse_mtype=2 ;;
     mtype3) echo --prop debug.radv_xclipse_mtype=3 ;;
+    bufl2) echo --prop debug.radv_xclipse_bufl2=1 ;;  # L2 writeback+invalidate in buffer barriers
     uc1|uc2|uc4|uc8) echo --prop debug.radv_xclipse_ucmask=${1#uc} ;;  # UC for one BO class
     *) echo "unknown label $1" >&2; exit 2 ;;
   esac

@@ -3139,6 +3139,7 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                             (instance->perftest_flags & RADV_PERFTEST_NGGC)) &&
                            !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
 
+   pdev->xclipse_buffer_l2 = radv_xclipse_flag("RADV_XCLIPSE_BUFL2", "radv_xclipse_bufl2");
    if (pdev->info.xclipse_model == AC_XCLIPSE_940 && pdev->use_ngg_culling) {
       pdev->xclipse_cull_min_vertices = radv_xclipse_cull_min_vertices();
       pdev->xclipse_cull_small_no_flush =

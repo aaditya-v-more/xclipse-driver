@@ -173,6 +173,9 @@ struct radv_physical_device {
    bool xclipse_dcc;
    /* Xclipse: DCC also for colour targets of 512x512 and less (debug.radv_xclipse_dcc_small 0 = off). */
    bool xclipse_dcc_small;
+   /* Xclipse: write back and invalidate L2 in every buffer barrier, as on chips whose L2 isn't
+    * coherent between clients (debug.radv_xclipse_bufl2 1). Blue-streak investigation. */
+   bool xclipse_buffer_l2;
 
    /* Whether to emulate ASTC image support on HW without support. */
    bool emulate_astc;
