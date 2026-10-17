@@ -40,7 +40,7 @@ Check the latest dated entries in `docs/PROGRESS.md` for work since the last han
 
 - `driver/` is the RADV port we build and change. It's a git subtree of radv-xclipse at branch `xclipse940` (JimVulkan's port plus yoro1836's 940 bring-up, PR #6). To pull upstream updates: `git subtree pull --prefix=driver <url> <branch>`.
 - `tests/xdtest.c` is the on-device Vulkan test harness: correctness and speed, stock or RADV. `pipeline/run.py` builds it, deploys it over adb, and writes `results/<time>/`.
-- `pipeline/game.py` runs the GameNative benchmark A/B. `pipeline/phone_ui.py` provides adb UI helpers: `dump`, `tap-text`, `type`. `pipeline/gn_driver.py` imports drivers, changes container settings and launches games (`apply GAME --driver/--set/--env/--args [--launch]`, `launch`, `install`, `select`, `set`, `env`, ...); its docstring lists every command.
+- `pipeline/game.py` runs the GameNative benchmark A/B. `pipeline/phone_ui.py` provides adb UI helpers: `dump`, `tap-text`, `type`. `pipeline/gn_driver.py` imports drivers, changes container settings and launches games (`apply GAME --driver/--set/--env/--args [--launch]`, `launch`, `install`, `select`, `set`, `env`, ...); its docstring lists every command. `pipeline/game_input.py` presses gamepad buttons in a running game through GameNative's on-screen controller (`press A RB --times N`) and starts a game past its intro screens (`play LifeIsStrange3`).
 - `docs/` holds the handoff, progress, findings, research, and game setup.
 - `recon/` holds the read-only device survey scripts and their raw output (summarized in `docs/findings.md`).
 - `third_party/` holds pinned source submodules; see `third_party/MANIFEST.md`. Restore them with

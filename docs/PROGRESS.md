@@ -1258,3 +1258,39 @@ error, then squared error. It runs in about 3 s on the Mac, and its output repro
   (results/2026-10-18_025830 old, _025809 new). The BC5 tolerance is now 0.018 (was 0.04), so a
   regression fails the test.
 - No change to memory or speed: the table has the same size and lookups.
+
+### 2026-10-18: game_input.py starts Life is Strange past its intro screens
+
+`pipeline/game_input.py play LifeIsStrange3` launches the game with `gn_driver.py launch`, presses
+RB through the intro screens, A for "Press any button" and A for Continue, waits for the first
+scene, then presses RB three times for the opening cutscene. `press BUTTON [--times N]
+[--interval S]` presses any pad button; `look` prints what `play` sees. Each press first checks that
+GameNative is in front, in landscape, with `wineserver` running; a press while the phone showed the
+home screen was refused, as intended.
+
+- Input method: GameNative's on-screen "Virtual Gamepad", tapped with `input swipe X Y X Y 120`
+  (a 120 ms hold). `adb shell input` events come from the virtual device (id -1), and GameNative's
+  `ExternalController.isGameController` rejects virtual devices, so `input gamepad keyevent
+  KEYCODE_BUTTON_A` would reach it as a keyboard key, not as the pad (read from the source; not
+  tried on the phone). uinput needs root. The button centres were measured from the outlines in a
+  raw screenshot (2340x1080 landscape) and stored as screen fractions. Verified on the phone: A on
+  the title opens the menu, RB skips each intro screen (and counts as "any button" on the title), A
+  on the menu starts Continue.
+- Screen states come from the mean green level of a box left of centre (x 20-50%, y 30-65%) in a
+  raw `screencap`: 27 under GameNative's "Launching game..." screen, 0 for the game's black window,
+  9-32 for the Square Enix and Deck Nine logos, health warning and autosave notice, 51-53 for the
+  title and menu, 7 then 0-3 while loading and on the chapter card, 19-49 in the first scene. A raw
+  capture takes 0.7-1.0 s, and 4-6 s when memory is short.
+- Timings (4 runs of `play`, plus manual runs): `gn_driver.py launch` 15.5-16.3 s, or 5.9 s when
+  Game Information is already showing. After it returns: black window at 2-4 s, Square Enix logo
+  at 19-24 s, title at 39-45 s with RB presses (6 presses) against about 48 s with no input. The
+  second A goes dark for loading within 1 s. The first scene draws 39-47 s after Continue, about
+  95-101 s after `play` starts.
+- Not reached: play itself. In all 8 launches tonight (03:22-03:49; driver xd-5c58dd1, Max Device
+  Memory 1024 MB, `debug.radv_xclipse_log` 1, one run with it 0), lmkd killed GameNative
+  (`oom_score_adj 0`, "min2x watermark is breached even after kill") during the Continue load or
+  within about 20 s of the first scene drawing. MemAvailable was 2.9-3.5 GB after `am kill-all`;
+  user apps (Instagram, ChatGPT, Samsung Health) restart in the background. Earlier on 2026-10-18,
+  with earlier driver builds, the game got through this scene to the song scene (above). So whether RB skips the opening cutscene, and when
+  play starts, is unverified; `play` reports a kill from logcat. The DXVK HUD (memory and
+  allocations) is still showing in this container.
