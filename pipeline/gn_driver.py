@@ -329,10 +329,19 @@ class Nav:
         self.acted = False  # tapped, swiped or typed since this command started
         self.last_game: str | None = None
         self.restarted = 0
+        self.fronted = False  # GameNative brought forward before the first dump
 
     # Looking ---------------------------------------------------------------------------------
     def look(self) -> Screen:
         if self._screen is None:
+            # Bring GameNative forward before the first dump: uiautomator never finds a home
+            # screen with a ticking clock widget idle, so dumping another app can fail outright.
+            if not self.fronted:
+                self.fronted = True
+                front = front_app()
+                if front and front != APP and not front.endswith("documentsui"):
+                    sh(f"am start -n {APP}/.MainActivity")
+                    time.sleep(2)
             self._screen = dump()
             STATS["dumps"] += 1
         return self._screen
