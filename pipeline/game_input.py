@@ -29,7 +29,7 @@ running unless --restart is given. If GameNative dies on the way (Android's low-
 says so from logcat.
 
 usage: python pipeline/game_input.py press BUTTON [BUTTON...] [--times N] [--interval S]
-       python pipeline/game_input.py play GAME [--restart]
+       python pipeline/game_input.py play GAME [--restart] [--until title] [--no-kill]
        python pipeline/game_input.py look
 
 BUTTON is one of A B X Y LB RB LT RT START SELECT L3 R3 UP DOWN LEFT RIGHT. press presses each
@@ -67,6 +67,8 @@ DPAD_HOLD_MS = 40
 # The box whose brightness `play` watches: left of centre, inside the game's 16:9 picture.
 BOX = (0.20, 0.30, 0.50, 0.65)
 GAME_PROCESS = "wineserver"
+# play's `am kill-all` calls; --no-kill turns them off to launch the way a player would.
+CLEAR_BACKGROUND = True
 
 
 class NotInGame(Exception):
@@ -168,7 +170,8 @@ def life_is_strange_3(run: Run, until: str | None = None) -> None:
              press_every_s=2.5)
     if until == "title":
         return
-    sh("am kill-all")  # background apps come back during the intros; the first scene needs the room
+    if CLEAR_BACKGROUND:
+        sh("am kill-all")  # background apps come back during the intros; the first scene needs the room
     time.sleep(1.0)
     for presses in range(1, 5):
         press("A")
@@ -181,7 +184,8 @@ def life_is_strange_3(run: Run, until: str | None = None) -> None:
         sys.exit("the menu did not start loading after four presses of A")
     # Background apps restart while the scene loads and the load is where lmkd kills GameNative, so
     # keep clearing them on the phone for the next 45 s without holding up the brightness polling.
-    sh("nohup sh -c 'for i in $(seq 15); do am kill-all; sleep 3; done' >/dev/null 2>&1 &")
+    if CLEAR_BACKGROUND:
+        sh("nohup sh -c 'for i in $(seq 15); do am kill-all; sleep 3; done' >/dev/null 2>&1 &")
     run.wait(lambda v: v > 12, "the first scene", limit_s=180)
     for _ in range(3):  # the opening cutscene
         time.sleep(2.0)
@@ -196,7 +200,8 @@ def play(game: str, restart: bool, until: str | None = None) -> None:
     if sh(f"pidof {GAME_PROCESS}") and not restart:
         sys.exit(f"a game is running already ({GAME_PROCESS}); pass --restart to stop it and start "
                  f"{game}")
-    sh("am kill-all")
+    if CLEAR_BACKGROUND:
+        sh("am kill-all")
     since = sh("date '+%m-%d %H:%M:%S.000'")
     run = Run()
     result = subprocess.run([sys.executable, str(HERE / "gn_driver.py"), "launch", game])
@@ -233,6 +238,8 @@ def main() -> None:
     p.add_argument("game", choices=sorted(GAMES))
     p.add_argument("--restart", action="store_true", help="stop a game that is running first")
     p.add_argument("--until", choices=["title"], help="stop at this screen instead of play")
+    p.add_argument("--no-kill", action="store_true",
+                   help="don't run am kill-all to clear background apps")
     commands.add_parser("look", help="print what play sees and whether presses are allowed")
     args = parser.parse_args()
 
@@ -247,6 +254,8 @@ def main() -> None:
                     press(button)
                     print(f"pressed {button}", flush=True)
         elif args.command == "play":
+            global CLEAR_BACKGROUND
+            CLEAR_BACKGROUND = not args.no_kill
             play(args.game, args.restart, args.until)
         else:
             look()

@@ -1335,3 +1335,30 @@ MemAvailable 860-1000 MB, the game 345 MB resident with 1.45 GB swapped.
 
 Menu input: with 120 ms holds the D-pad stepped one to three values per press in the option rows;
 40 ms taps step once. `game_input.py` now holds the D-pad 40 ms and the other buttons 120 ms.
+
+### 2026-10-18: Life is Strange survival rate; Engine.ini streaming caps do nothing
+
+Same setup as the entry above (xd-69715ca, Max Device Memory 512 MB, in-game 80% scaling):
+
+- With `game_input.py play` clearing background apps (`am kill-all` before launch, before Continue,
+  and every 3 s through the load): 4 of 5 runs reached play and stayed up at least 90 s.
+- With `play --no-kill` (new flag, closer to how a player launches): 1 of 2.
+
+**`-ENGINEINI=D:/xclipse/LiS3Engine.ini` works in this Shipping build** (`D:\xclipse\` is
+`/sdcard/Download/xclipse/`). The game reads the file as its saved Engine.ini and rewrites it as the
+full merged engine config (UTF-16, 452 KB), keeping our `[SystemSettings]` lines at the top. Those
+cvars apply: `r.ScreenPercentage=50` left the title screen's 3D scene black, with the menu still
+drawn, at 57 FPS. Whether that black is a driver bug at that render size is untested.
+
+The streaming cvars changed nothing. In play, DXVK's HUD read 1659 MB used with no ini, 1659 MB
+with `r.Streaming.PoolSize=250`, `UseFixedPoolSize=1`, `MipBias=1`, and 1651 MB with
+`r.TextureStreaming=1` added. The title read 716 MB against 718. Texture memory here is therefore
+not governed by the streaming pool. Exec Arguments are back to `-nostartupmovies -dx11`; the
+rewritten `LiS3Engine.ini` stays on the phone, unused.
+
+Where the GPU memory is in play: gpumem for the game is 2134 MB against DXVK's heap of 2081 MB, so
+DXVK holds nearly all of it (the earlier 2.3-2.9 GB readings were load peaks with Max Device Memory
+1024). Of DXVK's 1651 MB used, images are about 610 MB (`[IMG_MEM]`: render targets 193, BC 133,
+other textures 231, storage 32, depth 17). That leaves about 1 GB of buffers suballocated in
+DXVK's chunks (mesh vertex/index data, constant and staging buffers), which the driver can't
+split further because DXVK binds one buffer over each whole chunk.
