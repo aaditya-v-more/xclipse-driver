@@ -1107,3 +1107,11 @@ the noise floor. On `results/2026-10-17_163705-game-compare` that floor is 0.35�
 0.53–0.97 at 75 s: Heaven's camera moves enough between shots taken "at the same second" to swamp
 any rendering difference. SSIM on Heaven fly-through shots therefore can't separate drivers; it
 needs a static scene. The exact image readbacks in `xdtest` remain the correctness check.
+
+**Load hangs are rare.** After the two hangs above (one per build), 16 more Heaven launches on
+`xd-85cd575` all loaded: 8 with a warm cache (`results/2026-10-17_221303-game`) and 8 forced cold
+with `debug.radv_debug=nocache` (`results/2026-10-17_223447-game`), 57.5–59.4 FPS. So
+the hang is about 2 in 45 launches today, with no GPU fault, and it is not tied to cold compiles.
+Both stopped after texture loading finished and before the first pipeline compile.
+`game.py` now records the game's thread states twice, 5 s apart, when a run stalls, and
+`game_compare.py` retries a stalled launch once in the same slot instead of abandoning the study.

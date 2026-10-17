@@ -242,20 +242,27 @@ def main():
             for v in order:
                 for key, value in v["props"].items():
                     set_prop(key, value)
-                tag = f"pair{repeat}-{candidate}-{v['name']}"
-                print(f"{tag}: preparing launch (GPU limit {args.max_start_temp:.1f} C, "
-                      f"SKIN limit {skin} C)", flush=True)
-                r = game.run_once(manifest["bench"], manifest["driver"], folder, tag, user,
-                                  rendered_shots=SHOTS, seconds=args.seconds + 120,
-                                  measure_seconds=args.seconds, max_start_temp=args.max_start_temp,
-                                  max_start_skin=skin, cool_limit_s=args.cool_limit)
-                r.update(repeat=repeat, candidate=candidate, variant=v["name"], warmup=repeat == 0,
-                         role="baseline" if v is manifest["variants"][0] else "candidate",
-                         props=v["props"], accepted=bool(accepted(r, args.seconds, args.max_start_temp, skin)))
-                rows.append(r)
-                save(folder, meta, rows)
-                print(f"{tag}: {r['status']}, {r['surfaceflinger'].get('fps_avg', 0):.2f} FPS, "
-                      f"accepted={r['accepted']}", flush=True)
+                # Heaven rarely hangs on its loading screen (2 of about 45 launches on
+                # 2026-10-17, no GPU fault). A stalled launch is kept as a rejected attempt and
+                # retried once in the same slot, so the pair order is unchanged.
+                for attempt in range(2):
+                    tag = f"pair{repeat}-{candidate}-{v['name']}" + ("-retry" if attempt else "")
+                    print(f"{tag}: preparing launch (GPU limit {args.max_start_temp:.1f} C, "
+                          f"SKIN limit {skin} C)", flush=True)
+                    r = game.run_once(manifest["bench"], manifest["driver"], folder, tag, user,
+                                      rendered_shots=SHOTS, seconds=args.seconds + 120,
+                                      measure_seconds=args.seconds, max_start_temp=args.max_start_temp,
+                                      max_start_skin=skin, cool_limit_s=args.cool_limit)
+                    r.update(repeat=repeat, candidate=candidate, variant=v["name"], warmup=repeat == 0,
+                             role="baseline" if v is manifest["variants"][0] else "candidate",
+                             props=v["props"], attempt=attempt + 1,
+                             accepted=bool(accepted(r, args.seconds, args.max_start_temp, skin)))
+                    rows.append(r)
+                    save(folder, meta, rows)
+                    print(f"{tag}: {r['status']}, {r['surfaceflinger'].get('fps_avg', 0):.2f} FPS, "
+                          f"accepted={r['accepted']}", flush=True)
+                    if r["accepted"] or r["status"] != "stalled":
+                        break
                 if not r["accepted"]:
                     raise RuntimeError(f"{tag} failed measurement requirements; stopping")
     except BaseException as error:
