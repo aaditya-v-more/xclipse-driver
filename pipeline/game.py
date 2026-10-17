@@ -397,9 +397,30 @@ def gpu_temp() -> float:
         return 0.0
 
 
-def cool_down(target: float, limit_s: float = 120) -> float:
+def thermal_sample() -> dict:
+    """The thermal HAL's SKIN reading (C) and Android's thermal status (0 none .. 6 shutdown).
+    Samsung throttles the CPU and GPU from SKIN's thresholds (38, 40, 42, 45 C on this phone);
+    in fixed performance mode a run that crossed them fell from GPU/X4 400/1632 to 252/1056 MHz
+    while the GPU's own sensor stayed under its start limit (2026-10-17)."""
+    out = shell("dumpsys thermalservice", 15)
+    sample = {}
+    m = re.search(r"Thermal Status: (\d+)", out)
+    if m:
+        sample["thermal_status"] = int(m.group(1))
+    hal = out.partition("Current temperatures from HAL:")[2]
+    m = re.search(r"mValue=([\d.]+), mType=3, mName=SKIN", hal)
+    if m:
+        sample["skin_c"] = float(m.group(1))
+    return sample
+
+
+def cool_down(target: float, limit_s: float = 120, max_skin: float | None = None) -> float:
+    """Waits until the GPU is at most `target` C and, when given, SKIN at most `max_skin` C."""
     deadline = time.monotonic() + limit_s
-    while gpu_temp() > target and time.monotonic() < deadline:
+    while time.monotonic() < deadline:
+        if gpu_temp() <= target and (max_skin is None
+                                     or 0 < thermal_sample().get("skin_c", 0) <= max_skin):
+            break
         time.sleep(5)
     return gpu_temp()
 
@@ -407,7 +428,13 @@ def cool_down(target: float, limit_s: float = 120) -> float:
 def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
              shots: list[int] = (), seconds: int | None = None,
              measure_seconds: float | None = None,
-             max_start_temp: float | None = None) -> dict:
+             max_start_temp: float | None = None, max_start_skin: float | None = None,
+             cool_limit_s: float = 180, rendered_shots: list[int] = ()) -> dict:
+    """`shots` are seconds after launch; `rendered_shots` are seconds after the game starts
+    rendering for good, which is known only MIN_STEADY_S after it, so they must be later than that.
+    Loading time varies with clocks, so only the latter show matching scenes across runs."""
+    if any(t <= MIN_STEADY_S for t in rendered_shots):
+        raise ValueError(f"rendered_shots must be over {MIN_STEADY_S} s")
     cfg = BENCHES[bench]
     app_id = cfg["ids"][driver]
     shell(f"am force-stop {APP}")
@@ -422,11 +449,17 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     result["logcat_file"] = f"{tag}-{bench}-{driver}-logcat.txt"
     # Preparation can warm the phone after a caller's cooldown. Sample (and, for controlled
     # comparisons, cool) only after preparation, immediately before issuing the launch intent.
-    temperature = cool_down(max_start_temp, 180) if max_start_temp is not None else gpu_temp()
+    temperature = (cool_down(max_start_temp, cool_limit_s, max_start_skin)
+                   if max_start_temp is not None else gpu_temp())
     result["gpu_temp_c_before"] = temperature
+    thermal = thermal_sample()
+    result.update({f"{k}_before": v for k, v in thermal.items()})
+    if max_start_skin is not None:
+        result["max_start_skin_c"] = max_start_skin
     if max_start_temp is not None:
         result["max_start_temp_c"] = max_start_temp
-        if not 0 < temperature <= max_start_temp:
+        if not 0 < temperature <= max_start_temp or (
+                max_start_skin is not None and not 0 < thermal.get("skin_c", 0) <= max_start_skin):
             result.update(status="temperature-not-ready", surfaceflinger={}, gpu=[])
             logcat_stop()
             LOGCAT.pop("path", None)
@@ -443,6 +476,7 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     app_seen = False
     history, last_new, checked = [], 0.0, 0.0  # (seconds, frames so far); when the count last grew
     shots_left, pending_shots = sorted(shots), []
+    rendered_left, rendered_at = sorted(rendered_shots), None  # rendering start, s after launch
     exe = cfg["exe"].lower()
     while time.monotonic() - started < (seconds or cfg["seconds"]):
         time.sleep(0.5)  # the adb calls below take the rest of the second; the ring holds ~1-2 s
@@ -465,8 +499,17 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             break
         # Encoding and copying a PNG takes 1-3 s over wireless adb, longer than SurfaceFlinger's
         # ring lasts at 60 FPS, so the phone writes it in the background and it's copied later.
+        if rendered_left and rendered_at is None and lags:
+            start = rendering_start(sorted(frames), holes)
+            if start is not None:
+                rendered_at = start / 1e9 + min(lags)
+        due = []
         while shots_left and elapsed >= shots_left[0]:
-            name = f"{tag}-{bench}-{driver}-{shots_left.pop(0)}s.png"
+            due.append(f"{shots_left.pop(0)}s")
+        while rendered_left and rendered_at is not None and elapsed >= rendered_at + rendered_left[0]:
+            due.append(f"r{rendered_left.pop(0)}s")
+        for when in due:
+            name = f"{tag}-{bench}-{driver}-{when}.png"
             pending_shots.append((name, subprocess.Popen(
                 [ADB, "shell", f"mkdir -p {SHOT_DIR} && screencap -p {SHOT_DIR}/{name}"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)))
@@ -475,7 +518,8 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             gpu.append((round(elapsed, 1), *sample))
         if elapsed - sampled >= MEMORY_EVERY_S:
             now = {}
-            memory.append({"t": round(elapsed), **memory_sample(user, now), **battery_sample()})
+            memory.append({"t": round(elapsed), **memory_sample(user, now), **battery_sample(),
+                           **thermal_sample()})
             processes.update(now)
             sampled = elapsed
             crash = runtime_crash(since, processes)

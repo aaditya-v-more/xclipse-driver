@@ -23,6 +23,10 @@ import game
 import gn_driver
 import run
 
+# Screenshots at these seconds after the game starts rendering for good, so pairs show the same
+# point in the benchmark regardless of loading time. Both fall inside the measured window.
+SHOTS = [35, 75]
+
 
 def load_manifest(path):
     m = json.loads(path.read_text(encoding="utf-8"))
@@ -46,10 +50,11 @@ def set_prop(key, value):
         raise RuntimeError(f"property readback failed: {key}")
 
 
-def accepted(r, duration, max_start_temp):
+def accepted(r, duration, max_start_temp, max_start_skin=None):
     s = r.get("surfaceflinger", {})
     return (r["status"] == "ran" and s.get("steady_seconds", 0) >= duration - .25
             and 0 < r.get("gpu_temp_c_before", 0) <= max_start_temp
+            and (max_start_skin is None or 0 < r.get("skin_c_before", 0) <= max_start_skin)
             and s.get("sampling_gaps") == 0 and s.get("covered_share", 0) > .999
             and len(r.get("screens", [])) >= 2 and r.get("gpu")
             and not r.get("gpu_page_faults", 0) and not r.get("gpu_resets", 0))
@@ -98,7 +103,8 @@ def resource_stats(r):
     fields = {"rss_peak_mb": ("app_rss_mb", max), "swap_peak_mb": ("app_swap_mb", max),
               "gpu_peak_mb": ("app_gpu_mb", max), "available_min_mb": ("available_mb", min),
               "pressure_peak_pct": ("pressure_full_avg10", max),
-              "battery_peak_dc": ("battery_temperature_dc", max)}
+              "battery_peak_dc": ("battery_temperature_dc", max),
+              "skin_peak_c": ("skin_c", max), "thermal_status_peak": ("thermal_status", max)}
     out = {}
     for name, (key, aggregate) in fields.items():
         values = [s[key] for s in memory if s.get(key) is not None]
@@ -125,20 +131,20 @@ def summary(meta, rows):
             if values:
                 n, b, c, gain, lo, hi = values
                 out.append(f"| {v['name']} | {label} | {n} | {b:.2f} | {c:.2f} | {gain:+.2f}% | {lo:+.2f}..{hi:+.2f}% |")
-    out += ["", "| Pair | Variant | Accepted | FPS | 1% low | GPU MHz | GPU C | Start C |",
-            "|---|---|---|---:|---:|---:|---:|---:|"]
+    out += ["", "| Pair | Variant | Accepted | FPS | 1% low | GPU MHz | GPU C | Start C | Start SKIN C |",
+            "|---|---|---|---:|---:|---:|---:|---:|---:|"]
     for r in rows:
         s = r.get("surfaceflinger", {})
         pair = "warm-up" if r.get("warmup") else f"{r['repeat']}/{r['candidate']}"
         out.append(f"| {pair} | {r['variant']} | {r.get('accepted', False)} ({r['status']}) | "
                    f"{s.get('fps_avg', 0):.2f} | {s.get('fps_1pct_low', 0):.2f} | "
                    f"{r.get('gpu_clock_mhz', 0):.1f} | {r.get('gpu_temp_c_mean', 0):.1f} | "
-                   f"{r.get('gpu_temp_c_before', 0):.1f} |")
+                   f"{r.get('gpu_temp_c_before', 0):.1f} | {r.get('skin_c_before', 0):.1f} |")
     out += ["", "Whole-attempt memory peaks include launch. Summed process RSS can double-count shared pages;",
             "driver-accounted GPU memory can omit imported DMA-BUF allocations. Neither is total physical RAM.",
             "USB battery charge/voltage readings do not measure system power or energy per frame.", "",
-            "| Pair | Variant | Peak RSS MiB | Peak swap MiB | Accounted GPU MiB | Min available MiB | Peak memory PSI % | Peak battery C |",
-            "|---|---|---:|---:|---:|---:|---:|---:|"]
+            "| Pair | Variant | Peak RSS MiB | Peak swap MiB | Accounted GPU MiB | Min available MiB | Peak memory PSI % | Peak battery C | Peak SKIN C | Peak thermal status |",
+            "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for r in rows:
         p = resource_stats(r)
         def value(key, scale=1):
@@ -146,7 +152,7 @@ def summary(meta, rows):
         pair = "warm-up" if r.get("warmup") else f"{r['repeat']}/{r['candidate']}"
         out.append(f"| {pair} | {r['variant']} | {value('rss_peak_mb')} | {value('swap_peak_mb')} | "
                    f"{value('gpu_peak_mb')} | {value('available_min_mb')} | {value('pressure_peak_pct')} | "
-                   f"{value('battery_peak_dc', 10)} |")
+                   f"{value('battery_peak_dc', 10)} | {value('skin_peak_c')} | {value('thermal_status_peak')} |")
     out += ["", "Observed GPU/X4 profiles in the measured window (from rendering start + warm-up; first surface frame for older results), excluding GPU-off samples.",
             "Telemetry aligns with the frame window within one adb round trip. Missing or changing clocks exclude fixed-mode pairs.", "",
             "| Pair | Variant | GPU/X4 MHz: samples | Timing status |", "|---|---|---|---|"]
@@ -173,8 +179,13 @@ def main():
     ap.add_argument("--repetitions", type=int, default=6)
     ap.add_argument("--seconds", type=int, default=90)
     ap.add_argument("--max-start-temp", type=float, default=45)
+    ap.add_argument("--max-start-skin", type=float, default=36,
+                    help="SKIN sensor limit (C) at launch; Samsung throttles from 38 C (0 disables)")
+    ap.add_argument("--cool-limit", type=float, default=1800,
+                    help="seconds to wait for the start limits before giving up")
     ap.add_argument("--fixed-clocks", action="store_true")
     args = ap.parse_args()
+    skin = args.max_start_skin or None
     if args.repetitions < 5 or args.seconds < 60:
         ap.error("use at least five pairs and 60 measured seconds")
     manifest = load_manifest(args.manifest)
@@ -185,7 +196,8 @@ def main():
     folder.mkdir()
     meta = {"started": started.isoformat(timespec="seconds"), "manifest": manifest,
             "repetitions": args.repetitions, "seconds": args.seconds,
-            "max_start_temp_c": args.max_start_temp, "fixed_clocks": args.fixed_clocks,
+            "max_start_temp_c": args.max_start_temp, "max_start_skin_c": skin,
+            "fixed_clocks": args.fixed_clocks, "screens_after_rendering_s": SHOTS,
             "phone": run.phone_context()}
     rows = []
     keys = set(manifest["variants"][0]["props"]) | {"debug.radv_xclipse_log"}
@@ -230,13 +242,15 @@ def main():
                 for key, value in v["props"].items():
                     set_prop(key, value)
                 tag = f"pair{repeat}-{candidate}-{v['name']}"
-                print(f"{tag}: preparing launch (limit {args.max_start_temp:.1f} C)", flush=True)
+                print(f"{tag}: preparing launch (GPU limit {args.max_start_temp:.1f} C, "
+                      f"SKIN limit {skin} C)", flush=True)
                 r = game.run_once(manifest["bench"], manifest["driver"], folder, tag, user,
-                                  shots=[35, 65], seconds=args.seconds + 120, measure_seconds=args.seconds,
-                                  max_start_temp=args.max_start_temp)
+                                  rendered_shots=SHOTS, seconds=args.seconds + 120,
+                                  measure_seconds=args.seconds, max_start_temp=args.max_start_temp,
+                                  max_start_skin=skin, cool_limit_s=args.cool_limit)
                 r.update(repeat=repeat, candidate=candidate, variant=v["name"], warmup=repeat == 0,
                          role="baseline" if v is manifest["variants"][0] else "candidate",
-                         props=v["props"], accepted=bool(accepted(r, args.seconds, args.max_start_temp)))
+                         props=v["props"], accepted=bool(accepted(r, args.seconds, args.max_start_temp, skin)))
                 rows.append(r)
                 save(folder, meta, rows)
                 print(f"{tag}: {r['status']}, {r['surfaceflinger'].get('fps_avg', 0):.2f} FPS, "
