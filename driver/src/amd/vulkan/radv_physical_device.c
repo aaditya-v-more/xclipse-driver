@@ -61,6 +61,7 @@ typedef void *drmDevicePtr;
 #include <sys/system_properties.h>
 #include <android/log.h>
 #include <dlfcn.h>
+#include <sys/stat.h>
 #endif
 
 /* Xclipse flags: env var, or `setprop debug.<prop> 1` for GUI emulators that cannot set our
@@ -517,9 +518,26 @@ radv_xclipse_hash_knobs(blake3_hasher *ctx)
 
 /* Android disk shader cache. Upstream disables it on Android and apps have no HOME, so the builtin
  * BCn decoders recompiled every launch (0.5-0.8 s on the recording thread).
- * Directory: $TMPDIR, else the directory our .so was loaded from. Only /data/ paths (never FUSE
- * external storage: cache reads run on the compiling thread). Writes use the cache's own thread,
- * without fsync. MESA_SHADER_CACHE_DISABLE still turns it off. */
+ * Directory, first usable of: $XDG_CACHE_HOME, $HOME/.cache, the directory our .so was loaded from,
+ * $TMPDIR. GameNative empties TMPDIR (imagefs/usr/tmp) at every container launch, and DXVK 2.x has
+ * no state cache of its own, so a TMPDIR cache recompiled every pipeline on every launch.
+ * Only /data/ paths (never FUSE external storage: cache reads run on the compiling thread). Writes
+ * use the cache's own thread, without fsync. MESA_SHADER_CACHE_DIR overrides the directory and
+ * MESA_SHADER_CACHE_DISABLE still turns it off. */
+static bool
+radv_xclipse_cache_dir_ok(char *dir, size_t size, const char *base, const char *suffix)
+{
+   if (!base || strncmp(base, "/data/", 6))
+      return false;
+   snprintf(dir, size, "%s%s", base, suffix);
+   if (access(dir, F_OK) != 0)
+      mkdir(dir, 0700);
+   if (access(dir, W_OK) == 0)
+      return true;
+   dir[0] = '\0';
+   return false;
+}
+
 static void
 radv_xclipse_android_disk_cache(const struct radv_physical_device *pdev)
 {
@@ -528,24 +546,23 @@ radv_xclipse_android_disk_cache(const struct radv_physical_device *pdev)
 
    char dir[512] = {0};
    const char *how = "no writable app-private dir, cache stays off";
-   const char *t = getenv("TMPDIR");
-   if (t && !strncmp(t, "/data/", 6) && access(t, W_OK) == 0) {
-      snprintf(dir, sizeof(dir), "%s", t);
-      how = "TMPDIR";
-   } else {
-      Dl_info info;
-      if (dladdr(radv_xclipse_android_disk_cache, &info) && info.dli_fname &&
-          !strncmp(info.dli_fname, "/data/", 6)) {
-         snprintf(dir, sizeof(dir), "%s", info.dli_fname);
-         char *slash = strrchr(dir, '/');
-         if (slash)
-            *slash = '\0';
-         if (access(dir, W_OK) == 0)
-            how = "driver dir";
-         else
-            dir[0] = '\0';
-      }
+   Dl_info info;
+   char so_dir[512] = {0};
+   if (dladdr(radv_xclipse_android_disk_cache, &info) && info.dli_fname) {
+      snprintf(so_dir, sizeof(so_dir), "%s", info.dli_fname);
+      char *slash = strrchr(so_dir, '/');
+      if (slash)
+         *slash = '\0';
    }
+
+   if (radv_xclipse_cache_dir_ok(dir, sizeof(dir), getenv("XDG_CACHE_HOME"), ""))
+      how = "XDG_CACHE_HOME";
+   else if (radv_xclipse_cache_dir_ok(dir, sizeof(dir), getenv("HOME"), "/.cache"))
+      how = "HOME/.cache";
+   else if (so_dir[0] && radv_xclipse_cache_dir_ok(dir, sizeof(dir), so_dir, ""))
+      how = "driver dir";
+   else if (radv_xclipse_cache_dir_ok(dir, sizeof(dir), getenv("TMPDIR"), ""))
+      how = "TMPDIR, emptied by GameNative at each launch";
 
    disk_cache_set_default_dir(dir[0] ? dir : NULL);
    AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_ARM", "[ARM] diskcache dir=%s (%s)", dir[0] ? dir : "NONE", how);
