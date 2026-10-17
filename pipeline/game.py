@@ -163,7 +163,8 @@ def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = (), duration
     intervals = [(b - a) / 1e6 for a, b in pairs if not lost(a, b)]
     if not intervals:
         return {"frames": len(ts)}
-    worst = sorted(intervals)[int(len(intervals) * 0.99):]
+    ordered = sorted(intervals)
+    worst = ordered[int(len(intervals) * 0.99):]
     steady, start = 0, ts[0]
     for a, b in pairs:
         if b - a > STALL_S * 1_000_000_000 and not lost(a, b):
@@ -178,6 +179,11 @@ def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = (), duration
         "fps_avg": len(intervals) / covered_s,
         "frametime_median_ms": statistics.median(intervals),
         "fps_1pct_low": 1000.0 / statistics.mean(worst) if worst else None,
+        "frametime_p95_ms": ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))],
+        "frametime_p99_ms": ordered[min(len(ordered) - 1, int(len(ordered) * 0.99))],
+        # Frames over 50 ms (under 20 FPS) read as hitches; per minute so runs of any length compare.
+        "stutters_50ms": sum(1 for i in intervals if i > 50),
+        "stutters_per_min": sum(1 for i in intervals if i > 50) / (covered_s / 60),
         "sampling_gaps": sum(1 for a, b in pairs if lost(a, b)),
         "covered_share": covered_s / ((ts[-1] - ts[0]) / 1e9),
     }

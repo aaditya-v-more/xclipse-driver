@@ -500,6 +500,13 @@ def main() -> None:
     state = phone_state()
     if state != "device":
         sys.exit(f"phone not ready on adb (state: {state or 'not connected'})")
+    # The driver reads debug.radv* properties too, and a game.py run that was killed can leave its
+    # --prop values behind, silently changing what these tests measure.
+    leftover = [ln for ln in shell("getprop | grep -E '^\\[debug\\.(mesa\\.)?radv' || true").splitlines()
+                if not ln.rstrip().endswith("[]")]
+    if leftover:
+        print("warning: driver properties are set on the phone and apply to these tests:\n  "
+              + "\n  ".join(leftover), file=sys.stderr)
 
     started = dt.datetime.now()
     run_dir = RESULTS / started.strftime("%Y-%m-%d_%H%M%S")

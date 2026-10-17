@@ -3133,9 +3133,12 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                     !(instance->debug_flags & RADV_DEBUG_NO_NGG)) ||
                    pdev->info.gfx_level >= GFX11;
 
-   /* TODO: Investigate if NGG culling helps on GFX11. */
+   /* TODO: Investigate if NGG culling helps on GFX11. On the Xclipse 940 it costs: Heaven ran 28%
+    * faster without it (docs/PROGRESS.md, 2026-10-17), so it is opt-in there (RADV_PERFTEST=nggc).
+    */
    pdev->use_ngg_culling = pdev->use_ngg && pdev->info.max_render_backends > 1 &&
-                           (pdev->info.gfx_level == GFX10_3 || pdev->info.gfx_level == GFX10 ||
+                           ((pdev->info.xclipse_model != AC_XCLIPSE_940 &&
+                             (pdev->info.gfx_level == GFX10_3 || pdev->info.gfx_level == GFX10)) ||
                             (instance->perftest_flags & RADV_PERFTEST_NGGC)) &&
                            !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
 

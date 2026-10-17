@@ -131,13 +131,14 @@ def summary(meta, rows):
             if values:
                 n, b, c, gain, lo, hi = values
                 out.append(f"| {v['name']} | {label} | {n} | {b:.2f} | {c:.2f} | {gain:+.2f}% | {lo:+.2f}..{hi:+.2f}% |")
-    out += ["", "| Pair | Variant | Accepted | FPS | 1% low | GPU MHz | GPU C | Start C | Start SKIN C |",
-            "|---|---|---|---:|---:|---:|---:|---:|---:|"]
+    out += ["", "| Pair | Variant | Accepted | FPS | 1% low | p99 ms | >50 ms/min | GPU MHz | GPU C | Start C | Start SKIN C |",
+            "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for r in rows:
         s = r.get("surfaceflinger", {})
         pair = "warm-up" if r.get("warmup") else f"{r['repeat']}/{r['candidate']}"
         out.append(f"| {pair} | {r['variant']} | {r.get('accepted', False)} ({r['status']}) | "
                    f"{s.get('fps_avg', 0):.2f} | {s.get('fps_1pct_low', 0):.2f} | "
+                   f"{s.get('frametime_p99_ms', 0):.1f} | {s.get('stutters_per_min', 0):.1f} | "
                    f"{r.get('gpu_clock_mhz', 0):.1f} | {r.get('gpu_temp_c_mean', 0):.1f} | "
                    f"{r.get('gpu_temp_c_before', 0):.1f} | {r.get('skin_c_before', 0):.1f} |")
     out += ["", "Whole-attempt memory peaks include launch. Summed process RSS can double-count shared pages;",
