@@ -768,3 +768,48 @@ Re-scoring the 2026-10-13 study with the new start is not possible: those runs s
 at the end of the old window, and their holes were never recorded. Its numbers stay diagnostic.
 The next step is a fresh six-pair study with the fixed window (preferably over USB, which avoids
 Wi-Fi drops), then the blue-line investigation with matched reference captures.
+
+### Six-pair Heaven NGG-culling study over wireless debugging (2026-10-17)
+
+The first attempt, `results/2026-10-17_153015-game-compare`, aborted at container export with
+`uiautomator dump failed 4 times: ''`. The adb 37.0.1 server had crashed: SIGABRT in its mDNS
+bridge (`adbmdns_bridge` parsing a service name; crash reports under
+`~/Library/Logs/DiagnosticReports/adb-*.ips`). `run.py` now sets `ADB_MDNS=0` for the adb servers
+it starts (`e727268`). Start one by hand with `ADB_MDNS=0 adb start-server`. Reconnecting then uses
+the cached `ip:port` instead of mDNS discovery.
+
+`results/2026-10-17_153142-game-compare` (manifest `experiments/2026-10-12/heaven-culling.json`,
+fc066b9 RADV, DXVK 2.7.1, fixed performance mode, 90 s window from the new rendering start, 50 C
+start limit, wall charger): all 14 runs completed with no GPU faults or resets.
+
+Fixed performance mode did not hold one clock profile. Pair 0 (warm-up) through pair 2 and the pair 3
+baseline ran at GPU/X4 400/1632 MHz. From the pair 3 candidate onward, runs alternated between
+252/1056 and mixed profiles. Battery temperature was 44 to 45 C. The clock filter therefore kept
+only pairs 1 and 2:
+
+| Candidate | Metric | Pairs | Baseline median | Candidate median | Paired gain | Range |
+|---|---|---:|---:|---:|---:|---:|
+| no_culling (`nonggc`) | Average FPS | 2 | 39.27 | 50.16 | +27.73% | +27.57..+27.89% |
+| no_culling (`nonggc`) | 1% low FPS | 2 | 8.79 | 10.59 | +20.45% | +20.44..+20.46% |
+
+Peak app RSS was 930 to 974 MiB in both variants, with no clear RAM difference. Rendering began
+30.5 to 32.0 s after launch at 400/1632, and 36.8 to 46.0 s at the lower profiles: the slower
+CPU cluster lengthens loading.
+
+Visual review (screenshots at 35 and 65 s after launch):
+
+- Where both runs of a pair reached the scene, nonggc matches the baseline: same geometry and no
+  missing or extra objects.
+- The thin blue streaks across the sky appear in **both** variants: pair 0 baseline at 65 s,
+  pair 1 baseline and candidate at 35 s, pair 1 baseline at 65 s, and pair 2 candidate at 35 s.
+  They don't come from disabling NGG culling. They're a separate defect of this RADV/DXVK stack,
+  still to be tracked down against stock-driver reference frames.
+- In pairs 4 to 6, the 35 s shot still shows LOADING because rendering began later. Screenshot
+  times are measured from launch, so a matched visual comparison should time shots from the
+  rendering start, or take them later.
+
+Result: +27.7% average FPS and +20.5% 1% low FPS from `nonggc` hold for two clean pairs at
+400/1632, and the change adds no visible defect. That is promising but not yet the six matched
+pairs the study needed. The next study needs a clock state that stays fixed. Options: pause until
+the CPU falls back below its throttle point, lower the start limit, or run at normal clocks and
+report the clock distribution.

@@ -1,0 +1,53 @@
+{
+  "meta": {
+    "started": "2026-10-17T15:30:15",
+    "manifest": {
+      "purpose": "Isolate NGG culling on the same fc066b9 RADV / DXVK 2.7.1 Heaven container. Driver-only comparison at fixed performance mode; does not predict normal-mode FPS.",
+      "bench": "heaven",
+      "driver": "radv",
+      "container_contains": {
+        "graphicsDriverConfig": "version=RADV Xclipse (Mesa 26.3.0-devel-xd-fc066b9)",
+        "dxwrapperConfig": "version=2.7.1",
+        "envVars": "dxvk.enableDescriptorBuffer=False",
+        "box64Preset": "COMPATIBILITY",
+        "fexcorePreset": "INTERMEDIATE"
+      },
+      "variants": [
+        {
+          "name": "baseline",
+          "props": {
+            "debug.radv_debug": ""
+          }
+        },
+        {
+          "name": "no_culling",
+          "props": {
+            "debug.radv_debug": "nonggc"
+          }
+        }
+      ]
+    },
+    "repetitions": 6,
+    "seconds": 90,
+    "max_start_temp_c": 50.0,
+    "fixed_clocks": true,
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "35.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 336"
+    },
+    "error": "uiautomator dump failed 4 times: ''",
+    "fixed_mode_release": {
+      "returncode": 1,
+      "output": "adb: device '10.18.11.42:43425' not found\n"
+    },
+    "restore_errors": [
+      "property readback failed: debug.radv_xclipse_log"
+    ]
+  },
+  "results": []
+}
