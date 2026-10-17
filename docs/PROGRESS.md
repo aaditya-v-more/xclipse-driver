@@ -1068,8 +1068,22 @@ per minute), and `game_compare.py` shows p99 and stutters per minute per run.
 (`FileUtils.clear(imageFs.getTmpDir())`, `XServerScreen.kt` at the pinned commit). DXVK 2.x has no
 state cache of its own, so every launch recompiled every pipeline. The driver now prefers
 `$XDG_CACHE_HOME`, then `$HOME/.cache` (`imagefs/home/xuser/.cache`, where GameNative also points
-`DXVK_STATE_CACHE_PATH`), then its own directory, with `$TMPDIR` last (`08dedee`). Not yet
-measured on the phone.
+`DXVK_STATE_CACHE_PATH`), then its own directory, with `$TMPDIR` last (`08dedee`).
+
+Checked on `xd-85cd575` with the new `[PSOCACHE]` logcat counter (`debug.radv_xclipse_log=1`).
+GameNative also re-extracts the driver into its directory at each launch, so `HOME/.cache` is the
+right place:
+
+| Run | Cache | Pipelines | FPS | p99 ms | Frames over 50 ms | Seconds to rendering |
+|---|---|---|---|---|---|---|
+| `213914` run 2 | mostly cold | 29 hits, 227+ misses | 57.9 | 33.3 | 95 | 19.4 |
+| `214804` run 1 | warm | 256+ hits, 0 misses | 57.8 | 33.3 | 102 | 21.0 |
+| `214804` run 2 | warm | | 57.4 | | | |
+
+The cache now survives relaunches, but Heaven gains nothing measurable: it compiles only about 300
+pipelines, and its 50 ms frames are not compile stalls. Games with many more shaders should
+benefit; that needs a second workload to show. Both runs played the whole 253 s benchmark, which
+ends with Heaven closing its window (reported as `surface-lost`).
 
 **Normal-clock compare stopped on a load hang.** The 5-pair compare of `xd-5701dfa`
 (`results/2026-10-17_211444-game-compare`) ran its three warm-ups: baseline 58.9, `culling_on`
