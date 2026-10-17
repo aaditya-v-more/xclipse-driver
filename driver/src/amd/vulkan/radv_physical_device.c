@@ -3141,6 +3141,8 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
 
    pdev->xclipse_buffer_l2 = radv_xclipse_flag("RADV_XCLIPSE_BUFL2", "radv_xclipse_bufl2");
    pdev->xclipse_gfx11_cache_scope = radv_xclipse_flag_off("RADV_XCLIPSE_GL1SCOPE", "radv_xclipse_gl1scope");
+   pdev->xclipse_filter_emu = pdev->info.xclipse_model == AC_XCLIPSE_940 &&
+                              !radv_xclipse_flag_off("RADV_XCLIPSE_FILTEREMU", "radv_xclipse_filteremu");
    {
       const char *e = getenv("RADV_XCLIPSE_RINGUC");
       int v = e ? atoi(e) : 0;

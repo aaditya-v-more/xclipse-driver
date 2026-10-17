@@ -661,6 +661,11 @@ lower_descriptors_tex(nir_builder *b, lower_descriptors_state *state, nir_tex_in
       return true;
    }
 
+   if (tex->op == nir_texop_sampler_descriptor_amd) {
+      nir_def_replace(&tex->def, sampler);
+      return true;
+   }
+
    for (unsigned i = 0; i < tex->num_srcs; i++) {
       switch (tex->src[i].src_type) {
       case nir_tex_src_texture_deref:

@@ -2195,6 +2195,28 @@ static void fill_r16(uint8_t *d, float want[64][4])
    }
 }
 
+/* 16-bit UNORM or SNORM with 1, 2 or 4 channels, each channel its own ramp. */
+static void fill_16_channels(uint8_t *d, float want[64][4], int channels, bool snorm)
+{
+   for (int i = 0; i < 64; i++) {
+      for (int c = 0; c < 4; c++) {
+         if (c >= channels) {
+            want[i][c] = c == 3 ? 1.0f : 0.0f;
+            continue;
+         }
+         const int v = snorm ? (i * 997 + c * 7919) % 65535 - 32767 : (i * 1000 + c * 4111 + 17) % 65536;
+         const uint16_t bits = (uint16_t)v;
+         memcpy(d + (i * channels + c) * 2, &bits, 2);
+         want[i][c] = snorm ? fmaxf(v / 32767.0f, -1.0f) : v / 65535.0f;
+      }
+   }
+}
+
+static void fill_rg16(uint8_t *d, float want[64][4]) { fill_16_channels(d, want, 2, false); }
+static void fill_rgba16(uint8_t *d, float want[64][4]) { fill_16_channels(d, want, 4, false); }
+static void fill_r16_snorm(uint8_t *d, float want[64][4]) { fill_16_channels(d, want, 1, true); }
+static void fill_rgba16_snorm(uint8_t *d, float want[64][4]) { fill_16_channels(d, want, 4, true); }
+
 static void fill_r16f(uint8_t *d, float want[64][4])
 {
    for (int i = 0; i < 64; i++) {
@@ -2462,6 +2484,10 @@ static const struct texture_format {
    {"R8", VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.006f, fill_r8},
    {"R16", VK_FORMAT_R16_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.0002f, fill_r16},
    {"R16F", VK_FORMAT_R16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.002f, fill_r16f},
+   {"RG16", VK_FORMAT_R16G16_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.0002f, fill_rg16},
+   {"RGBA16", VK_FORMAT_R16G16B16A16_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.0002f, fill_rgba16},
+   {"R16_SNORM", VK_FORMAT_R16_SNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.0002f, fill_r16_snorm},
+   {"RGBA16_SNORM", VK_FORMAT_R16G16B16A16_SNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.0002f, fill_rgba16_snorm},
    {"D16", VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 0.0002f, fill_d16},
    {"D24S8", VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d24},
    {"D32F", VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d32f},
@@ -2813,7 +2839,9 @@ static void run_textures(void)
 
 /* ---- mips: textures with full mip chains, and cube maps, as games load them ---- */
 
-enum { MIP_RGBA8 = -1 }; /* a mip_case kind besides the enum bc_kind ones */
+/* mip_case kinds besides the enum bc_kind ones. R32F and R16 are sampled with linear min, mag
+ * and mip filters, which the 940 only gets right through RADV's shader filter. */
+enum { MIP_RGBA8 = -1, MIP_R32F = -2, MIP_R16 = -3 };
 
 static const struct mip_case {
    const char *name;
@@ -2833,6 +2861,8 @@ static const struct mip_case {
    {"BC5 1024x1024", VK_FORMAT_BC5_UNORM_BLOCK, BC5, 1024, 1024, false, 0.04f},
    {"BC7 512x512", VK_FORMAT_BC7_UNORM_BLOCK, BC7, 512, 512, false, 0.2f},
    {"BC1 cube 256", VK_FORMAT_BC1_RGBA_UNORM_BLOCK, BC1, 256, 256, true, 0.01f},
+   {"R32F 256x256 trilinear", VK_FORMAT_R32_SFLOAT, MIP_R32F, 256, 256, false, 1e-4f},
+   {"R16 640x360 trilinear", VK_FORMAT_R16_UNORM, MIP_R16, 640, 360, false, 2e-4f},
 };
 
 static uint32_t mip_hash(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
@@ -2847,8 +2877,11 @@ static uint32_t mip_hash(uint32_t a, uint32_t b, uint32_t c, uint32_t d)
  * BC blocks whose variant comes from such a hash. */
 static size_t mip_level_size(const struct mip_case *c, uint32_t w, uint32_t h)
 {
-   return c->kind == MIP_RGBA8 ? (size_t)w * h * 4
-                               : (size_t)((w + 3) / 4) * ((h + 3) / 4) * bc_block_size(c->kind);
+   if (c->kind == MIP_RGBA8 || c->kind == MIP_R32F)
+      return (size_t)w * h * 4;
+   if (c->kind == MIP_R16)
+      return (size_t)w * h * 2;
+   return (size_t)((w + 3) / 4) * ((h + 3) / 4) * bc_block_size(c->kind);
 }
 
 static void mip_fill(const struct mip_case *c, uint8_t *d, uint32_t w, uint32_t h, int level,
@@ -2859,6 +2892,20 @@ static void mip_fill(const struct mip_case *c, uint8_t *d, uint32_t w, uint32_t 
          for (uint32_t x = 0; x < w; x++) {
             const uint32_t v = mip_hash(x, y, level, layer);
             memcpy(d + ((size_t)y * w + x) * 4, &v, 4);
+         }
+      return;
+   }
+   if (c->kind == MIP_R32F || c->kind == MIP_R16) {
+      for (uint32_t y = 0; y < h; y++)
+         for (uint32_t x = 0; x < w; x++) {
+            const uint32_t v = mip_hash(x, y, level, layer);
+            if (c->kind == MIP_R32F) {
+               const float f = (v >> 8) / 16777216.0f * 4.0f - 1.0f;
+               memcpy(d + ((size_t)y * w + x) * 4, &f, 4);
+            } else {
+               const uint16_t u = (uint16_t)v;
+               memcpy(d + ((size_t)y * w + x) * 2, &u, 2);
+            }
          }
       return;
    }
@@ -2878,7 +2925,33 @@ static void mip_texel(const struct mip_case *c, uint32_t x, uint32_t y, int leve
          want[i] = (v >> (8 * i) & 255) / 255.0f;
       return;
    }
+   if (c->kind == MIP_R32F || c->kind == MIP_R16) {
+      const uint32_t v = mip_hash(x, y, level, layer);
+      want[0] = c->kind == MIP_R32F ? (v >> 8) / 16777216.0f * 4.0f - 1.0f : (uint16_t)v / 65535.0f;
+      want[1] = want[2] = 0.0f;
+      want[3] = 1.0f;
+      return;
+   }
    bc_texel(c->kind, mip_hash(x / 4, y / 4, level, layer) % 4, (y % 4) * 4 + x % 4, want);
+}
+
+/* What a linear filter reads at level `level` at normalized (u, v), clamped to the edge. */
+static void mip_bilinear(const struct mip_case *c, float u, float v, int level, int layer,
+                         float want[4])
+{
+   const int w = c->width >> level ? (int)(c->width >> level) : 1;
+   const int h = c->height >> level ? (int)(c->height >> level) : 1;
+   const float x = u * w - 0.5f, y = v * h - 0.5f;
+   const int x0 = (int)floorf(x), y0 = (int)floorf(y);
+   const float fx = x - x0, fy = y - y0;
+   float t[4][4];
+   for (int n = 0; n < 4; n++) {
+      const int tx = x0 + n % 2, ty = y0 + n / 2;
+      mip_texel(c, tx < 0 ? 0 : tx >= w ? w - 1 : tx, ty < 0 ? 0 : ty >= h ? h - 1 : ty, level,
+                layer, t[n]);
+   }
+   for (int i = 0; i < 4; i++)
+      want[i] = (t[0][i] * (1 - fx) + t[1][i] * fx) * (1 - fy) + (t[2][i] * (1 - fx) + t[3][i] * fx) * fy;
 }
 
 /* Uploads each case's whole mip chain (and six faces for a cube) with one copy region per level,
@@ -2902,8 +2975,11 @@ static void run_mips(void)
       .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
       .maxLod = VK_LOD_CLAMP_NONE,
    };
-   VkSampler sampler;
+   VkSampler sampler, trilinear;
    VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &sampler));
+   sci.magFilter = sci.minFilter = VK_FILTER_LINEAR;
+   sci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+   VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &trilinear));
    const VkDescriptorSetLayoutBinding bindings[3] = {
       {0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
       {1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},
@@ -2971,7 +3047,8 @@ static void run_mips(void)
       VkFormatProperties fp;
       vkGetPhysicalDeviceFormatProperties(pdev, c->format, &fp);
       const VkFormatFeatureFlags need =
-         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
+         VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT |
+         (c->kind == MIP_R32F || c->kind == MIP_R16 ? VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT : 0);
       jbool("supported", (fp.optimalTilingFeatures & need) == need);
       if ((fp.optimalTilingFeatures & need) != need) {
          jclose();
@@ -3041,8 +3118,9 @@ static void run_mips(void)
          };
       }
       memset(out.map, 0xff, out_size); /* NaN */
+      const bool linear = c->kind == MIP_R32F || c->kind == MIP_R16;
       const VkDescriptorImageInfo image_infos[2] = {
-         {sampler, views[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+         {linear ? trilinear : sampler, views[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
          {sampler, views[1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
       };
       const VkDescriptorBufferInfo buffer_info = {out.buf, 0, VK_WHOLE_SIZE};
@@ -3117,8 +3195,21 @@ static void run_mips(void)
                   float want[4];
                   mip_texel(c, x, y, l, a, want);
                   const size_t i = (((size_t)a * levels + l) * GRID * GRID + gy * GRID + gx) * 4;
-                  for (int r = 0; r < (c->cube ? 4 : 3); r++) {
-                     if (texel_close(got[i + r], want, 4, c->tolerance))
+                  /* A linear case reads slot 3 halfway to the next level: the texel blended
+                   * evenly with the next level's filtered value at the same place. */
+                  float half[4];
+                  if (linear) {
+                     const float u = (x + 0.5f) / w, v = (y + 0.5f) / h;
+                     if (l + 1 < levels) {
+                        mip_bilinear(c, u, v, l + 1, a, half);
+                        for (int ch = 0; ch < 4; ch++)
+                           half[ch] = (want[ch] + half[ch]) / 2;
+                     } else {
+                        memcpy(half, want, sizeof(half));
+                     }
+                  }
+                  for (int r = 0; r < (c->cube || linear ? 4 : 3); r++) {
+                     if (texel_close(got[i + r], r == 3 && linear ? half : want, 4, c->tolerance))
                         continue;
                      bad_levels |= 1u << l;
                      if (!bad[r]++ && !first[0])
@@ -3160,7 +3251,7 @@ static void run_mips(void)
    }
    jclose();
    if (wrong[0])
-      finish("fail", "wrong texels (fetch/sample/grad/cube): %s", wrong);
+      finish("fail", "wrong texels (fetch/sample/grad/cube or half-level): %s", wrong);
 
    free_buffer(&out);
    vkDestroyDescriptorPool(dev, dpool, NULL);
@@ -3169,6 +3260,7 @@ static void run_mips(void)
    vkDestroyPipelineLayout(dev, layout, NULL);
    vkDestroyDescriptorSetLayout(dev, dsl, NULL);
    vkDestroySampler(dev, sampler, NULL);
+   vkDestroySampler(dev, trilinear, NULL);
 }
 
 /* ---- mrt: eight render targets at once, with clears and additive blending, as deferred

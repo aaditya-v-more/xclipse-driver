@@ -192,6 +192,8 @@ struct radv_physical_device {
     * (RADV_XCLIPSE_GL1SCOPE=0 / debug.radv_xclipse_gl1scope 0; A/B only, brings back the blue
     * streaks). */
    bool xclipse_gfx11_cache_scope;
+   /* Linear filtering of 32-bit float and 16-bit UNORM/SNORM formats in the shader. */
+   bool xclipse_filter_emu;
 
    /* Whether to emulate ASTC image support on HW without support. */
    bool emulate_astc;

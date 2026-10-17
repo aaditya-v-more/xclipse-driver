@@ -1237,6 +1237,7 @@ radv_device_init_compiler_info(struct radv_device *device)
             .ngg_streamout = pdev->use_ngg_streamout,
             .xclipse_xfb = pdev->xclipse_xfb,
             .xclipse_gfx11_cache_scope = pdev->xclipse_gfx11_cache_scope,
+            .xclipse_filter_emu = pdev->xclipse_filter_emu,
          },
       /* Misc values included as part of the cache key */
       .key =
