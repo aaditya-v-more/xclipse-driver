@@ -55,17 +55,20 @@ def accepted(r, duration, max_start_temp):
             and not r.get("gpu_page_faults", 0) and not r.get("gpu_resets", 0))
 
 
-def active_clocks(r):
-    """Observed GPU/X4 clocks after the first surface frame plus warm-up; omit GPU-off samples.
+def active_clocks(r, duration=None):
+    """Observed GPU/X4 clocks in the measured window; omit GPU-off samples.
 
-    This is a conservative launch-relative telemetry window, not exact alignment with the
-    SurfaceFlinger frame window. Other CPU clusters can still change frequency in fixed mode.
+    The window starts WARMUP_S after the game renders for good (seconds_to_rendering, aligned to
+    the frame window within an adb round trip) and lasts `duration` when given. Results recorded
+    before 2026-10-17 lack that field and fall back to the first surface frame, which can precede
+    loading. Other CPU clusters can still change frequency in fixed mode.
     """
-    first = r.get("seconds_to_first_frame")
-    if first is None:
+    begin = r.get("seconds_to_rendering", r.get("seconds_to_first_frame"))
+    if begin is None:
         return Counter()
+    end = begin + game.WARMUP_S + duration if duration is not None else float("inf")
     return Counter((s[2], s[7]) for s in r.get("gpu", [])
-                   if len(s) >= 8 and s[0] >= first + game.WARMUP_S and s[2] > 0 and s[7] > 0)
+                   if len(s) >= 8 and begin + game.WARMUP_S <= s[0] <= end and s[2] > 0 and s[7] > 0)
 
 
 def scored_rows(meta, rows):
@@ -79,7 +82,7 @@ def scored_rows(meta, rows):
             if r["status"] == "pass":
                 groups.setdefault((r["repeat"], r["candidate"]), []).append(r)
         for group in groups.values():
-            clocks = [active_clocks(r) for r in group]
+            clocks = [active_clocks(r, meta.get("seconds")) for r in group]
             matched = (len(group) == 2 and {r["role"] for r in group} == {"baseline", "candidate"}
                        and all(len(c) == 1 and sum(c.values()) >= 10 for c in clocks)
                        and set(clocks[0]) == set(clocks[1]))
@@ -144,11 +147,11 @@ def summary(meta, rows):
         out.append(f"| {pair} | {r['variant']} | {value('rss_peak_mb')} | {value('swap_peak_mb')} | "
                    f"{value('gpu_peak_mb')} | {value('available_min_mb')} | {value('pressure_peak_pct')} | "
                    f"{value('battery_peak_dc', 10)} |")
-    out += ["", "Observed GPU/X4 profiles after first surface frame + warm-up, excluding GPU-off samples.",
-            "Profiles need not align exactly with the measured frame window. Missing or changing clocks exclude fixed-mode pairs.", "",
+    out += ["", "Observed GPU/X4 profiles in the measured window (from rendering start + warm-up; first surface frame for older results), excluding GPU-off samples.",
+            "Telemetry aligns with the frame window within one adb round trip. Missing or changing clocks exclude fixed-mode pairs.", "",
             "| Pair | Variant | GPU/X4 MHz: samples | Timing status |", "|---|---|---|---|"]
     for r, scored in zip(rows, adapted):
-        profile = ", ".join(f"{gpu / 1000:g}/{cpu / 1000:g}: {count}" for (gpu, cpu), count in sorted(active_clocks(r).items()))
+        profile = ", ".join(f"{gpu / 1000:g}/{cpu / 1000:g}: {count}" for (gpu, cpu), count in sorted(active_clocks(r, meta.get("seconds")).items()))
         pair = "warm-up" if r.get("warmup") else f"{r['repeat']}/{r['candidate']}"
         out.append(f"| {pair} | {r['variant']} | {profile or 'missing'} | {scored['status']} |")
     if meta.get("error"):

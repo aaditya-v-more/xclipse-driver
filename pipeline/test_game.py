@@ -66,7 +66,7 @@ class FailureDetectionTests(unittest.TestCase):
         with patch.object(game, "logcat_since", return_value=[own, other, anr]):
             self.assertEqual(game.runtime_crash("", {"100": game.APP}), [own, anr])
 
-    def simulate_run(self, failure):
+    def simulate_run(self, failure, **overrides):
         """Replay lifecycle failures while the frame counter claims a valid 70-second run."""
         clock = [0.0]
 
@@ -100,6 +100,7 @@ class FailureDetectionTests(unittest.TestCase):
             "screenshot": lambda path: True,
             "drivers_seen": lambda *a: [],
             "logcat_since": lambda *a: [],
+            **overrides,
         }
         with contextlib.ExitStack() as stack:
             for name, fn in replacements.items():
@@ -117,6 +118,20 @@ class FailureDetectionTests(unittest.TestCase):
                 result["run"] = 1
                 report = game.summarize({"started": "test"}, [result])
                 self.assertIn("no valid runs", report)
+
+    def test_ring_overflow_is_a_hole_although_fewer_than_ring_rows_print(self):
+        # This phone prints 124-127 of the 128 records, so a full-ring check never fired.
+        def reads(step):
+            count = [0]
+            def present_times(layer):
+                count[0] += 1
+                start = count[0] * step
+                return list(range(start, start + 126)), False, 8333333
+            return present_times
+        lost = self.simulate_run("none", present_times=reads(200))
+        self.assertEqual(lost["holes_ns"][:2], [(325, 400), (525, 600)])
+        overlapping = self.simulate_run("none", present_times=reads(100))
+        self.assertEqual(overlapping["holes_ns"], [])
 
     def test_gpu_faults_and_resets_stop_before_time_limit_or_ui_capture(self):
         for failure, counter in (("gpu-fault", "page_faults"), ("gpu-reset", "resets")):

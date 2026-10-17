@@ -131,6 +131,9 @@ def select_phone(refresh: bool = False) -> None:
         return
     serials = [line.split("\t")[0] for line in listing.splitlines()[1:]
                if line.endswith("\tdevice")]
+    wireless = [s for s in serials if re.fullmatch(r"[\d.]+:\d+", s)]
+    if wireless:  # remembered for reconnect_wireless()
+        _SELECTED["address"] = wireless[0]
     if len(serials) < 2:
         return
     for serial in serials:
@@ -140,6 +143,8 @@ def select_phone(refresh: bool = False) -> None:
             continue
         if got == PHONE_SERIAL:
             os.environ["ANDROID_SERIAL"] = serial
+            if serial in wireless:
+                _SELECTED["address"] = serial
             _SELECTED["auto"] = True
             return
     print(f"warning: {len(serials)} adb devices attached and none is {PHONE_SERIAL}",
@@ -155,12 +160,35 @@ def shell(command: str, timeout: float = 60) -> str:
     return adb("shell", command, timeout=timeout).stdout.strip()
 
 
+def reconnect_wireless() -> None:
+    """Reconnects wireless debugging after Wi-Fi drops the connection (seen 2026-10-17 mid-run;
+    the phone kept running and its port answered again). Uses the address of the phone's mDNS
+    service, else the last IP:port it was reached at."""
+    try:
+        services = run([ADB, "mdns", "services"], timeout=15).stdout.splitlines()
+    except subprocess.TimeoutExpired:
+        services = []
+    found = [p[2] for p in (s.split() for s in services)
+             if len(p) >= 3 and PHONE_SERIAL in p[0] and "tls-connect" in p[1]]
+    for address in dict.fromkeys(found + [_SELECTED.get("address", "")]):
+        if address:
+            try:
+                run([ADB, "connect", address], timeout=15)
+            except subprocess.TimeoutExpired:
+                pass
+
+
 def phone_state() -> str:
     try:
         state = adb("get-state", timeout=15).stdout.strip()
-        if state != "device" and _SELECTED.get("auto"):
-            select_phone(refresh=True)
-            state = adb("get-state", timeout=15).stdout.strip()
+        if state != "device" and (_SELECTED.get("address") or _SELECTED.get("auto")):
+            for _ in range(3):  # Wi-Fi drops have recovered within seconds
+                reconnect_wireless()
+                select_phone(refresh=True)
+                state = adb("get-state", timeout=15).stdout.strip()
+                if state == "device":
+                    break
+                time.sleep(3)
         return state
     except subprocess.TimeoutExpired:
         return ""

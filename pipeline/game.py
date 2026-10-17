@@ -44,6 +44,7 @@ from run import ADB, RESULTS, STAY_ON_CMD, adb, phone_state, select_phone, shell
 
 APP = "app.gamenative"
 OUT_DIR = "/sdcard/Download/xclipse/out"  # D:\xclipse\out inside the containers
+SHOT_DIR = "/data/local/tmp/xd/shots"  # scheduled screenshots wait here until the run ends
 BENCHES = {
     "gravitymark": {"ids": {"stock": 2000940101, "radv": 2000940102}, "seconds": 300,
                     "exe": "GravityMark.exe",
@@ -101,7 +102,7 @@ def game_layers() -> list[str]:
     return names
 
 
-RING = 128  # frame records SurfaceFlinger keeps per layer
+RING = 128  # frame records SurfaceFlinger keeps per layer; on this phone it prints 124-127 of them
 
 
 def present_times(layer: str) -> tuple[list[int], bool, int]:
@@ -116,21 +117,46 @@ def present_times(layer: str) -> tuple[list[int], bool, int]:
     return times, len(rows) >= RING, period
 
 
+def rendering_start(ts: list[int], holes: list[tuple[int, int]] = ()) -> int | None:
+    """Present time (ns) at which the game starts rendering for good, or None before that.
+
+    GameNative's SurfaceView exists from its "Booting..." screen on and presents a frame now and
+    then while Wine starts; the game renders once 10 frames land within 2 s. Heaven first shows
+    its own LOADING screen at up to 45 FPS for about 2 s, stalls for 3 to 6.5 s, and only then
+    renders the benchmark (verified with screenshots and per-read SurfaceFlinger timestamps on
+    2026-10-17). So the start is the first such burst in a stretch with no real stall (gap over
+    STALL_S that is not a sampling hole) lasting MIN_STEADY_S. `ts` must be sorted."""
+    def lost(a: int, b: int) -> bool:
+        return any(a <= h0 and h1 <= b for h0, h1 in holes)
+    begin = 0
+    for end in range(1, len(ts) + 1):
+        if end < len(ts) and not (ts[end] - ts[end - 1] > STALL_S * 1_000_000_000
+                                  and not lost(ts[end - 1], ts[end])):
+            continue
+        stretch = ts[begin:end]  # frames with no real stall between them
+        if stretch[-1] - stretch[0] >= MIN_STEADY_S * 1_000_000_000:
+            first = next((t for i, t in enumerate(stretch[:-10])
+                          if stretch[i + 10] - t < 2_000_000_000), None)
+            if first is not None and stretch[-1] - first >= MIN_STEADY_S * 1_000_000_000:
+                return first
+        begin = end
+    return None
+
+
 def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = (), duration_s: float | None = None) -> dict:
-    """Frame statistics from present timestamps. `holes` are (last seen, first seen again) pairs
+    """Frame statistics from present timestamps, skipping WARMUP_S after rendering_start and
+    keeping duration_s after that when given. `holes` are (last seen, first seen again) pairs
     where SurfaceFlinger's ring overflowed between two reads: frames were presented in between but
     their times are gone, so those intervals count for nothing rather than as one long frame."""
     ts = sorted(set(times_ns))
-    # GameNative's SurfaceView exists from its "Booting..." screen on and presents a frame now and
-    # then while Wine starts. The game is rendering once 10 frames land within 2 s.
-    rendering = next((t for i, t in enumerate(ts[:-10]) if ts[i + 10] - t < 2_000_000_000), None)
+    rendering = rendering_start(ts, holes)
     if rendering is None:
         return {"frames": len(ts)}
     ts = [t for t in ts if t >= rendering + WARMUP_S * 1_000_000_000]
     if duration_s is not None:
         ts = [t for t in ts if t <= rendering + (WARMUP_S + duration_s) * 1_000_000_000]
     if len(ts) < 10:
-        return {"frames": len(ts)}
+        return {"frames": len(ts), "rendering_ns": rendering}
     def lost(a: int, b: int) -> bool:
         return any(a <= h0 and h1 <= b for h0, h1 in holes)
     pairs = list(zip(ts, ts[1:]))
@@ -146,6 +172,7 @@ def frame_stats(times_ns: list[int], holes: list[tuple[int, int]] = (), duration
     covered_s = sum(intervals) / 1e3
     return {
         "frames": len(ts),
+        "rendering_ns": rendering,
         "seconds": (ts[-1] - ts[0]) / 1e9,
         "steady_seconds": steady / 1e9,
         "fps_avg": len(intervals) / covered_s,
@@ -411,10 +438,11 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
 
     frames, layer, seen_at, gone_for, sampled = set(), None, None, 0, -MEMORY_EVERY_S
     holes, last_seen, periods = [], 0, Counter()  # lost-frame windows; newest frame; refresh periods
+    lags = []  # seconds since launch when a read returned, minus its newest present time
     exe_seen = exe_gone = app_gone = 0
     app_seen = False
     history, last_new, checked = [], 0.0, 0.0  # (seconds, frames so far); when the count last grew
-    shots_left = sorted(shots)
+    shots_left, pending_shots = sorted(shots), []
     exe = cfg["exe"].lower()
     while time.monotonic() - started < (seconds or cfg["seconds"]):
         time.sleep(0.5)  # the adb calls below take the rest of the second; the ring holds ~1-2 s
@@ -435,10 +463,13 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             # Do not delay stopping for screenshots/UI dumps, or capture the home screen
             # afterwards. The log and any screenshots already taken remain available.
             break
+        # Encoding and copying a PNG takes 1-3 s over wireless adb, longer than SurfaceFlinger's
+        # ring lasts at 60 FPS, so the phone writes it in the background and it's copied later.
         while shots_left and elapsed >= shots_left[0]:
-            shot = run_dir / f"{tag}-{bench}-{driver}-{shots_left.pop(0)}s.png"
-            if screenshot(shot):
-                result.setdefault("screens", []).append(shot.name)
+            name = f"{tag}-{bench}-{driver}-{shots_left.pop(0)}s.png"
+            pending_shots.append((name, subprocess.Popen(
+                [ADB, "shell", f"mkdir -p {SHOT_DIR} && screencap -p {SHOT_DIR}/{name}"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)))
         sample = gpu_sample()
         if sample:
             gpu.append((round(elapsed, 1), *sample))
@@ -503,9 +534,11 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
             if period:
                 periods[period] += 1
             lo, hi = min(new), max(new)
-            # A full ring whose oldest frame is newer than the newest one seen means frames were
-            # presented in between and their times are gone.
-            if full and frames and lo > last_seen:
+            lags.append(time.monotonic() - started - hi / 1e9)
+            # A read whose oldest frame is newer than the newest one seen means frames presented in
+            # between may be gone. Don't wait for RING rows: the ring prints at most 127, so that
+            # missed every overflow. While GameNative boots it can also drop old records early.
+            if frames and lo > last_seen:
                 holes.append((last_seen, lo))
             last_seen = max(last_seen, hi)
         frames.update(new)
@@ -514,6 +547,16 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
         history.append((elapsed, len(frames)))
         if measure_seconds is not None and frame_stats(list(frames), holes).get("seconds", 0) >= measure_seconds:
             break
+    for name, proc in pending_shots:
+        try:
+            proc.wait(timeout=60)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        # Keep the phone copy unless this one is complete: never lose the only image.
+        if (adb("pull", f"{SHOT_DIR}/{name}", str(run_dir / name)).returncode == 0
+                and (run_dir / name).read_bytes()[:4] == b"\x89PNG"):
+            result.setdefault("screens", []).append(name)
+            shell(f"rm -f {SHOT_DIR}/{name}")
     result["seconds_to_game_process"] = exe_seen or None
     result["seconds_to_first_frame"] = seen_at
     result["layer"] = layer
@@ -523,7 +566,16 @@ def run_once(bench: str, driver: str, run_dir: Path, tag: str, user: str,
     result["memory"] = memory
     result["gpu"] = gpu  # [seconds since launch, busy %, clock kHz, temp C, CPU cluster kHz...]
     result["present_ns"] = sorted(frames)  # CLOCK_MONOTONIC, as RADV's [WAIT] log lines
-    after_warmup = [s for s in gpu if seen_at is not None and s[0] >= seen_at + WARMUP_S]
+    result["holes_ns"] = holes
+    # Present times are on the phone's clock and samples on ours. The smallest gap between a read
+    # returning and its newest frame bounds the offset; it's within one adb round trip (~0.15 s).
+    rendering = stats.get("rendering_ns")
+    if rendering is not None and lags:
+        result["seconds_to_rendering"] = round(rendering / 1e9 + min(lags), 2)
+    begin = result.get("seconds_to_rendering", seen_at)
+    end = (begin + WARMUP_S + measure_seconds if begin is not None and measure_seconds is not None
+           else float("inf"))
+    after_warmup = [s for s in gpu if begin is not None and begin + WARMUP_S <= s[0] <= end]
     if after_warmup:
         result["gpu_busy_pct"] = statistics.mean(s[1] for s in after_warmup)
         result["gpu_clock_mhz"] = statistics.mean(s[2] for s in after_warmup) / 1000
@@ -591,10 +643,10 @@ def summarize(meta: dict, results: list[dict]) -> str:
                 ""]
     out += [
            "Frames counted from SurfaceFlinger (what GameNative presents on screen), skipping the "
-           f"first {WARMUP_S} s after the first frame. A run counts (`ran`) only with {MIN_STEADY_S} s "
+           f"first {WARMUP_S} s after the game starts rendering for good (after loading stalls). A run counts (`ran`) only with {MIN_STEADY_S} s "
            f"of frames in a row, none more than {STALL_S} s apart, with no detected failure or "
            "early process exit; the medians use only those. "
-           "\"Lost windows\" counts gaps where SurfaceFlinger's 128-frame ring overflowed between two "
+           "\"Lost windows\" counts gaps where SurfaceFlinger's frame ring overflowed between two "
            "reads; those intervals are left out of every figure. Hz is the compositor's refresh rate "
            "during the run. GPU MHz, GPU C and X4 MHz (the big core's clock) are means after warm-up.",
            "",
