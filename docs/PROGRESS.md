@@ -1200,3 +1200,45 @@ larger. Samsung sizes BC4-BC7 natively. This is the lead for Life is Strange's s
   play. New `[BO_KIND]` line (RADV_CHURN tag, `debug.radv_xclipse_log 1`) gives live MB per kind:
   app, query, desc/upload, shader arenas, scratch/rings, command buffers (the IB reuse cache parks up
   to 64 MiB of these).
+
+### 2026-10-18: gn_driver routes between screens instead of restarting GameNative
+
+`pipeline/gn_driver.py` used to force-stop GameNative for every command and walk from the sign-in
+screen; it also assumed portrait (it failed in landscape, where "Game Information" isn't on
+screen and its fixed swipe paths miss the lists). It now names the current screen from one dump
+(library, Game Information, Quick Actions, editor and tab, Settings, Driver Manager, Contents
+Manager, dropdown, dialogs, a running game) and follows a graph of moves to the target, restarting
+only from an unknown screen or a running game. New `apply GAME [--driver] [--set] [--env] [--args]
+[--launch]` makes several changes with one save and one read-back pass; `launch GAME` taps Play.
+The old commands and their output are kept, on top of `apply`.
+
+Measured costs (USB): a uiautomator dump is 2.2-2.5 s (3 s over a running game), about 1.1 s of
+start-up plus at least 1 s of idle wait; `--compressed` saves nothing. `adb shell` costs 45 ms a
+call, a persistent shell 1.3 ms. Other changes: dump and read in one command; positions, drags
+and tab-row swipes from the dump's bounds and scrollable boxes (portrait and landscape); drags that
+hold before lifting, so lists don't fling; a fling to the end for lists that grow there (installed
+drivers, environment variables); typing in one shell command, placing punctuation before the
+next character so Gboard adds no space (DXVK_CONFIG went from about 12 dumps to 1); unchanged
+values skipped. Two hazards found: with the keyboard up the window pans (title buttons report
+0,0 bounds) and in landscape the keyboard covers dialog buttons (a tap on Cancel typed "y"), so
+the keyboard is closed after typing and taps under it are refused; and MOVE_END stops at a wrapped
+line's end, so clearing also deletes forwards (Exec Arguments had kept a trailing space this way).
+
+| Command (LifeIsStrange3, values already set) | Before (portrait, restart) | After, from Game Information |
+| --- | --- | --- |
+| `set` Max Device Memory | 44.1 s | 18.8 s portrait, 17.7 s landscape |
+| `install` c568733 zip (already imported) | 125.2 s | 33.8 s portrait, 34.4 s landscape |
+| `select` c568733 | 42.0 s | 10.0 s both |
+| `env` DXVK_CONFIG, same value | 144.2 s (retyped, saved, reopened) | 13.3 s (read, left alone) |
+| `env` DXVK_CONFIG, changed | 144.2 s | 44.3 s landscape |
+| launch (old: `open_library()` + `go` + Play) | 24.0 s | 5.8 s; 21.6 s with a game running (restart) |
+| `apply` Exec Arguments + Max Device Memory + DXVK_CONFIG, all changed | 3 commands | 72-91 s landscape |
+
+Verified on the phone in both orientations (rotation forced with `user_rotation`, then put back to
+landscape-locked 1): show, get (Graphics, Emulation, Exec Arguments), options, set, select,
+install, env (same and changed), apply with driver and env changes in portrait and with args,
+dropdown and env changes in landscape, each reverted with a second apply, and launch. Not run on
+the phone: `import-content`, `export-config` (they would add files to Download/xclipse), `args`
+(bench containers only), an install that imports a new zip. LifeIsStrange3 reads back as it was:
+driver xd-c568733, Max Device Memory 1024 MB, the same Exec Arguments (with its one trailing
+space) and DXVK_CONFIG.

@@ -88,9 +88,26 @@ python pipeline/gn_driver.py envs Heaven-radv DXVK_LOG_LEVEL=none WRAPPER_DISABL
 ```
 
 The helper scrolls the tab row, uses the Add dialog to insert or replace the named value, saves,
-and verifies it after reopening. It never deletes a variable. Record the old value before changing
+and verifies it after reopening. A variable that already has the value is left alone. It never
+deletes a variable. Record the old value before changing
 it; this command replaces the entire value, so preserve any other settings in an existing
 `DXVK_CONFIG`. Use `dxvk.enableDescriptorBuffer=Auto` to restore that option's default.
+
+`apply` makes several changes in one editor session with one save, then reopens the container
+and reads each back; `--launch` (or `launch GAME` on its own) then starts the game with Play.
+`--set` finds FEXCore and Box64 presets on the Emulation tab and other labels on Graphics; a
+`TAB:` prefix names another tab:
+
+```sh
+python pipeline/gn_driver.py apply LifeIsStrange3 --driver "RADV Xclipse (Mesa 26.3.0-devel-xd-c568733)" \
+    --set "Max Device Memory=1024 MB" --env "DXVK_CONFIG=dxvk.enableDescriptorBuffer=False" \
+    --args "-nostartupmovies -dx11" --launch
+python pipeline/gn_driver.py launch LifeIsStrange3
+```
+
+`gn_driver.py` works out the current screen from one dump and moves from there, in portrait or
+landscape; it restarts GameNative only from an unknown screen or a running game. `--stats` prints
+dumps, taps, restarts and time; `GN_DEBUG=1` logs each screen it recognises.
 
 On the verified GameNative v1.3.0-prerelease APK and RADV `xd-fc066b9`, Heaven with DXVK 2.7.1
 faults at startup with descriptor buffers enabled. Disabling them is a working compatibility
