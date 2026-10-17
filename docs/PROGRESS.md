@@ -961,3 +961,69 @@ under a linear sampler. Samsung's driver withholds linear filtering for exactly 
 and RADV advertises it. Linear PCF on depth is correct, and the test now checks it with
 fractional results. Dropping the feature bits would only make apps refuse formats they use today,
 as stock Heaven does with its D24 depth texture, so the fix has to emulate the filter in the shader.
+
+### Linear filtering emulated for the formats the 940 point-samples (2026-10-17)
+
+The texture unit point-samples 16-bit UNORM/SNORM and 32-bit float textures (and depth read
+without compare) under a linear sampler (`docs/findings.md`). RADV advertises linear filtering for
+them, and dropping it would break DXVK, which needs it for D3D11. So
+`radv_nir_lower_xclipse_filter.c` emulates the filter in the shader. It runs on the 940 by
+default; `debug.radv_xclipse_filteremu` / `RADV_XCLIPSE_FILTEREMU` set the mode: `0` off, `2`
+bilinear only, `3` check and branch only (diagnostic).
+
+How it works:
+
+- Formats aren't known at compile time. Each 2D float sample (tex/txb/txl/txd) reads its image
+  descriptor's FORMAT and the sampler's filter and unnormalized bits.
+- Only an affected format under a linear filter branches to the emulation. That path:
+  - gathers the 2x2 footprint per read component and blends it by hand;
+  - applies the shader and sampler LOD bias, the min/max LOD clamps and the mag/min choice;
+  - blends a second level for a linear mip filter.
+- The hardware sample stays unconditional, and the branch sits at the sample's first use.
+- The gather goes to the corner the four texels share. At a texel center the hardware rounds its
+  footprint its own way, and gathering there failed R16 640x360 on half the texels.
+
+Tests (`xdtest`, radv):
+
+- `textures`, `mips` and `depth` pass (`results/2026-10-17_201755`).
+- New mips cases sample R32F 256x256 and R16 640x360 with a trilinear sampler at texel centers
+  and halfway between levels.
+- With the emulation off (`191622`), every affected format fails `textures`, and both trilinear
+  mips cases fail.
+- Mode 2 fails only the half-level slot (`193800`).
+- Stock skips the trilinear cases: it doesn't advertise linear filtering for them.
+
+Heaven, fixed performance mode, one 80 s run each:
+
+| Build | Emulation on | Off (`filteremu0`) | Other modes |
+|---|---|---|---|
+| `xd-75b70f7` (hardware sample in the else block) | 37.5 | 39.5 | |
+| `xd-1d040a2` (hardware sample unconditional) | 38.5 | 39.6 | |
+| `xd-f2d2ae0` | 38.9 | 39.3 | bilinear only: 38.5 |
+| `xd-a28907e` (branch sunk to first use) | 38.6, 38.6 | 39.8, 39.6 | |
+| `xd-3aeebd5` (edge-case fixes) | 38.8 | 39.3 | branch only: 39.4 |
+
+On recent builds the emulation costs about 0.8 FPS (2%): 38.7 against 39.5 on average. The check
+and branch are free (mode 3 matches off). Bilinear-only is no cheaper, so the cost is the
+emulation body itself: work on the taken path, plus probably VGPR pressure from the rarely taken
+blocks.
+
+Heaven does take the path. In mode 3 the 44 s fade frame turns fully black, where the other modes
+show it dark but visible. Even so, the on and off shots show no visible difference
+(`results/2026-10-17_192102-game` … `202947-game`). The cost buys spec-correct filtering for
+apps that rely on it: height maps, VSM/ESM shadows, R16 and float data textures.
+
+The emulation stays on by default, and `filteremu=0` is the escape hatch.
+
+Not yet tested on the device:
+
+- mixed mag/min filters;
+- samplers with unnormalized coordinates (skipped by the emulation);
+- the fragment-shader implicit-LOD path, apart from Heaven running without visible defects.
+
+Next ways to cut the cost:
+
+- One "any affected" branch per block over a cloned copy, so the fast path stays one block.
+- Issue gathers one component at a time to lower the slow path's VGPR peak.
+
+`gn_driver.py` now scrolls up to 15 swipes for installed drivers; the list outgrew 4.
