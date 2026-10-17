@@ -151,7 +151,7 @@ class Run:
             time.sleep(0.5)
 
 
-def life_is_strange_3(run: Run) -> None:
+def life_is_strange_3(run: Run, until: str | None = None) -> None:
     """Brightness of BOX on xd-5c58dd1, Max Device Memory 1024 MB, -nostartupmovies -dx11
     (2026-10-18): 27 under GameNative's "Launching game..." screen, then black; the Square Enix and
     Deck Nine logos, the health warning and the autosave notice 9-32 (they skip on RB, or pass by
@@ -162,6 +162,8 @@ def life_is_strange_3(run: Run) -> None:
     run.wait(lambda v: v > 3, "the game's first picture", limit_s=120)
     run.wait(lambda v: v > 42, "the title screen", limit_s=120, press_button="RB",
              press_every_s=2.5)
+    if until == "title":
+        return
     sh("am kill-all")  # background apps come back during the intros; the first scene needs the room
     time.sleep(1.0)
     for presses in range(1, 5):
@@ -183,7 +185,7 @@ def life_is_strange_3(run: Run) -> None:
 GAMES = {"LifeIsStrange3": life_is_strange_3}
 
 
-def play(game: str, restart: bool) -> None:
+def play(game: str, restart: bool, until: str | None = None) -> None:
     if sh(f"pidof {GAME_PROCESS}") and not restart:
         sys.exit(f"a game is running already ({GAME_PROCESS}); pass --restart to stop it and start "
                  f"{game}")
@@ -195,13 +197,13 @@ def play(game: str, restart: bool) -> None:
         sys.exit(f"gn_driver.py launch {game} failed")
     run.log("launched")
     try:
-        GAMES[game](run)
+        GAMES[game](run, until)
     except NotInGame as e:
         killed = sh(f"logcat -d -b main -s lmkd:I -t '{since}' | grep \"'app.gamenative'\"")
         if killed:
             sys.exit(f"{e}: the low-memory killer stopped GameNative:\n{killed.splitlines()[-1]}")
         raise
-    run.log(f"{game} is in play")
+    run.log(f"{game} is {'at its ' + until + ' screen' if until else 'in play'}")
 
 
 def look() -> None:
@@ -223,6 +225,7 @@ def main() -> None:
     p = commands.add_parser("play", help="start a game and get it past its intro screens")
     p.add_argument("game", choices=sorted(GAMES))
     p.add_argument("--restart", action="store_true", help="stop a game that is running first")
+    p.add_argument("--until", choices=["title"], help="stop at this screen instead of play")
     commands.add_parser("look", help="print what play sees and whether presses are allowed")
     args = parser.parse_args()
 
@@ -237,7 +240,7 @@ def main() -> None:
                     press(button)
                     print(f"pressed {button}", flush=True)
         elif args.command == "play":
-            play(args.game, args.restart)
+            play(args.game, args.restart, args.until)
         else:
             look()
     except NotInGame as e:
