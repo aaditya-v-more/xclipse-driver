@@ -64,6 +64,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shlex
 import sys
@@ -95,6 +96,8 @@ DRIVER_LABEL = "Graphics Driver Version"
 ADD_ENV = "Add environment variable"
 ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 STATS = {"dumps": 0, "taps": 0, "restarts": 0}
+DEBUG = bool(os.environ.get("GN_DEBUG"))  # log each screen identified, to stderr
+T0 = time.monotonic()
 
 
 def label(n: dict) -> str:
@@ -179,18 +182,20 @@ def identify(s: Screen, game: str | None = None, last_game: str | None = None) -
     if has("New Environment Variable"):
         return State("env_dialog", last_game)
     title = next((n for n in s if n["text"].endswith((" Config", " Config*"))), None)
-    if title and any(label(n) in TABS for n in s):
+    # Settings has "Modify Default Config" and an "Emulation" heading: count the tabs.
+    if title and len({label(n) for n in s if label(n) in TABS}) >= 3:
         tab = next((label(n) for n in s if label(n) in TABS and n["selected"]), None)
         name = title["text"].rsplit(" Config", 1)[0]
         return State("editor", name, tab, title["text"].endswith("*"))
     if has("Quick Actions"):
         return State("quick_actions", last_game or "?")
-    if has("Import ZIP from device"):
-        return State("driver_manager")
-    if has("Import .wcp from device"):
-        return State("contents_manager")
     if has("Customize your experience"):
         return State("settings")
+    # The import buttons scroll out of view in landscape; the dialog's title and Close stay.
+    if has("Import ZIP from device") or (has("Driver Manager") and has("Close")):
+        return State("driver_manager")
+    if has("Import .wcp from device") or (has("Contents Manager") and has("Close")):
+        return State("contents_manager")
     if has("Close options"):
         return State("menu")
     if has("Play") and has("Uninstall") and has("Options"):
@@ -199,6 +204,9 @@ def identify(s: Screen, game: str | None = None, last_game: str | None = None) -
         return State("library")
     if s.window and area(s.window) < s.width * s.height * 9 // 10:
         return State("popup")
+    # A game: its loading screen, or the performance overlay GameNative draws over it.
+    if has("Launching game...") or any(re.fullmatch(r"FPS [\d.]+", label(n)) for n in s):
+        return State("in_game")
     return State("unknown")
 
 
@@ -334,6 +342,9 @@ class Nav:
 
     def state(self, game: str | None = None) -> State:
         st = identify(self.look(), game, self.last_game)
+        if DEBUG:
+            print(f"  [{time.monotonic() - T0:6.1f} s] {st.kind} {st.game or ''} {st.tab or ''}"
+                  f"{' *' if st.dirty else ''}", file=sys.stderr, flush=True)
         if st.kind in ("game_info", "editor") and st.game != "?":
             self.last_game = st.game
         return st
@@ -434,6 +445,25 @@ class Nav:
     def key(self, code: str) -> None:
         self._run_guarded(f"input keyevent {code}", code)
 
+    def _drag_box(self, box: tuple) -> tuple:
+        """`box` less the bars that sit over its ends (a library's tab bar and button hints):
+        a drag that starts on one of those doesn't scroll the list."""
+        s = self.look()
+        x1, y1, x2, y2 = box
+        mid = (y1 + y2) // 2
+        limit = s.width * s.height // 4
+        for o in s:
+            b = o["box"]
+            if o["scroll"] is not None or not (label(o) or o["click"]) or area(b) >= limit:
+                continue
+            if b[2] <= x1 or b[0] >= x2 or b[3] <= y1 or b[1] >= y2:
+                continue
+            if b[3] <= mid:
+                y1 = max(y1, b[3])
+            elif b[1] >= mid:
+                y2 = min(y2, b[1])
+        return (x1, y1, x2, y2) if y2 - y1 > (box[3] - box[1]) // 3 else box
+
     def swipe(self, box: tuple, direction: str) -> None:
         """Scrolls the list in `box`: "down" shows what's below, "up" what's above, "left" what's
         to the right. The finger drags 80% of the list's size and holds still before lifting,
@@ -441,6 +471,8 @@ class Nav:
         overlap by a fifth of the list, enough for any label and the value under it. The drag
         runs off-centre, on the side where labels sit, away from switches and arrows."""
         x1, y1, x2, y2 = box
+        if direction in ("down", "up"):
+            x1, y1, x2, y2 = self._drag_box(box)
         w, h = x2 - x1, y2 - y1
         if direction in ("down", "up"):
             x = x1 + w * 3 // 10
@@ -461,11 +493,22 @@ class Nav:
         self._run_guarded(cmd, "a swipe")
 
     def seek(self, pick: Callable[[Screen], dict | None], box: tuple | None = None,
-             max_swipes: int = 16) -> tuple[dict, Screen] | None:
-        """Scrolls a list until `pick` finds a node, down first, then up: (node, dump), or None
-        once both ends are reached. The list is `box`, else the screen's tallest scrollable."""
+             max_swipes: int = 16, from_end: bool = False) -> tuple[dict, Screen] | None:
+        """Scrolls a list until `pick` finds a node: (node, dump), or None once both ends are
+        reached. It looks down first, then up; with `from_end` (for lists that grow at the end,
+        such as installed drivers) it flings to the end first and looks up from there. The list
+        is `box`, else the screen's tallest scrollable."""
         s = self.look()
-        direction, swipes = "down", 0
+        direction, swipes, ends = "down", 0, set()
+        if from_end and not pick(s):
+            area_box = box or self._list_box(s)
+            if area_box:
+                x1, y1, x2, y2 = self._drag_box(area_box)
+                x, a, b = x1 + (x2 - x1) * 3 // 10, y1 + (y2 - y1) * 9 // 10, y1 + (y2 - y1) // 10
+                self._run_guarded("; ".join([f"input swipe {x} {a} {x} {b} 60"] * 3), "a fling")
+                time.sleep(0.5)  # let the fling settle before the dump's idle wait
+                s = self.look()
+                direction = "up"
         while True:
             n = pick(s)
             if n:
@@ -478,9 +521,10 @@ class Nav:
             swipes += 1
             s = self.look()
             if self._content(s, area_box) == before:  # that end of the list
-                if direction == "up":
+                ends.add(direction)
+                if len(ends) == 2:
                     return None
-                direction = "up"
+                direction = "up" if direction == "down" else "down"
 
     @staticmethod
     def _list_box(s: Screen) -> tuple | None:
@@ -512,13 +556,16 @@ class Nav:
         sh(f"am start -n {APP}/.MainActivity")
         self.changed()
         self.last_game = None
-        calm, deadline = 0, time.monotonic() + 60
-        while calm < 2:  # the update offer can show up a moment after the library
+        calm, deadline, offered = 0, time.monotonic() + 60, False
+        # The update offer can show up a moment after the library: unless it has been passed
+        # already, the library must be seen twice.
+        while calm < (1 if offered else 2):
             st = self.state()
             if st.kind == "library":
                 calm += 1
             elif st.kind in ("signin", "update", "membership"):
                 calm = 0
+                offered = offered or st.kind == "update"
                 self.pass_prompt(st)
             elif time.monotonic() > deadline:
                 sys.exit(f"GameNative didn't reach its library after restarting ({st.kind})")
@@ -553,10 +600,10 @@ class Nav:
                 continue
             path = route(st, target)
             if not path:
-                # Unknown screens are re-read once (something may still be loading), then
-                # GameNative is restarted.
+                # Unknown screens are re-read (something may still be loading), then GameNative
+                # is restarted; so is it at once while a game runs.
                 unknown += 1
-                if st.kind in ("unknown", "popup") and unknown < 2:
+                if st.kind in ("unknown", "popup") and unknown < 3:
                     self.changed()
                     continue
                 self.restart()
@@ -664,7 +711,9 @@ class Nav:
         if before == value:
             return before
         entries, popup, page = self.dropdown(text)
-        found = self.seek(lambda s: find_view(s, value), box=self._list_box(popup) or None)
+        # Installed drivers are appended to the driver list, so a new build is near its end.
+        found = self.seek(lambda s: find_view(s, value), box=self._list_box(popup) or None,
+                          from_end=text == DRIVER_LABEL and value.startswith("RADV"))
         if not found:
             choices = [label(n) for n in self.look() if label(n)]
             self.close_dropdown(page)
@@ -729,8 +778,9 @@ class Change(NamedTuple):
 
 
 def env_values(nav: Nav, names: set[str]) -> dict[str, str | None]:
-    """Scrolls the Environment tab down to its Add button, reading each wanted variable's text
-    value on the way (None for one that isn't text-valued). Names not seen are missing."""
+    """Flings the Environment tab to its Add button at the end, then scrolls up until each wanted
+    variable's text value is read (None for one that isn't text-valued). Names not seen after
+    reaching the top are missing."""
     seen: dict[str, str | None] = {}
 
     def collect(s: Screen) -> None:
@@ -747,7 +797,8 @@ def env_values(nav: Nav, names: set[str]) -> dict[str, str | None]:
         collect(s)
         return s[0] if s and seen.keys() >= names else None
 
-    if not nav.seek(add_button):
+    # Add sits at the end of the list, and added variables are appended above it.
+    if not nav.seek(add_button, from_end=True):
         sys.exit(f"no {ADD_ENV!r} on the Environment tab")
     if seen.keys() < names:  # the list may not have started at the top: look above too
         nav.seek(all_seen)
@@ -944,7 +995,7 @@ def import_zip(zip_name: str, entry: str, nav: Nav = NAV) -> None:
     nav.go(State("driver_manager"))
     # Installed drivers are listed below the import button, in the dialog's scrolling area,
     # with a trash icon beside each; the swipes run over their names, away from the icons.
-    if nav.seek(lambda s: find_view(s, entry), max_swipes=30):
+    if nav.seek(lambda s: find_view(s, entry), max_swipes=30, from_end=True):
         print(f"{entry} is installed already")
         return
     nav.seek(lambda s: find_view(s, "Import ZIP from device"))
@@ -957,7 +1008,7 @@ def import_zip(zip_name: str, entry: str, nav: Nav = NAV) -> None:
     nav.press(lambda s: find_view(s, zip_name), zip_name)
     nav.wait(lambda st: st.kind == "driver_manager", limit_s=30, what="Driver Manager")
     deadline = time.monotonic() + 30  # the entry shows up a few seconds after the pick
-    while not nav.seek(lambda s: find_view(s, entry), max_swipes=30):
+    while not nav.seek(lambda s: find_view(s, entry), max_swipes=30, from_end=True):
         if time.monotonic() > deadline:
             sys.exit(f"picked {zip_name}, but {entry!r} isn't in the installed drivers")
         nav.changed()
