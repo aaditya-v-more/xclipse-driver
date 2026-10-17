@@ -1222,7 +1222,7 @@ next character so Gboard adds no space (DXVK_CONFIG went from about 12 dumps to 
 values skipped. Two hazards found: with the keyboard up the window pans (title buttons report
 0,0 bounds) and in landscape the keyboard covers dialog buttons (a tap on Cancel typed "y"), so
 the keyboard is closed after typing and taps under it are refused; and MOVE_END stops at a wrapped
-line's end, so clearing also deletes forwards (Exec Arguments had kept a trailing space this way).
+line's end, so clearing also deletes forwards (probably how Exec Arguments came to end in a space).
 
 | Command (LifeIsStrange3, values already set) | Before (portrait, restart) | After, from Game Information |
 | --- | --- | --- |
