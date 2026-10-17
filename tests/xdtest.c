@@ -55,6 +55,7 @@
 #include "storage_write_comp.h"
 #include "storage_read_comp.h"
 #include "bcn_s3tc_comp.h"
+#include "subgroup_comp.h"
 #include "mrt_read_comp.h"
 #include "xfb_many_vert.h"
 #include "xfb_vert.h"
@@ -236,6 +237,7 @@ static PFN_vkCreateInstance create_instance_fn;
 static VkInstance inst;
 static VkPhysicalDevice pdev;
 static VkPhysicalDeviceProperties props;
+static VkPhysicalDeviceVulkan11Properties props11;
 static VkPhysicalDeviceMemoryProperties memprops;
 static VkQueueFamilyProperties qfams[16];
 static uint32_t qfam_count = 16;
@@ -319,6 +321,7 @@ static void start_instance(void)
    };
    vkGetPhysicalDeviceProperties2(pdev, &p2);
    props = p2.properties;
+   props11 = p11;
 
    char api[32];
    snprintf(api, sizeof(api), "%u.%u.%u", VK_API_VERSION_MAJOR(props.apiVersion),
@@ -1531,6 +1534,102 @@ static void dispatch_fill(const uint32_t *code, size_t size, bool timed)
 static void run_compute(void)
 {
    dispatch_fill(fill_comp, sizeof(fill_comp), false);
+}
+
+/* Cross-lane operations. On the 940 a wave64 shader is two wave32 halves, and ACO's emulation of
+ * lane reads across the halves is suspect ([W64XLANE] in the RADV log), so every partner lane is
+ * recomputed on the host from the lane coordinates each invocation reports. */
+static uint32_t subgroup_value(uint32_t i)
+{
+   return i * 2654435761u + 12345u;
+}
+
+static void run_subgroup(void)
+{
+   const VkSubgroupFeatureFlags ops = VK_SUBGROUP_FEATURE_BASIC_BIT | VK_SUBGROUP_FEATURE_SHUFFLE_BIT |
+      VK_SUBGROUP_FEATURE_SHUFFLE_RELATIVE_BIT | VK_SUBGROUP_FEATURE_ARITHMETIC_BIT;
+   jint("subgroup_size", props11.subgroupSize);
+   if (!(props11.subgroupSupportedStages & VK_SHADER_STAGE_COMPUTE_BIT) ||
+       (props11.subgroupSupportedOperations & ops) != ops)
+      finish("skip", "compute shuffles or arithmetic are unsupported");
+
+   enum { N = 4096, WG = 64, WORDS = 8, OPS = 6 };
+   struct buffer b = make_buffer(N * WORDS * sizeof(uint32_t), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+   memset(b.map, 0xee, N * WORDS * sizeof(uint32_t));
+   double ms;
+   step("creating compute pipeline");
+   struct compute c = make_compute(subgroup_comp, sizeof(subgroup_comp), &b.buf, 1, 0, NULL, &ms);
+   VkCommandBuffer cb = begin_cmd();
+   bind_compute(cb, &c);
+   vkCmdDispatch(cb, N / WG, 1, 1);
+   VkMemoryBarrier to_host = {
+      .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+      .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+      .dstAccessMask = VK_ACCESS_HOST_READ_BIT,
+   };
+   vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0, 1,
+                        &to_host, 0, NULL, 0, NULL);
+   VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+   submit_and_wait(cb, "subgroup dispatch");
+
+   const uint32_t *d = b.map;
+   uint32_t size = d[1];
+   jint("subgroup_size_used", size);
+   if (!size || size > WG || (size & (size - 1)) || WG % size)
+      finish("fail", "shader reported subgroup size %u", size);
+   /* Global invocation index of each (workgroup, subgroup, lane). */
+   static int32_t at[N];
+   for (uint32_t i = 0; i < N; i++)
+      at[i] = -1;
+   for (uint32_t i = 0; i < N; i++) {
+      uint32_t id = d[i * WORDS], wg = id >> 16, sg = (id >> 8) & 0xff, lane = id & 0xff;
+      if (d[i * WORDS + 1] != size || wg >= N / WG || sg >= WG / size || lane >= size ||
+          wg != i / WG || at[wg * WG + sg * size + lane] >= 0)
+         finish("fail", "invocation %u reported bad lane coordinates 0x%08x (size %u)", i, id,
+                d[i * WORDS + 1]);
+      at[wg * WG + sg * size + lane] = (int32_t)i;
+   }
+
+   static const char *const names[OPS] = {"shuffle_half", "shuffle_reverse", "shuffle_xor_half",
+                                          "shuffle_down", "add", "inclusive_add"};
+   uint32_t bad[OPS] = {0}, first[OPS] = {0}, got[OPS] = {0}, want[OPS] = {0};
+   for (uint32_t i = 0; i < N; i++) {
+      uint32_t id = d[i * WORDS], base = (id >> 16) * WG + ((id >> 8) & 0xff) * size, lane = id & 0xff;
+#define LANE(l) subgroup_value((uint32_t)at[base + (l)])
+      uint32_t sum = 0, prefix = 0;
+      for (uint32_t l = 0; l < size; l++) {
+         sum += LANE(l);
+         if (l <= lane)
+            prefix += LANE(l);
+      }
+      uint32_t expect[OPS] = {LANE((lane + size / 2) % size), LANE(size - 1 - lane), LANE(lane ^ (size / 2)),
+                              lane + 1 < size ? LANE(lane + 1) : 0, sum, prefix};
+#undef LANE
+      for (unsigned op = 0; op < OPS; op++) {
+         if (op == 3 && lane + 1 >= size)
+            continue; /* undefined past the last lane */
+         uint32_t value = d[i * WORDS + 2 + op];
+         if (value != expect[op] && bad[op]++ == 0) {
+            first[op] = i;
+            got[op] = value;
+            want[op] = expect[op];
+         }
+      }
+   }
+   unsigned failed = OPS;
+   for (unsigned op = 0; op < OPS; op++) {
+      char key[48];
+      snprintf(key, sizeof key, "mismatches_%s", names[op]);
+      jint(key, bad[op]);
+      if (bad[op] && failed == OPS)
+         failed = op;
+   }
+   if (failed < OPS)
+      finish("fail", "%s wrong in %u of %u invocations; first at %u (lane %u): got 0x%08x, want 0x%08x",
+             names[failed], bad[failed], N, first[failed], d[first[failed] * WORDS] & 0xff, got[failed],
+             want[failed]);
+   free_compute(&c);
+   free_buffer(&b);
 }
 
 /* Exercise native descriptor buffers without Wine or GameNative's memory wrapper. Two nonzero
@@ -6071,6 +6170,7 @@ int main(int argc, char **argv)
       {"descriptors", run_descriptors, false, NEED_DESCRIPTORS},
       {"placed", run_placed, false, NEED_PLACED},
       {"culling", run_culling, true, 0},
+      {"subgroup", run_subgroup, false, 0},
       {"alu", run_alu, false, 0},           {"bandwidth", run_bandwidth, false, 0},
       {"fill", run_fill, true, 0},          {"draws", run_draws, true, 0},
       {"compile", run_compile, false, 0},

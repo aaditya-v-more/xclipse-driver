@@ -116,7 +116,7 @@ The 940 runs GFX10.3 command streams, but its shader launch works like GFX11's i
   - RGBA8, sRGB, RGBA16F, R16F, R11G11B10F, RGB10A2, R8 and the BC formats filter correctly.
   - Samsung's driver withholds `SAMPLED_IMAGE_FILTER_LINEAR` for exactly the affected formats. RADV advertises it.
   - Depth comparison with a linear filter (PCF) is correct on D16, D32F and D32FS8, so shadow maps are fine.
-  - RADV emulates the filter in the shader for those formats (`radv_nir_lower_xclipse_filter.c`, `debug.radv_xclipse_filteremu`), at about 2% in Heaven. A gather4 placed at a texel center can pick a footprint other than `floor(uv*size-0.5)`, so the emulation gathers at the shared corner.
+  - RADV emulates the filter in the shader for those formats (`radv_nir_lower_xclipse_filter.c`, `debug.radv_xclipse_filteremu`), at about 2% in Heaven at fixed clocks and no measurable cost at normal clocks, where Heaven is CPU-bound. A gather4 placed at a texel center can pick a footprint other than `floor(uv*size-0.5)`, but an explicit-LOD sample at an exact texel center returns that texel, so the emulation loops over texel centers (4 or 8 samples).
 
 ## Build PC
 
