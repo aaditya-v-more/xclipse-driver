@@ -1167,3 +1167,22 @@ driver (results/2026-10-18_010729). 1024x1024 with full mips, against Samsung's 
 
 BC1-BC3 match. Uncompressed and render-target images align to 64 KB (Samsung: 4 KB) and run 1-7%
 larger. Samsung sizes BC4-BC7 natively. This is the lead for Life is Strange's scene-load lmkd kill.
+
+### 2026-10-18: BC7 matches Samsung's memory; Life is Strange's churn comes from our caps
+
+- `4b15f1b`: BC7_SRGB uses a BC3_SRGB carrier (was RGBA8_SRGB): 7.08 MB to 2.88 MB per 1024x1024
+  mip chain. Views now keep their sRGB-ness on the hidden plane, so an sRGB view of a mutable UNORM
+  image (DXVK's typeless textures) linearises. The textures test gained a BC7_SRGB case, compared
+  in encoded space.
+- `49804f2`: BC7's BC3 plane aliases plane 0 (as BC5's EAC plane already did); uploads transcode
+  from the copy's source buffer (`bc3buf` variant). BC7 UNORM and SRGB are now 1.44 MB, the same as
+  Samsung's (results/2026-10-18_012406). Readbacks of an aliased image return BC3 blocks.
+- Fable's review agreed and ranked BC7 aliasing, then BC4/BC5_SNORM EAC carriers.
+- Life is Strange census (`debug.radv_xclipse_log 1`, 45 s of play): BC5_UNORM 816 decodes, 100%
+  of blocks; BC7 22 decodes, 0.0%. Emulation is not this game's memory: its 2.4-2.7 GB is its own.
+  Content repeat was 79% (the same textures re-uploaded), and the HUD showed the budget at 249%.
+  DXGI reports min(driver budget, `dxvk.maxMemoryBudget`, `dxgi.maxDeviceMemory`), and we had
+  capped those at 1536 and 1024 MB, so UE4 kept evicting and re-streaming. Max Device Memory is now
+  2048 MB. At the title screen, surface repeat fell to 12%, at 47 FPS.
+- Ran 2.7 GB through the song scene with no lmkd kill. The later "crash" was my `am force-stop`
+  for driver tests (01:23:58 in logcat), not the game.
