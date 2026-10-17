@@ -1,17 +1,28 @@
 #!/bin/sh
 # Screen runtime RADV flags against Heaven's blue streak artifacts: one Heaven RADV run per flag,
-# with screenshots every 10 s from 35 s after rendering starts (the airship scene shows streaks
-# in about half of the frames at 35 s). Pass labels to run a subset, e.g. `wave32 nongg`.
-# Review the *-r*s.png screenshots in each results/<time>-game folder by eye.
+# with screenshots every 4 s through the airship scene (32-64 s after rendering starts). Pass
+# labels to run a subset, e.g. `wave32 nongg`. Review the *-r*s.png screenshots in each
+# results/<time>-game folder by eye.
+#
+# The streaks showed in 7 of 12 airship shots in fixed performance mode but hardly at normal
+# clocks, so FIXED=1 (the default) holds fixed performance mode for the screen and releases it on
+# exit. FIXED=0 leaves clocks alone. SHOTS overrides the shot times.
 cd "$(dirname "$0")/.." || exit 1
 PY=tools/python/bin/python3
 [ -x "$PY" ] || PY=tools/python/python.exe
-SHOTS=35,45,55,65,75,85,95
+SHOTS=${SHOTS:-32,36,40,44,48,52,56,60,64}
+FIXED=${FIXED:-1}
+if [ "$FIXED" = 1 ]; then
+  trap 'adb shell cmd power set-fixed-performance-mode-enabled false' EXIT
+  trap 'exit 130' INT TERM
+  out=$(adb shell cmd power set-fixed-performance-mode-enabled true 2>&1)
+  [ -z "$out" ] || { echo "fixed performance mode not confirmed: $out" >&2; exit 1; }
+fi
 run() {
   label=$1; shift
   echo "=== $label $*"
-  "$PY" -u pipeline/game.py --bench heaven --drivers radv --runs 1 --seconds 150 \
-      --rendered-shots $SHOTS --note "artifact screen: $label" "$@"
+  "$PY" -u pipeline/game.py --bench heaven --drivers radv --runs 1 --seconds 120 \
+      --rendered-shots $SHOTS --note "artifact screen: $label (fixed mode: $FIXED)" "$@"
 }
 flags() {
   case $1 in
