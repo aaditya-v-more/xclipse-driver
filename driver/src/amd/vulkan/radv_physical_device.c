@@ -3148,7 +3148,7 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
       if (!e && __system_property_get("debug.radv_xclipse_ringuc", val) > 0 && val[0])
          v = atoi(val);
 #endif
-      pdev->xclipse_ring_uc = v & 0xf;
+      pdev->xclipse_ring_uc = v & 0x3f;
    }
    if (pdev->info.xclipse_model == AC_XCLIPSE_940 && pdev->use_ngg_culling) {
       pdev->xclipse_cull_min_vertices = radv_xclipse_cull_min_vertices();

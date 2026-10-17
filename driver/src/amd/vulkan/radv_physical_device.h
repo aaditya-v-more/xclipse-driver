@@ -89,6 +89,15 @@ enum radv_drm_device_type {
    RADV_DRM_DEVICE_VIRTIO,
 };
 
+enum {
+   RADV_XCLIPSE_RING_UC_TESS = 1,          /* both tess rings, one BO */
+   RADV_XCLIPSE_RING_UC_GE = 2,            /* GE attribute/pos/prim rings */
+   RADV_XCLIPSE_RING_UC_GS = 4,            /* ES-GS and GS-VS rings */
+   RADV_XCLIPSE_RING_UC_SCRATCH = 8,       /* graphics and compute scratch */
+   RADV_XCLIPSE_RING_UC_TESS_FACTOR = 16,  /* tess factor ring, split into its own BO */
+   RADV_XCLIPSE_RING_UC_TESS_OFFCHIP = 32, /* tess offchip ring, factor ring split out */
+};
+
 struct radv_physical_device {
    struct vk_physical_device vk;
 
@@ -176,8 +185,8 @@ struct radv_physical_device {
    /* Xclipse: write back and invalidate L2 in every buffer barrier, as on chips whose L2 isn't
     * coherent between clients (debug.radv_xclipse_bufl2 1). Blue-streak investigation. */
    bool xclipse_buffer_l2;
-   /* Xclipse: map these internal rings uncached (debug.radv_xclipse_ringuc mask): 1 = tess,
-    * 2 = GE attribute/pos/prim, 4 = ES-GS/GS-VS, 8 = scratch. Blue-streak investigation. */
+   /* Xclipse: map these internal rings uncached (debug.radv_xclipse_ringuc, RADV_XCLIPSE_RING_UC_*).
+    * Blue-streak investigation. */
    uint32_t xclipse_ring_uc;
 
    /* Whether to emulate ASTC image support on HW without support. */

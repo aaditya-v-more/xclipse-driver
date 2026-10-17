@@ -57,6 +57,9 @@ struct radv_queue_state {
    struct radeon_winsys_bo *esgs_ring_bo;
    struct radeon_winsys_bo *gsvs_ring_bo;
    struct radeon_winsys_bo *tess_rings_bo;
+   /* Xclipse: the tess factor ring in its own BO (tess_rings_bo then holds only the offchip
+    * ring), so each can be mapped uncached on its own. NULL = one BO for both. */
+   struct radeon_winsys_bo *tess_factor_bo;
    struct radeon_winsys_bo *task_rings_bo;
    struct radeon_winsys_bo *mesh_scratch_ring_bo;
    struct radeon_winsys_bo *ge_rings_bo;

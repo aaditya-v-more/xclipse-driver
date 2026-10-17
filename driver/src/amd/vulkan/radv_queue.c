@@ -266,7 +266,7 @@ static void
 radv_fill_shader_rings(struct radv_device *device, uint32_t *desc, struct radeon_winsys_bo *scratch_bo,
                        uint32_t esgs_ring_size, struct radeon_winsys_bo *esgs_ring_bo, uint32_t gsvs_ring_size,
                        struct radeon_winsys_bo *gsvs_ring_bo, struct radeon_winsys_bo *tess_rings_bo,
-                       struct radeon_winsys_bo *task_rings_bo, struct radeon_winsys_bo *mesh_scratch_ring_bo,
+                       struct radeon_winsys_bo *tess_factor_bo, struct radeon_winsys_bo *task_rings_bo, struct radeon_winsys_bo *mesh_scratch_ring_bo,
                        struct radeon_winsys_bo *ge_rings_bo)
 {
    const struct radv_physical_device *pdev = radv_device_physical(device);
@@ -314,8 +314,12 @@ radv_fill_shader_rings(struct radv_device *device, uint32_t *desc, struct radeon
    desc += 8;
 
    if (tess_rings_bo) {
-      radv_set_ring_buffer(pdev, tess_rings_bo, pdev->info.tess_offchip_ring_size, pdev->info.tess_factor_ring_size,
-                           false, false, true, 0, 0, &desc[0]);
+      if (tess_factor_bo)
+         radv_set_ring_buffer(pdev, tess_factor_bo, 0, pdev->info.tess_factor_ring_size, false, false, true, 0, 0,
+                              &desc[0]);
+      else
+         radv_set_ring_buffer(pdev, tess_rings_bo, pdev->info.tess_offchip_ring_size,
+                              pdev->info.tess_factor_ring_size, false, false, true, 0, 0, &desc[0]);
 
       radv_set_ring_buffer(pdev, tess_rings_bo, 0, pdev->info.tess_offchip_ring_size, false, false, true, 0, 0,
                            &desc[4]);
@@ -393,7 +397,7 @@ radv_emit_gs_ring_sizes(struct radv_device *device, struct radv_cmd_stream *cs, 
 
 static void
 radv_emit_tess_factor_ring(struct radv_device *device, struct radv_cmd_stream *cs,
-                           struct radeon_winsys_bo *tess_rings_bo)
+                           struct radeon_winsys_bo *tess_rings_bo, struct radeon_winsys_bo *tess_factor_bo)
 {
    const struct radv_physical_device *pdev = radv_device_physical(device);
    uint64_t va;
@@ -404,6 +408,12 @@ radv_emit_tess_factor_ring(struct radv_device *device, struct radv_cmd_stream *c
    va = radv_buffer_get_va(tess_rings_bo);
 
    radv_cs_add_buffer(device->ws, cs->b, tess_rings_bo);
+
+   /* ac_emit_cp_tess_rings() puts the factor ring at va + tess_offchip_ring_size. */
+   if (tess_factor_bo) {
+      va = radv_buffer_get_va(tess_factor_bo) - pdev->info.tess_offchip_ring_size;
+      radv_cs_add_buffer(device->ws, cs->b, tess_factor_bo);
+   }
 
    ac_emit_cp_tess_rings(cs->b, &pdev->info, va);
 }
@@ -999,6 +1009,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    struct radeon_winsys_bo *esgs_ring_bo = queue->esgs_ring_bo;
    struct radeon_winsys_bo *gsvs_ring_bo = queue->gsvs_ring_bo;
    struct radeon_winsys_bo *tess_rings_bo = queue->tess_rings_bo;
+   struct radeon_winsys_bo *tess_factor_bo = queue->tess_factor_bo;
    struct radeon_winsys_bo *task_rings_bo = queue->task_rings_bo;
    struct radeon_winsys_bo *mesh_scratch_ring_bo = queue->mesh_scratch_ring_bo;
    struct radeon_winsys_bo *ge_rings_bo = queue->ge_rings_bo;
@@ -1017,7 +1028,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    const uint32_t queue_scratch_size = queue->ring_info.scratch_size_per_wave * queue->ring_info.scratch_waves;
 
    if (scratch_size > queue_scratch_size) {
-      result = radv_bo_create(device, NULL, scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(8),
+      result = radv_bo_create(device, NULL, scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(RADV_XCLIPSE_RING_UC_SCRATCH),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &scratch_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1028,7 +1039,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    const uint32_t compute_queue_scratch_size =
       queue->ring_info.compute_scratch_size_per_wave * queue->ring_info.compute_scratch_waves;
    if (compute_scratch_size > compute_queue_scratch_size) {
-      result = radv_bo_create(device, NULL, compute_scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz | RING_UC(8),
+      result = radv_bo_create(device, NULL, compute_scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz | RING_UC(RADV_XCLIPSE_RING_UC_SCRATCH),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &compute_scratch_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1036,7 +1047,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    if (needs->esgs_ring_size > queue->ring_info.esgs_ring_size) {
-      result = radv_bo_create(device, NULL, needs->esgs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(4),
+      result = radv_bo_create(device, NULL, needs->esgs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(RADV_XCLIPSE_RING_UC_GS),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &esgs_ring_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1044,7 +1055,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    if (needs->gsvs_ring_size > queue->ring_info.gsvs_ring_size) {
-      result = radv_bo_create(device, NULL, needs->gsvs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(4),
+      result = radv_bo_create(device, NULL, needs->gsvs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(RADV_XCLIPSE_RING_UC_GS),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &gsvs_ring_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1052,11 +1063,25 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    if (!queue->ring_info.tess_rings && needs->tess_rings) {
-      result = radv_bo_create(device, NULL, pdev->info.total_tess_ring_size, 256, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz | RING_UC(1),
+      /* Split the factor ring out when either half is to be uncached on its own. */
+      const bool split = ring_uc & (RADV_XCLIPSE_RING_UC_TESS_FACTOR | RADV_XCLIPSE_RING_UC_TESS_OFFCHIP);
+      const uint32_t size = split ? pdev->info.tess_offchip_ring_size : pdev->info.total_tess_ring_size;
+      result = radv_bo_create(device, NULL, size, 256, RADEON_DOMAIN_VRAM,
+                              ring_bo_flags_tmz | RING_UC(RADV_XCLIPSE_RING_UC_TESS | RADV_XCLIPSE_RING_UC_TESS_OFFCHIP),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &tess_rings_bo);
       if (result != VK_SUCCESS)
          goto fail;
-      radv_rmv_log_command_buffer_bo_create(device, tess_rings_bo, 0, 0, pdev->info.total_tess_ring_size);
+      radv_rmv_log_command_buffer_bo_create(device, tess_rings_bo, 0, 0, size);
+
+      if (split) {
+         result = radv_bo_create(device, NULL, pdev->info.tess_factor_ring_size, 256, RADEON_DOMAIN_VRAM,
+                                 ring_bo_flags_tmz |
+                                    RING_UC(RADV_XCLIPSE_RING_UC_TESS | RADV_XCLIPSE_RING_UC_TESS_FACTOR),
+                                 RADV_BO_PRIORITY_SCRATCH, 0, true, &tess_factor_bo);
+         if (result != VK_SUCCESS)
+            goto fail;
+         radv_rmv_log_command_buffer_bo_create(device, tess_factor_bo, 0, 0, pdev->info.tess_factor_ring_size);
+      }
    }
 
    if (!queue->ring_info.task_rings && needs->task_rings) {
@@ -1098,7 +1123,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
       result = radv_bo_create(device, NULL, pdev->info.total_attribute_pos_prim_ring_size, 2 * 1024 * 1024 /* 2MiB */,
                               /* Not cs_domain(): has_dedicated_vram is forced true here. */
                               pdev->info.vram_size_kb ? RADEON_DOMAIN_VRAM : RADEON_DOMAIN_GTT,
-                              RADEON_FLAG_32BIT | RADEON_FLAG_DISCARDABLE | ring_bo_flags_tmz | RING_UC(2),
+                              RADEON_FLAG_32BIT | RADEON_FLAG_DISCARDABLE | ring_bo_flags_tmz | RING_UC(RADV_XCLIPSE_RING_UC_GE),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &ge_rings_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1149,7 +1174,8 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
     */
    if ((queue->qf == RADV_QUEUE_COMPUTE && !descriptor_bo && task_rings_bo) || scratch_bo != queue->scratch_bo ||
        esgs_ring_bo != queue->esgs_ring_bo || gsvs_ring_bo != queue->gsvs_ring_bo ||
-       tess_rings_bo != queue->tess_rings_bo || task_rings_bo != queue->task_rings_bo ||
+       tess_rings_bo != queue->tess_rings_bo || tess_factor_bo != queue->tess_factor_bo ||
+       task_rings_bo != queue->task_rings_bo ||
        mesh_scratch_ring_bo != queue->mesh_scratch_ring_bo || ge_rings_bo != queue->ge_rings_bo ||
        add_sample_positions) {
       const uint32_t size = 304;
@@ -1169,7 +1195,8 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
       }
 
       radv_fill_shader_rings(device, map, scratch_bo, needs->esgs_ring_size, esgs_ring_bo, needs->gsvs_ring_size,
-                             gsvs_ring_bo, tess_rings_bo, task_rings_bo, mesh_scratch_ring_bo, ge_rings_bo);
+                             gsvs_ring_bo, tess_rings_bo, tess_factor_bo, task_rings_bo, mesh_scratch_ring_bo,
+                             ge_rings_bo);
 
       ws->buffer_unmap(ws, descriptor_bo, false);
    }
@@ -1208,7 +1235,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
             radv_cs_add_buffer(device->ws, cs->b, mesh_scratch_ring_bo);
 
          radv_emit_gs_ring_sizes(device, cs, esgs_ring_bo, needs->esgs_ring_size, gsvs_ring_bo, needs->gsvs_ring_size);
-         radv_emit_tess_factor_ring(device, cs, tess_rings_bo);
+         radv_emit_tess_factor_ring(device, cs, tess_rings_bo, tess_factor_bo);
          radv_emit_task_rings(device, cs, task_rings_bo, false);
          radv_emit_ge_rings(device, cs, ge_rings_bo);
          radv_emit_graphics_shader_pointers(device, cs, descriptor_bo);
@@ -1308,6 +1335,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    queue->tess_rings_bo = tess_rings_bo;
+   queue->tess_factor_bo = tess_factor_bo;
    queue->task_rings_bo = task_rings_bo;
    queue->mesh_scratch_ring_bo = mesh_scratch_ring_bo;
    queue->ge_rings_bo = ge_rings_bo;
@@ -1331,6 +1359,8 @@ fail:
       radv_bo_destroy(device, NULL, gsvs_ring_bo);
    if (tess_rings_bo && tess_rings_bo != queue->tess_rings_bo)
       radv_bo_destroy(device, NULL, tess_rings_bo);
+   if (tess_factor_bo && tess_factor_bo != queue->tess_factor_bo)
+      radv_bo_destroy(device, NULL, tess_factor_bo);
    if (task_rings_bo && task_rings_bo != queue->task_rings_bo)
       radv_bo_destroy(device, NULL, task_rings_bo);
    if (ge_rings_bo && ge_rings_bo != queue->ge_rings_bo)
@@ -2208,6 +2238,10 @@ radv_queue_state_finish(struct radv_queue_state *queue, struct radv_device *devi
    if (queue->tess_rings_bo) {
       radv_rmv_log_command_buffer_bo_destroy(device, queue->tess_rings_bo);
       radv_bo_destroy(device, NULL, queue->tess_rings_bo);
+   }
+   if (queue->tess_factor_bo) {
+      radv_rmv_log_command_buffer_bo_destroy(device, queue->tess_factor_bo);
+      radv_bo_destroy(device, NULL, queue->tess_factor_bo);
    }
    if (queue->task_rings_bo) {
       radv_rmv_log_command_buffer_bo_destroy(device, queue->task_rings_bo);
