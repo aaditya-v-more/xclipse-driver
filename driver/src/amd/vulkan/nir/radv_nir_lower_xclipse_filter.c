@@ -145,7 +145,9 @@ bilinear(nir_builder *b, nir_tex_instr *orig, nir_def *coord, nir_def *level, ni
 static void
 lower_tex(nir_builder *b, nir_tex_instr *tex)
 {
-   b->cursor = nir_before_instr(&tex->instr);
+   /* The hardware sample stays where it is, unconditional, so ACO can still overlap it with the
+    * shader's other fetches; only the rare emulated path branches. */
+   b->cursor = nir_after_instr(&tex->instr);
 
    nir_def *coord = nir_get_tex_src(tex, nir_tex_src_coord);
    nir_def *src_lod = nir_get_tex_src(tex, nir_tex_src_lod);
@@ -160,9 +162,15 @@ lower_tex(nir_builder *b, nir_tex_instr *tex)
    /* FORMAT is image word1 bits 20-27 in the GFX11 layout; XY_MAG/MIN_FILTER are sampler word2
     * bits 20-21 and 22-23, where bit 0 of each means bilinear (also for anisotropic). */
    nir_def *format = nir_ubitfield_extract_imm(b, nir_channel(b, image, 1), 20, 8);
-   nir_def *affected = nir_imm_false(b);
+   uint32_t masks[3] = {0};
    for (unsigned i = 0; i < ARRAY_SIZE(unfilterable_formats); i++)
-      affected = nir_ior(b, affected, nir_ieq_imm(b, format, unfilterable_formats[i]));
+      masks[unfilterable_formats[i] / 32] |= BITFIELD_BIT(unfilterable_formats[i] % 32);
+   nir_def *word = nir_ushr_imm(b, format, 5);
+   nir_def *mask = nir_bcsel(b, nir_ieq_imm(b, word, 0), nir_imm_int(b, masks[0]),
+                             nir_bcsel(b, nir_ieq_imm(b, word, 1), nir_imm_int(b, masks[1]),
+                                       nir_bcsel(b, nir_ieq_imm(b, word, 2), nir_imm_int(b, masks[2]),
+                                                 nir_imm_int(b, 0))));
+   nir_def *affected = nir_ine_imm(b, nir_iand_imm(b, nir_ushr(b, mask, format), 1), 0);
    nir_def *word2 = nir_channel(b, sampler, 2);
    nir_def *linear = nir_ine_imm(b, nir_iand_imm(b, word2, BITFIELD_BIT(20) | BITFIELD_BIT(22)), 0);
 
@@ -219,11 +227,9 @@ lower_tex(nir_builder *b, nir_tex_instr *tex)
       emulated = nir_if_phi(b, blended, r0);
       emulated = nir_trim_vector(b, emulated, tex->def.num_components);
    }
-   nir_push_else(b, nif);
-   nir_instr_move(b->cursor, &tex->instr);
    nir_pop_if(b, nif);
 
-   /* The sample now sits in the else block, so rewrite every use but the phi's. */
+   /* The phi is in another block, so rewrite every use but its own by hand. */
    nir_def *result = nir_if_phi(b, emulated, &tex->def);
    nir_foreach_use_including_if_safe (src, &tex->def) {
       if (nir_src_is_if(src) || nir_src_use_instr(src) != nir_def_instr(result))
