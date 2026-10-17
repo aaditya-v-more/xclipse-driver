@@ -17,8 +17,14 @@
 /* BC_OUT_EACBUF: the BC5 -> EAC_R11G11 transcode reading the blocks straight from the copy's source
  * buffer (pc.src_va) instead of plane 0, so an upload is one pass. Used when the EAC plane shares
  * plane 0's memory (radv_image.xclipse_bc_alias). */
+/* BC_OUT_BC3BUF: the same for BC7 -> BC3 (decode and re-encode), when the BC3 plane shares
+ * plane 0's memory. */
+#if defined(BC_OUT_EACBUF) || defined(BC_OUT_BC3BUF)
 #if defined(BC_OUT_EACBUF)
 #define BC_OUT_EAC
+#else
+#define BC_OUT_BC3
+#endif
 #define BC_SRC_BUFFER
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference_uvec2 : require

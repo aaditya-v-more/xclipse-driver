@@ -228,6 +228,9 @@ static const uint32_t bc_decoder_bc3_spv[] = {
 static const uint32_t bc_decoder_eacbuf_spv[] = {
 #include "bc_decoder_eacbuf_spv.h"
 };
+static const uint32_t bc_decoder_bc3buf_spv[] = {
+#include "bc_decoder_bc3buf_spv.h"
+};
 
 /* Keep in sync with bc_decoder.glsl. */
 enum bc_shader_format {
@@ -252,6 +255,8 @@ enum bc_variant {
    BC_VARIANT_BC3 = 5,
    /* BC_VARIANT_EAC reading the copy's source buffer instead of plane 0 (aliased BC5, one pass). */
    BC_VARIANT_EAC_BUF = 6,
+   /* BC_VARIANT_BC3 reading the copy's source buffer (aliased BC7). */
+   BC_VARIANT_BC3_BUF = 7,
    BC_VARIANT_COUNT,
 };
 
@@ -426,6 +431,10 @@ get_pipeline(struct radv_device *device, enum bc_variant variant, VkPipeline *pi
       spv = bc_decoder_eacbuf_spv;
       spv_size = sizeof(bc_decoder_eacbuf_spv);
       break;
+   case BC_VARIANT_BC3_BUF:
+      spv = bc_decoder_bc3buf_spv;
+      spv_size = sizeof(bc_decoder_bc3buf_spv);
+      break;
    default:
       spv = bc_decoder_unorm8_spv;
       spv_size = sizeof(bc_decoder_unorm8_spv);
@@ -467,7 +476,7 @@ get_pipeline(struct radv_device *device, enum bc_variant variant, VkPipeline *pi
    /* Log compile time per variant (each compiles at most once per process). */
    {
       static const char *const vname[BC_VARIANT_COUNT] = {
-         "unorm8", "snorm8", "f16", "u32x4", "eac", "bc3", "eacbuf"};
+         "unorm8", "snorm8", "f16", "u32x4", "eac", "bc3", "eacbuf", "bc3buf"};
       AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_KILL", "[BCCOMPILE] variant=%s %.0f ms",
                           (variant >= 0 && variant < BC_VARIANT_COUNT) ? vname[variant] : "?",
                           (double)_cc_ns / 1e6);
@@ -591,7 +600,7 @@ bc_content_slot(struct radv_device *device, uint32_t w, uint32_t h)
 #endif
 
 /* src_va != 0: read the blocks from that address (the copy's source buffer, pitches in blocks)
- * instead of plane 0. BC5 into an aliased image only. */
+ * instead of plane 0. BC5 or BC7 into an aliased image only. */
 static void
 bc_decode(struct radv_cmd_buffer *cmd_buffer, struct radv_image *image, VkImageLayout layout,
           const VkImageSubresourceLayers *subresource, VkOffset3D offset, VkExtent3D extent, uint64_t src_va,
@@ -605,7 +614,11 @@ bc_decode(struct radv_cmd_buffer *cmd_buffer, struct radv_image *image, VkImageL
 
    const uint64_t _pipe_t0 = radv_cpushare_now();
    const VkResult _pipe_r =
-      get_pipeline(device, src_va ? BC_VARIANT_EAC_BUF : bc_variant(format), &pipeline, &p_layout);
+      get_pipeline(device,
+                   !src_va                               ? bc_variant(format)
+                   : bc_variant(format) == BC_VARIANT_BC3 ? BC_VARIANT_BC3_BUF
+                                                          : BC_VARIANT_EAC_BUF,
+                   &pipeline, &p_layout);
    radv_cpushare_add(RADV_CPU_PIPELINE, radv_cpushare_now() - _pipe_t0);
    if (_pipe_r != VK_SUCCESS) {
       vk_command_buffer_set_error(&cmd_buffer->vk, VK_ERROR_OUT_OF_HOST_MEMORY);

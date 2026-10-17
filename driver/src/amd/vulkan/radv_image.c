@@ -1257,8 +1257,8 @@ radv_image_init_first_mip_pipe_misaligned(const struct radv_device *device, stru
    }
 }
 
-/* Xclipse (on by default): BC5_UNORM's EAC_R11G11 plane can share plane 0's memory. Both are 16-byte 4x4
- * blocks, and every write into the image then transcodes either straight from the copy's source
+/* Xclipse (on by default): BC5_UNORM's EAC_R11G11 plane and BC7's BC3 plane can share plane 0's memory.
+ * All are 16-byte 4x4 blocks, and every write into the image then transcodes either straight from the copy's source
  * buffer (radv_CmdCopyBufferToImage2) or in place (a copy into plane 0, then radv_meta_decode_bc
  * reading and writing each block where it is). Only when the two surfaces are laid out
  * identically. */
@@ -1266,7 +1266,9 @@ static bool
 radv_xclipse_bc_can_alias(const struct radv_physical_device *pdev, const struct radv_image *image,
                           const struct radv_image_create_info *create_info)
 {
-   if (!pdev->xclipse_bc5_alias || image->vk.format != VK_FORMAT_BC5_UNORM_BLOCK ||
+   const bool aliasable = image->vk.format == VK_FORMAT_BC5_UNORM_BLOCK ||
+                          image->vk.format == VK_FORMAT_BC7_UNORM_BLOCK || image->vk.format == VK_FORMAT_BC7_SRGB_BLOCK;
+   if (!pdev->xclipse_bc5_alias || !aliasable ||
        !radv_is_format_emulated(pdev, image->vk.format) || image->disjoint || create_info->bo_metadata ||
        (image->vk.create_flags & VK_IMAGE_CREATE_2_SPARSE_BINDING_BIT_KHR))
       return false;
