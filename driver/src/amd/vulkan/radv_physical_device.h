@@ -193,7 +193,7 @@ struct radv_physical_device {
     * streaks). */
    bool xclipse_gfx11_cache_scope;
    /* Linear filtering of 32-bit float and 16-bit UNORM/SNORM formats in the shader. */
-   bool xclipse_filter_emu;
+   uint8_t xclipse_filter_emu; /* 0 off, 1 bilinear and trilinear, 2 bilinear only */
 
    /* Whether to emulate ASTC image support on HW without support. */
    bool emulate_astc;

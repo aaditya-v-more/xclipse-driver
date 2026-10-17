@@ -39,6 +39,7 @@ flags() {
     uc1|uc2|uc4|uc8) echo --prop debug.radv_xclipse_ucmask=${1#uc} ;;  # UC for one BO class
     gl1scope0) echo --prop debug.radv_xclipse_gl1scope=0 ;;  # GFX11 cache bits (GLC only) for device-scope loads
     filteremu0) echo --prop debug.radv_xclipse_filteremu=0 ;;  # hardware point-sampling for unfilterable formats
+    filteremu2) echo --prop debug.radv_xclipse_filteremu=2 ;;  # emulate bilinear only, no second mip level
     *) echo "unknown label $1" >&2; exit 2 ;;
   esac
 }

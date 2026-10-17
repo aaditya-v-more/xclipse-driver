@@ -143,7 +143,7 @@ bilinear(nir_builder *b, nir_tex_instr *orig, nir_def *coord, nir_def *level, ni
 }
 
 static void
-lower_tex(nir_builder *b, nir_tex_instr *tex)
+lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
 {
    /* The hardware sample stays where it is, unconditional, so ACO can still overlap it with the
     * shader's other fetches; only the rare emulated path branches. */
@@ -219,12 +219,15 @@ lower_tex(nir_builder *b, nir_tex_instr *tex)
       nir_def *frac = nir_bcsel(b, mip_linear, nir_fsub(b, lod, base), nir_imm_float(b, 0.0f));
       nir_def *level0 = nir_f2i32(b, base);
 
-      nir_def *r0 = bilinear(b, tex, coord, level0, read);
-      nir_if *nif1 = nir_push_if(b, nir_fgt_imm(b, frac, 0.0f));
-      nir_def *r1 = bilinear(b, tex, coord, nir_imin(b, nir_iadd_imm(b, level0, 1), last), read);
-      nir_def *blended = lerp(b, r0, r1, frac);
-      nir_pop_if(b, nif1);
-      emulated = nir_if_phi(b, blended, r0);
+      emulated = bilinear(b, tex, coord, level0, read);
+      if (trilinear) {
+         nir_def *r0 = emulated;
+         nir_if *nif1 = nir_push_if(b, nir_fgt_imm(b, frac, 0.0f));
+         nir_def *r1 = bilinear(b, tex, coord, nir_imin(b, nir_iadd_imm(b, level0, 1), last), read);
+         nir_def *blended = lerp(b, r0, r1, frac);
+         nir_pop_if(b, nif1);
+         emulated = nir_if_phi(b, blended, r0);
+      }
       emulated = nir_trim_vector(b, emulated, tex->def.num_components);
    }
    nir_pop_if(b, nif);
@@ -270,7 +273,7 @@ can_lower(const nir_tex_instr *tex)
 }
 
 bool
-radv_nir_lower_xclipse_filter(nir_shader *shader)
+radv_nir_lower_xclipse_filter(nir_shader *shader, bool trilinear)
 {
    bool progress = false;
 
@@ -287,7 +290,7 @@ radv_nir_lower_xclipse_filter(nir_shader *shader)
 
       nir_builder b = nir_builder_create(impl);
       util_dynarray_foreach (&texs, nir_tex_instr *, tex)
-         lower_tex(&b, *tex);
+         lower_tex(&b, *tex, trilinear);
 
       if (util_dynarray_num_elements(&texs, nir_tex_instr *)) {
          progress = true;

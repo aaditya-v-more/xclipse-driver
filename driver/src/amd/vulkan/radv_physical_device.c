@@ -3141,13 +3141,24 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
 
    pdev->xclipse_buffer_l2 = radv_xclipse_flag("RADV_XCLIPSE_BUFL2", "radv_xclipse_bufl2");
    pdev->xclipse_gfx11_cache_scope = radv_xclipse_flag_off("RADV_XCLIPSE_GL1SCOPE", "radv_xclipse_gl1scope");
-   pdev->xclipse_filter_emu = pdev->info.xclipse_model == AC_XCLIPSE_940 &&
-                              !radv_xclipse_flag_off("RADV_XCLIPSE_FILTEREMU", "radv_xclipse_filteremu");
+   pdev->xclipse_filter_emu = 0;
+   if (pdev->info.xclipse_model == AC_XCLIPSE_940) {
+      /* "0" turns the filter emulation off; "2" skips the second level of a linear mip filter. */
+      const char *e = getenv("RADV_XCLIPSE_FILTEREMU");
+      char val[PROP_VALUE_MAX] = {0};
+      (void)val;
+#if DETECT_OS_ANDROID
+      if (!(e && e[0]) && __system_property_get("debug.radv_xclipse_filteremu", val) > 0 && val[0])
+         e = val;
+#endif
+      pdev->xclipse_filter_emu = !(e && e[0]) ? 1 : e[0] == '0' ? 0 : e[0] == '2' ? 2 : 1;
+   }
    {
       const char *e = getenv("RADV_XCLIPSE_RINGUC");
       int v = e ? atoi(e) : 0;
 #if DETECT_OS_ANDROID
       char val[PROP_VALUE_MAX] = {0};
+      (void)val;
       if (!e && __system_property_get("debug.radv_xclipse_ringuc", val) > 0 && val[0])
          v = atoi(val);
 #endif

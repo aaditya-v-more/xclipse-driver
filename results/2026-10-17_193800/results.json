@@ -1,0 +1,504 @@
+{
+  "meta": {
+    "started": "2026-10-17T19:38:00",
+    "driver": {
+      "commit": "1d040a2+changes",
+      "so_sha256": "91d890fba163f91899abb95a1129e5e2d2b87bcb35a5f3fcd4ea507e7b4403aa"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "36.0",
+      "gpu_clock_khz": "252000",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 348"
+    },
+    "tests": [
+      "textures",
+      "mips"
+    ],
+    "drivers": [
+      "radv"
+    ],
+    "env": [
+      "RADV_XCLIPSE_FILTEREMU=2"
+    ],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "37.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 348"
+    }
+  },
+  "results": [
+    {
+      "test": "textures",
+      "driver": "radv",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 12.131,
+      "ms_instance": 2.148,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 2.157,
+      "has_bc": true,
+      "formats": [
+        {
+          "format": "RGBA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BGRA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "features": "0x1dd81",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGB10A2",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R32F",
+          "features": "0x1dd87",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "D16",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D24S8",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "D32F",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D32FS8",
+          "features": "0x1d601",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "BC1",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC2",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC3",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC4",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC5",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC7",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] sampling BC2",
+        "[xdtest] sampling BC3",
+        "[xdtest] sampling BC4",
+        "[xdtest] sampling BC5",
+        "[xdtest] sampling BC7",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "mips",
+      "driver": "radv",
+      "gpu_temp_c_before": "37.0",
+      "ms_load": 15.815,
+      "ms_instance": 3.199,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.684,
+      "texture_compression_bc": true,
+      "cases": [
+        {
+          "case": "RGBA8 64x64",
+          "supported": true,
+          "levels": 7,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 2048x2048",
+          "supported": true,
+          "levels": 12,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 640x360",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 cube 128",
+          "supported": true,
+          "levels": 8,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC3 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC4 512x512",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC5 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC7 512x512",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 cube 256",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "R32F 256x256 trilinear",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 1364,
+          "wrong_levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "first_wrong": "cube layer 0 level 0 (8,8): got (0.235341, 0, 0, 1), want (0.235341, 0, 0, 1)"
+        },
+        {
+          "case": "R16 640x360 trilinear",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 1516,
+          "wrong_levels": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "first_wrong": "cube layer 0 level 0 (20,11): got (0.193332, 0, 0, 1), want (0.193332, 0, 0, 1)"
+        }
+      ],
+      "status": "fail",
+      "error": "wrong texels (fetch/sample/grad/cube or half-level): R32F 256x256 trilinear 0/0/0/1364, R16 640x360 trilinear 0/0/0/1516",
+      "progress": [
+        "[xdtest] BC5 1024x1024",
+        "[xdtest] BC7 512x512",
+        "[xdtest] BC1 cube 256",
+        "[xdtest] R32F 256x256 trilinear",
+        "[xdtest] R16 640x360 trilinear",
+        "[xdtest] fail: wrong texels (fetch/sample/grad/cube or half-level): R32F 256x256 trilinear 0/0/0/1364, R16 640x360 trilinear 0/0/0/1516"
+      ],
+      "driver_log": [
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.tex.non.uniform\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.wait.for.vm.map.updates\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.no.implicit.varying.subgroup.size\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.rt.wave64\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.hide.rebar.on.dgpu\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.app.layer\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.override.uniform.offset.alignment\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.force.64.byte.sampled.image\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.force.nan.preserve.min.max\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.force.vk.devicename\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.lower.terminate.to.discard\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.zero.vram\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.wsi.force.bgra8.unorm.first\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.wsi.force.swapchain.to.current.extent\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.wsi.disable.unordered.submits\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.x11.ignore.suboptimal\"",
+        "10-17 19:38:03.256 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.disable.ngg.gs\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.enable.unified.heap.on.apu\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.report.llvm9.version.string\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.prefer.2d.swizzle.for.3d.storage\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.gfx12.hiz.wa\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.adaptive.sync\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.x11.override.min.image.count\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.x11.strict.image.count\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.x11.ensure.min.image.count\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.google.display.timing\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.device.coherent.memory\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.cooperative.matrix2.nv\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.emulate.rt\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.enable.float16.gfx8\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.require.etc2\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.require.astc\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.clear.lds\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.override.vram.size\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.override.graphics.shader.version\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.override.compute.shader.version\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.override.ray.tracing.shader.version\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.driconf.executable.override\"",
+        "10-17 19:38:03.257 W/libc    (14047): Access denied finding property \"vendor.mesa.process.name\"",
+        "10-17 19:38:03.261 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.force.family\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.userq\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.image.opcodes\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.cu.mask\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.parse.ib\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:38:03.262 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:38:03.280 W/libc    (14047): Access denied finding property \"vendor.mesa.disk.cache.single.file\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.disk.cache.database\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.disk.cache.multi.file\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.shader.cache.max.size\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.glsl.cache.max.size\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.wsi.debug\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.wsi.present.mode\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.wsi.headless.swapchain\"",
+        "10-17 19:38:03.281 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.enable.submit.thread\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.bvh.stats.file\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.enable.pipeline.cache\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.force.vrs.config.file\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.force.vrs\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.tex.aniso\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.tex.aniso\"",
+        "10-17 19:38:03.282 W/libc    (14047): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.trap.handler\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.bvh.stats.file\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.radv.printf.buffer.size\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.enable.pipeline.cache\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.aco.debug\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.debug\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.dump.path\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.read.path\"",
+        "10-17 19:38:03.283 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.force.unstructured\"",
+        "10-17 19:38:03.293 W/libc    (14047): Access denied finding property \"vendor.mesa.vk.max.timeout\"",
+        "10-17 19:38:03.319 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.dump.path\"",
+        "10-17 19:38:03.319 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.read.path\"",
+        "10-17 19:38:03.327 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.dump.path\"",
+        "10-17 19:38:03.327 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.read.path\"",
+        "10-17 19:38:03.344 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.dump.path\"",
+        "10-17 19:38:03.344 W/libc    (14047): Access denied finding property \"vendor.mesa.spirv.read.path\""
+      ]
+    }
+  ]
+}
