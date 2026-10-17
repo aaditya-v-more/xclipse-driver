@@ -199,10 +199,10 @@ class FailureDetectionTests(unittest.TestCase):
                 self.assertNotIn("message_box", result)
 
     def test_repeated_failures_skip_only_affected_container_and_checkpoint(self):
-        args = argparse.Namespace(runs=3, max_failures=2, shots="", seconds=90)
+        args = argparse.Namespace(runs=3, max_failures=2, shots="", rendered_shots="", seconds=90)
         calls, checkpoints = [], []
 
-        def run(bench, driver, *_):
+        def run(bench, driver, *_, **__):
             calls.append(driver)
             return {"bench": bench, "driver": driver,
                     "status": "error-box" if driver == "stock" else "ran",

@@ -775,6 +775,9 @@ def main() -> None:
                     help="record an experiment setting or validation note in both reports; repeatable")
     ap.add_argument("--shots", default="",
                     help="seconds after launch to save screenshots at, comma-separated")
+    ap.add_argument("--rendered-shots", default="",
+                    help=f"seconds after the game starts rendering for good (over {MIN_STEADY_S}) "
+                         "to save screenshots at, comma-separated; these match scenes across runs")
     ap.add_argument("--seconds", type=int, help="end each run this many seconds after launch")
     ap.add_argument("--prop", action="append", default=[], metavar="NAME=VALUE",
                     help="Android property to set for the session and clear afterwards")
@@ -880,7 +883,8 @@ def run_all(args, benches: list[str], drivers: list[str], run_dir: Path, user: s
                         continue
                     print(f"run {n} {bench:<12} {driver:<5}", end=" ", flush=True)
                     r = run_once(bench, driver, run_dir, f"run{n}", user,
-                                 [int(t) for t in args.shots.split(",") if t], args.seconds)
+                                 [int(t) for t in args.shots.split(",") if t], args.seconds,
+                                 rendered_shots=[int(t) for t in args.rendered_shots.split(",") if t])
                     r["run"] = n
                     s = r["surfaceflinger"]
                     print(f"{r['status']} {s.get('fps_avg', 0):.1f} fps over "
