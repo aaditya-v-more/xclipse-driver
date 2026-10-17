@@ -320,7 +320,7 @@ radv_postprocess_nir(const struct radv_compiler_info *compiler_info, const struc
 
    /* Before non-uniform lowering, which wraps the samples this adds, and resinfo lowering. */
    if (compiler_info->hw.xclipse_filter_emu)
-      NIR_PASS(_, stage->nir, radv_nir_lower_xclipse_filter, compiler_info->hw.xclipse_filter_emu == 1);
+      NIR_PASS(_, stage->nir, radv_nir_lower_xclipse_filter, compiler_info->hw.xclipse_filter_emu);
 
    enum nir_lower_non_uniform_access_type lower_non_uniform_access_types =
       nir_lower_non_uniform_ubo_access | nir_lower_non_uniform_ssbo_access | nir_lower_non_uniform_texture_access |

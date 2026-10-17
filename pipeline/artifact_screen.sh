@@ -40,6 +40,7 @@ flags() {
     gl1scope0) echo --prop debug.radv_xclipse_gl1scope=0 ;;  # GFX11 cache bits (GLC only) for device-scope loads
     filteremu0) echo --prop debug.radv_xclipse_filteremu=0 ;;  # hardware point-sampling for unfilterable formats
     filteremu2) echo --prop debug.radv_xclipse_filteremu=2 ;;  # emulate bilinear only, no second mip level
+    filteremu3) echo --prop debug.radv_xclipse_filteremu=3 ;;  # diagnostic: check and branch, zero result
     *) echo "unknown label $1" >&2; exit 2 ;;
   esac
 }

@@ -3143,7 +3143,8 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
    pdev->xclipse_gfx11_cache_scope = radv_xclipse_flag_off("RADV_XCLIPSE_GL1SCOPE", "radv_xclipse_gl1scope");
    pdev->xclipse_filter_emu = 0;
    if (pdev->info.xclipse_model == AC_XCLIPSE_940) {
-      /* "0" turns the filter emulation off; "2" skips the second level of a linear mip filter. */
+      /* "0" turns the filter emulation off; "2" skips the second level of a linear mip filter; "3"
+       * (diagnostic) keeps the check and branch but returns zero. */
       const char *e = getenv("RADV_XCLIPSE_FILTEREMU");
       char val[PROP_VALUE_MAX] = {0};
       (void)val;
@@ -3151,7 +3152,7 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
       if (!(e && e[0]) && __system_property_get("debug.radv_xclipse_filteremu", val) > 0 && val[0])
          e = val;
 #endif
-      pdev->xclipse_filter_emu = !(e && e[0]) ? 1 : e[0] == '0' ? 0 : e[0] == '2' ? 2 : 1;
+      pdev->xclipse_filter_emu = !(e && e[0]) ? 1 : e[0] == '0' ? 0 : e[0] == '2' ? 2 : e[0] == '3' ? 3 : 1;
    }
    {
       const char *e = getenv("RADV_XCLIPSE_RINGUC");

@@ -159,11 +159,17 @@ emulation_point(nir_tex_instr *tex)
 }
 
 static void
-lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
+lower_tex(nir_builder *b, nir_tex_instr *tex, unsigned mode)
 {
    /* The hardware sample stays where it is, unconditional, so ACO can still overlap it with the
     * shader's other fetches; only the rare emulated path branches. */
    b->cursor = emulation_point(tex);
+
+   /* Only the uses that exist now move to the result; the emulation adds its own. */
+   struct util_dynarray uses;
+   util_dynarray_init(&uses, NULL);
+   nir_foreach_use_including_if (src, &tex->def)
+      util_dynarray_append(&uses, src);
 
    nir_def *coord = nir_get_tex_src(tex, nir_tex_src_coord);
    nir_def *src_lod = nir_get_tex_src(tex, nir_tex_src_lod);
@@ -189,14 +195,15 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
    nir_def *affected = nir_ine_imm(b, nir_iand_imm(b, nir_ushr(b, mask, format), 1), 0);
    nir_def *word2 = nir_channel(b, sampler, 2);
    nir_def *linear = nir_ine_imm(b, nir_iand_imm(b, word2, BITFIELD_BIT(20) | BITFIELD_BIT(22)), 0);
+   /* FORCE_UNNORMALIZED is sampler word0 bit 15; the emulation assumes normalized coordinates. */
+   nir_def *normalized = nir_ieq_imm(b, nir_iand_imm(b, nir_channel(b, sampler, 0), BITFIELD_BIT(15)), 0);
 
-   nir_if *nif = nir_push_if(b, nir_iand(b, affected, linear));
+   nir_if *nif = nir_push_if(b, nir_iand(b, nir_iand(b, affected, linear), normalized));
    nir_def *emulated;
    {
       nir_def *levels = &build_tex(b, tex, nir_texop_query_levels, NULL, NULL, nir_type_int32, 0, false)->def;
       nir_def *word1 = nir_channel(b, sampler, 1);
       nir_def *lod;
-      bool clamped = false;
 
       if (src_lod) {
          lod = src_lod;
@@ -208,15 +215,15 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
          nir_def *rho2 = nir_fmax(b, length2(b, dx), length2(b, dy));
          lod = nir_fmul_imm(b, nir_flog2(b, rho2), 0.5);
       } else if (b->shader->info.stage == MESA_SHADER_FRAGMENT) {
-         /* The hardware query includes the sampler's bias and LOD clamp. */
-         lod = nir_channel(b, &build_tex(b, tex, nir_texop_lod, coord, NULL, nir_type_float32, 0, false)->def, 0);
-         clamped = true;
+         /* The query's y is the raw LOD from the derivatives; x is already clamped, so a shader
+          * bias couldn't be added to it. */
+         lod = nir_channel(b, &build_tex(b, tex, nir_texop_lod, coord, NULL, nir_type_float32, 0, false)->def, 1);
       } else {
          lod = nir_imm_float(b, 0.0f);
       }
       if (bias)
          lod = nir_fadd(b, lod, bias);
-      if (!clamped) {
+      {
          /* LOD_BIAS is word2 bits 0-13 (signed, 8 fraction bits); MIN_LOD and MAX_LOD are word1 bits
           * 0-11 and 12-23 (unsigned, 8 fraction bits). */
          lod = nir_fadd(b, lod, nir_fmul_imm(b, nir_i2f32(b, nir_ibitfield_extract_imm(b, word2, 0, 14)), 1.0 / 256));
@@ -224,6 +231,10 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
          nir_def *max_lod = nir_fmul_imm(b, nir_u2f32(b, nir_ubitfield_extract_imm(b, word1, 12, 12)), 1.0 / 256);
          lod = nir_fmin(b, nir_fmax(b, lod, min_lod), max_lod);
       }
+      /* The magnification filter applies at LOD <= 0, the minification filter above it. */
+      nir_def *xy_linear = nir_ine_imm(b, nir_iand(b, word2, nir_bcsel(b, nir_fle_imm(b, lod, 0.0f),
+                                                                       nir_imm_int(b, BITFIELD_BIT(20)),
+                                                                       nir_imm_int(b, BITFIELD_BIT(22)))), 0);
       nir_def *last = nir_iadd_imm(b, levels, -1);
       lod = nir_fmin(b, nir_fmax(b, lod, nir_imm_float(b, 0.0f)), nir_i2f32(b, last));
 
@@ -236,7 +247,7 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
       nir_def *level0 = nir_f2i32(b, base);
 
       emulated = bilinear(b, tex, coord, level0, read);
-      if (trilinear) {
+      if (mode == 1) {
          nir_def *r0 = emulated;
          nir_if *nif1 = nir_push_if(b, nir_fgt_imm(b, frac, 0.0f));
          nir_def *r1 = bilinear(b, tex, coord, nir_imin(b, nir_iadd_imm(b, level0, 1), last), read);
@@ -244,16 +255,18 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
          nir_pop_if(b, nif1);
          emulated = nir_if_phi(b, blended, r0);
       }
-      emulated = nir_trim_vector(b, emulated, tex->def.num_components);
+      /* A point filter at this LOD keeps the hardware sample, which point-samples correctly. */
+      emulated = nir_bcsel(b, xy_linear, nir_trim_vector(b, emulated, tex->def.num_components), &tex->def);
+      if (mode == 3) /* diagnostic: the check and branch alone */
+         emulated = nir_imm_zero(b, tex->def.num_components, 32);
    }
    nir_pop_if(b, nif);
 
-   /* The phi is in another block, so rewrite every use but its own by hand. */
+   /* The phi is in another block, so nir_def_rewrite_uses_after() doesn't apply. */
    nir_def *result = nir_if_phi(b, emulated, &tex->def);
-   nir_foreach_use_including_if_safe (src, &tex->def) {
-      if (nir_src_is_if(src) || nir_src_use_instr(src) != nir_def_instr(result))
-         nir_src_rewrite(src, result);
-   }
+   util_dynarray_foreach (&uses, nir_src *, src)
+      nir_src_rewrite(*src, result);
+   util_dynarray_fini(&uses);
 }
 
 static bool
@@ -289,7 +302,7 @@ can_lower(const nir_tex_instr *tex)
 }
 
 bool
-radv_nir_lower_xclipse_filter(nir_shader *shader, bool trilinear)
+radv_nir_lower_xclipse_filter(nir_shader *shader, unsigned mode)
 {
    bool progress = false;
 
@@ -306,7 +319,7 @@ radv_nir_lower_xclipse_filter(nir_shader *shader, bool trilinear)
 
       nir_builder b = nir_builder_create(impl);
       util_dynarray_foreach (&texs, nir_tex_instr *, tex)
-         lower_tex(&b, *tex, trilinear);
+         lower_tex(&b, *tex, mode);
 
       if (util_dynarray_num_elements(&texs, nir_tex_instr *)) {
          progress = true;

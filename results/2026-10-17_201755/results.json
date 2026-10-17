@@ -1,0 +1,455 @@
+{
+  "meta": {
+    "started": "2026-10-17T20:17:55",
+    "driver": {
+      "commit": "a28907e+changes",
+      "so_sha256": "aaa31e57663b2f5b0b9e340b16931a67602ba56b0f0c584b82d7421a4b380c35"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "31.0",
+      "gpu_clock_khz": "252000",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 299"
+    },
+    "tests": [
+      "textures",
+      "mips",
+      "depth"
+    ],
+    "drivers": [
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "32.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 299"
+    }
+  },
+  "results": [
+    {
+      "test": "textures",
+      "driver": "radv",
+      "gpu_temp_c_before": "31.0",
+      "ms_load": 34.448,
+      "ms_instance": 2.631,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 2.221,
+      "has_bc": true,
+      "formats": [
+        {
+          "format": "RGBA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BGRA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "features": "0x1dd81",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGB10A2",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R32F",
+          "features": "0x1dd87",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "D16",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D24S8",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "D32F",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D32FS8",
+          "features": "0x1d601",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "BC1",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC2",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC3",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC4",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC5",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC7",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] sampling BC2",
+        "[xdtest] sampling BC3",
+        "[xdtest] sampling BC4",
+        "[xdtest] sampling BC5",
+        "[xdtest] sampling BC7",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "mips",
+      "driver": "radv",
+      "gpu_temp_c_before": "30.0",
+      "ms_load": 9.69,
+      "ms_instance": 1.63,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.445,
+      "texture_compression_bc": true,
+      "cases": [
+        {
+          "case": "RGBA8 64x64",
+          "supported": true,
+          "levels": 7,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 2048x2048",
+          "supported": true,
+          "levels": 12,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 640x360",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 cube 128",
+          "supported": true,
+          "levels": 8,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC3 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC4 512x512",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC5 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC7 512x512",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 cube 256",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "R32F 256x256 trilinear",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "R16 640x360 trilinear",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] BC5 1024x1024",
+        "[xdtest] BC7 512x512",
+        "[xdtest] BC1 cube 256",
+        "[xdtest] R32F 256x256 trilinear",
+        "[xdtest] R16 640x360 trilinear",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "depth",
+      "driver": "radv",
+      "gpu_temp_c_before": "31.0",
+      "ms_load": 10.718,
+      "ms_instance": 2.053,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.499,
+      "formats": [
+        {
+          "format": "D16",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D32F",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D24S8",
+          "supported": false
+        },
+        {
+          "format": "D32FS8",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating pipelines",
+        "[xdtest] dummy image layout",
+        "[xdtest] D16",
+        "[xdtest] D32F",
+        "[xdtest] D32FS8",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}
