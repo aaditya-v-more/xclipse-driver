@@ -2604,7 +2604,7 @@ static const struct texture_format {
    {"BC4", VK_FORMAT_BC4_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.01f, fill_bc4},
    /* RADV on Xclipse re-encodes BC5 as EAC RG11 and BC7 as BC3 for the texture unit
     * (radv_bc_emulation_format), losing a few steps of 255 on BC5 and tens on BC7 by design. */
-   {"BC5", VK_FORMAT_BC5_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.04f, fill_bc5},
+   {"BC5", VK_FORMAT_BC5_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.018f, fill_bc5},
    {"BC7", VK_FORMAT_BC7_UNORM_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.2f, fill_bc7},
    {"BC7_SRGB", VK_FORMAT_BC7_SRGB_BLOCK, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.2f, fill_bc7_srgb},
 };

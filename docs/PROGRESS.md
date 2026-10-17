@@ -1242,3 +1242,19 @@ the phone: `import-content`, `export-config` (they would add files to Download/x
 (bench containers only), an install that imports a new zip. LifeIsStrange3 reads back as it was:
 driver xd-c568733, Max Device Memory 1024 MB, the same Exec Arguments (with its one trailing
 space) and DXVK_CONFIG.
+
+### 2026-10-18: Minimax EAC table halves BC5 error
+
+Fable advised keeping BC4 on the exact BC3 carrier (no switch) and regenerating the BC5 to
+EAC_R11G11 table. The new generator, `driver/src/amd/vulkan/meta/eac_lut_gen.c`, searches every
+multiplier and table per BC4 endpoint pair. It minimises the worst palette entry, then endpoint
+error, then squared error. It runs in about 3 s on the Mac, and its output reproduces byte for byte.
+
+- Model, worst error per 8-value block: 2.49/3.37/6.24/9.34 became 2.45/3.35/5.19/6.89 per 255 by
+  spread band. Mean error is 10-35% lower. A full-range pair (255,0) went from 7.6 to 1.4 with exact
+  endpoints.
+- 6-value blocks that also use 0 and 255 stay at 9-14/255 worst. That's a limit of EAC.
+- Hardware (textures test, BC5): worst 8.16 to 4.33/255, mean 1.24 to 0.59/255
+  (results/2026-10-18_025830 old, _025809 new). The BC5 tolerance is now 0.018 (was 0.04), so a
+  regression fails the test.
+- No change to memory or speed: the table has the same size and lookups.
