@@ -37,6 +37,7 @@ flags() {
     bufl2) echo --prop debug.radv_xclipse_bufl2=1 ;;  # L2 writeback+invalidate in buffer barriers
     ring1|ring2|ring4|ring8|ring16|ring32) echo --prop debug.radv_xclipse_ringuc=${1#ring} ;;  # UC for one ring class
     uc1|uc2|uc4|uc8) echo --prop debug.radv_xclipse_ucmask=${1#uc} ;;  # UC for one BO class
+    gl1scope0) echo --prop debug.radv_xclipse_gl1scope=0 ;;  # GFX11 cache bits (GLC only) for device-scope loads
     *) echo "unknown label $1" >&2; exit 2 ;;
   esac
 }
