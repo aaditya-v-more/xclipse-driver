@@ -813,3 +813,33 @@ Result: +27.7% average FPS and +20.5% 1% low FPS from `nonggc` hold for two clea
 pairs the study needed. The next study needs a clock state that stays fixed. Options: pause until
 the CPU falls back below its throttle point, lower the start limit, or run at normal clocks and
 report the clock distribution.
+
+### Six-pair rerun holding one clock profile (2026-10-17)
+
+The clock drop above followed Samsung's skin throttling, not the GPU sensor. `dumpsys
+thermalservice` reports a SKIN sensor with throttling thresholds of 38, 40, 42 and 45 C. The battery
+rose to 44.5 C over the earlier study while the GPU still met its 50 C start limit. `game_compare`
+now waits for SKIN at or below 36 C before each launch (`--max-start-skin`, up to `--cool-limit`
+1800 s; `98dfa88`). It also records SKIN and thermal status before and during runs, and takes
+screenshots 35 and 75 s after rendering starts. Those shots show the same scene in every run.
+
+`results/2026-10-17_163705-game-compare` (same manifest, fixed mode, 90 s window): every completed
+run held GPU/X4 400/1632 MHz for its whole window. SKIN peaked at 37.8 to 39.2 C, and thermal
+status stayed 0. Pairs 1 to 5 completed. Pair 6's candidate hung at launch: `Heaven.exe` ran but
+never opened a window or loaded Vulkan, with no GPU fault. The study stops on any failed run, so
+it ended there.
+
+| Candidate | Metric | Pairs | Baseline median | Candidate median | Paired gain | Range |
+|---|---|---:|---:|---:|---:|---:|
+| no_culling (`nonggc`) | Average FPS | 5 | 38.98 | 50.16 | +28.29% | +27.54..+33.97% |
+| no_culling (`nonggc`) | 1% low FPS | 5 | 8.75 | 10.64 | +21.62% | +21.57..+31.66% |
+
+The +33.97% outlier is pair 3, whose baseline ran at 37.46 FPS at the same clocks. The other four
+pairs are +27.5 to +28.3%. Visual review covered 24 scene-matched shots (warm-ups included). Both
+variants render the same scene. The blue streaks appear in the airship scene 35 s after rendering
+starts in 7 of 12 shots, in both variants. They don't appear 75 s after rendering starts, in the
+depth-of-field cliff scene. `nonggc` adds no defect and doesn't cause the streaks.
+
+Result: in this measured condition, `nonggc` is a repeatable +28% average FPS and +22% 1%-low
+FPS gain on Heaven with no rendering regression. It is the first package candidate. A normal-clock
+check is still needed.
