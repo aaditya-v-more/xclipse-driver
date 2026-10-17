@@ -281,9 +281,9 @@ def set_envs(game: str, values: dict[str, str]) -> None:
 
 
 def args_field(nodes: list[dict]) -> dict:
-    """The Exec Arguments text field (its label sits just above it)."""
+    """The Exec Arguments text field (its label sits just above it, or inside it while empty)."""
     lab = find(nodes, "Exec Arguments")
-    below = [n for n in nodes if n["cls"] == "EditText" and 0 < n["y"] - lab["y"] < 150]
+    below = [n for n in nodes if n["cls"] == "EditText" and -60 < n["y"] - lab["y"] < 150]
     if not below:
         sys.exit("no Exec Arguments field on screen")
     return min(below, key=lambda n: n["y"])

@@ -1115,3 +1115,18 @@ the hang is about 2 in 45 launches today, with no GPU fault, and it is not tied 
 Both stopped after texture loading finished and before the first pipeline compile.
 `game.py` now records the game's thread states twice, 5 s apart, when a run stalls, and
 `game_compare.py` retries a stalled launch once in the same slot instead of abandoning the study.
+
+### Life is Strange: True Colors starts on RADV (2026-10-17)
+
+The 24 GB game folder was pushed over USB (~39 MB/s) to `/sdcard/GameNative/CustomGames/LifeIsStrange3`.
+GameNative moved it to `/data/user/0/app.gamenative/CustomGames/LifeIsStrange3` on first
+Edit container and downloaded Proton 10.0 ARM64ec on first Play. Container: bionic, Wrapper,
+RADV Xclipse xd-85cd575, DXVK 2.7.1, `DXVK_CONFIG=dxvk.enableDescriptorBuffer=False`, BCn none,
+FEXCore Intermediate, Box64 Compatibility, Executable Path `LifeIsStrange3.exe` (picked from
+the field's list; it starts `Siren/Binaries/Win64/Siren-Win64-Shipping.exe`).
+
+Without arguments it created its Vulkan device and then sat on a black screen with idle threads
+for 3+ minutes. With Exec Arguments `-nostartupmovies -dx11` it reaches the title screen
+("Press any button") within 2 minutes, rendering correctly at about 25 FPS (GameNative overlay,
+GPU 100%, RAM 6.1 GB). Which of the two arguments fixed it was not isolated.
+`gn_driver.py`'s Exec Arguments lookup now also finds an empty field, whose label sits inside it.
