@@ -142,12 +142,28 @@ bilinear(nir_builder *b, nir_tex_instr *orig, nir_def *coord, nir_def *level, ni
    return nir_vec(b, comps, 4);
 }
 
+/* The branch goes right before the sample's first use in its block (or at the block's end), so
+ * samples that follow it stay in the same block and ACO can still clause them together. */
+static nir_cursor
+emulation_point(nir_tex_instr *tex)
+{
+   for (nir_instr *instr = nir_instr_next(&tex->instr); instr; instr = nir_instr_next(instr)) {
+      if (instr->type == nir_instr_type_jump)
+         break;
+      nir_foreach_use (src, &tex->def) {
+         if (nir_src_use_instr(src) == instr)
+            return nir_before_instr(instr);
+      }
+   }
+   return nir_after_block_before_jump(tex->instr.block);
+}
+
 static void
 lower_tex(nir_builder *b, nir_tex_instr *tex, bool trilinear)
 {
    /* The hardware sample stays where it is, unconditional, so ACO can still overlap it with the
     * shader's other fetches; only the rare emulated path branches. */
-   b->cursor = nir_after_instr(&tex->instr);
+   b->cursor = emulation_point(tex);
 
    nir_def *coord = nir_get_tex_src(tex, nir_tex_src_coord);
    nir_def *src_lod = nir_get_tex_src(tex, nir_tex_src_lod);
