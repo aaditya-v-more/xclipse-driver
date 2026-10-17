@@ -906,3 +906,18 @@ missing VGT flush or the reuse cache. syncshaders shows lower FPS alone doesn't 
 every BO costs 35% FPS, so `f15ee9e` adds `debug.radv_xclipse_ucmask` (UC for one BO class:
 1 = host-cached, 2 = host write-combined, 4 = no CPU access, 8 = imported) and screen labels
 uc1/uc2/uc4/uc8 to find the class that needs it.
+
+Per-class UC screen on `xd-f15ee9e` (same fixed-mode setup):
+
+| Flag | Folder | FPS | Blue streaks |
+|---|---|---:|---|
+| uc1 (host-cached BOs) | `results/2026-10-17_181137-game` | 39.4 | yes |
+| uc2 (host write-combined BOs) | `results/2026-10-17_181408-game` | 39.4 | yes |
+| uc4 (no-CPU-access BOs) | `results/2026-10-17_181629-game` | 32.5 | **none** |
+| baseline | `results/2026-10-17_181850-game` | 39.5 | yes |
+
+The stale data lives in GPU-only memory, so CPU/GPU coherence is ruled out: some GPU client
+reads data another GPU client left in, or never wrote through, L2. UC on all no-CPU-access BOs
+costs 18% FPS. `7ca5e18` adds `debug.radv_xclipse_ringuc` (UC for internal rings: 1 = tess,
+2 = GE attribute/pos/prim, 4 = ES-GS/GS-VS, 8 = scratch; ring1..ring8 labels), and `bbd5df5`
+adds `debug.radv_xclipse_bufl2` (L2 writeback+invalidate in every buffer barrier, label bufl2).
