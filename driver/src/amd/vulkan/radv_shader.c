@@ -3219,6 +3219,16 @@ radv_shader_create_uncached(struct radv_device *device, const struct radv_shader
    shader->info = binary->info;
    shader->config = binary->config;
    shader->max_waves = radv_get_max_waves(device, &shader->config, &shader->info);
+#ifdef __ANDROID__
+   /* One line per shader at debug.radv_xclipse_log >= 1, to compare register pressure between
+    * builds and knobs in a game's logcat. */
+   AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV", "[SHADER] stage=%d vgprs=%u sgprs=%u waves=%u code=%u lds=%u scratch=%u",
+                   shader->info.stage, shader->config.num_vgprs, shader->config.num_sgprs, shader->max_waves,
+                   binary->type == RADV_BINARY_TYPE_LEGACY
+                      ? ((const struct radv_shader_binary_legacy *)binary)->exec_size : 0,
+                   shader->config.lds_size,
+                   shader->config.scratch_bytes_per_wave);
+#endif
 
    if (dbg)
       shader->dbg = *dbg;
