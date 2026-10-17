@@ -44,6 +44,67 @@ static void radv_amdgpu_winsys_bo_destroy(struct radeon_winsys *_ws, struct rade
 /* BO churn accounting. No SDMA here, so every kernel TLB flush takes the raw MMIO ENG17 path; each
  * GART bind/unbind is one flush. Reported with debug.radv_xclipse_log 1. */
 
+/* Allocation backpressure. Android's lmkd kills the foreground game when free pages fall to twice
+ * the min watermark, which happens at scene loads: the game's heap is being swapped to zram while
+ * new GPU memory, which is pinned, keeps arriving. With RADV_XCLIPSE_MEMWAIT / debug.radv_xclipse_memwait
+ * set to N (MB), creating a BO of 4 MB or more first waits, in 10 ms steps for up to 300 ms, while
+ * MemFree is below N MB, giving kswapd time to reclaim. 0 or unset turns it off. */
+static unsigned
+radv_xclipse_memwait_mb(void)
+{
+   static int mb = -1;
+   if (mb < 0) {
+      const char *e = getenv("RADV_XCLIPSE_MEMWAIT");
+      if (e && !*e)
+         e = NULL;
+#ifdef __ANDROID__
+      char v[PROP_VALUE_MAX] = {0};
+      mb = e ? atoi(e) : (__system_property_get("debug.radv_xclipse_memwait", v) > 0 ? atoi(v) : 0);
+#else
+      mb = e ? atoi(e) : 0;
+#endif
+      if (mb < 0)
+         mb = 0;
+      AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_ARM", "[ARM] memwait=%d MB (%s)", mb, e ? "env" : "prop/default");
+   }
+   return mb;
+}
+
+/* MemFree in MB from /proc/meminfo (its second line), or UINT64_MAX if it can't be read. */
+static uint64_t
+radv_xclipse_memfree_mb(void)
+{
+   char buf[256];
+   FILE *f = fopen("/proc/meminfo", "r");
+   if (!f)
+      return UINT64_MAX;
+   uint64_t kb = UINT64_MAX;
+   while (fgets(buf, sizeof(buf), f)) {
+      if (sscanf(buf, "MemFree: %" SCNu64, &kb) == 1)
+         break;
+   }
+   fclose(f);
+   return kb == UINT64_MAX ? kb : kb >> 10;
+}
+
+static void
+radv_xclipse_memwait(uint64_t size)
+{
+   unsigned limit = radv_xclipse_memwait_mb();
+   if (!limit || size < (4ull << 20))
+      return;
+   uint64_t free0 = radv_xclipse_memfree_mb(), free = free0;
+   unsigned waited = 0;
+   while (free < limit && waited < 300) {
+      usleep(10 * 1000);
+      waited += 10;
+      free = radv_xclipse_memfree_mb();
+   }
+   if (waited)
+      AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[MEMWAIT] %u ms before +%" PRIu64 " MB: MemFree %" PRIu64 " -> %" PRIu64 " MB",
+                      waited, size >> 20, free0, free);
+}
+
 /* Size histogram of created BOs, powers of 4 from 16KB. */
 static uint32_t radv_xclipse_bo_hist[8];
 static const char *const radv_xclipse_bo_hist_name[8] = {"<16K", "<64K", "<256K", "<1M",
@@ -1093,6 +1154,7 @@ radv_amdgpu_winsys_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned 
       request.flags |= AMDGPU_GEM_CREATE_ENCRYPTED;
    }
 
+   radv_xclipse_memwait(size);
    r = ac_drm_bo_alloc(ws->dev, &request, &buf_handle);
    if (r) {
       fprintf(stderr, "radv/amdgpu: Failed to allocate a buffer:\n");
