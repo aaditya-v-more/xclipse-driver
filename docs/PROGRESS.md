@@ -1130,3 +1130,10 @@ for 3+ minutes. With Exec Arguments `-nostartupmovies -dx11` it reaches the titl
 ("Press any button") within 2 minutes, rendering correctly at about 25 FPS (GameNative overlay,
 GPU 100%, RAM 6.1 GB). Which of the two arguments fixed it was not isolated.
 `gn_driver.py`'s Exec Arguments lookup now also finds an empty field, whose label sits inside it.
+
+The first run past the title screen died while loading the first scene: lmkd killed GameNative
+(`oom_score_adj 0`, "min2x watermark is breached even after kill", swap low), taking the game
+with it. No GPU fault. With Max Device Memory set to `2048 MB` (it was `0 MB`) and `am kill-all`
+before launch, it loaded into the opening scene at about 32 FPS, RAM 5.8 GB per GameNative's overlay,
+swap about 3.5 GB, rendering correctly. One launch so far, so the cap's effect is not separated
+from the cleared background apps.
