@@ -3140,6 +3140,16 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
                            !(instance->debug_flags & RADV_DEBUG_NO_NGGC);
 
    pdev->xclipse_buffer_l2 = radv_xclipse_flag("RADV_XCLIPSE_BUFL2", "radv_xclipse_bufl2");
+   {
+      const char *e = getenv("RADV_XCLIPSE_RINGUC");
+      int v = e ? atoi(e) : 0;
+#if DETECT_OS_ANDROID
+      char val[PROP_VALUE_MAX] = {0};
+      if (!e && __system_property_get("debug.radv_xclipse_ringuc", val) > 0 && val[0])
+         v = atoi(val);
+#endif
+      pdev->xclipse_ring_uc = v & 0xf;
+   }
    if (pdev->info.xclipse_model == AC_XCLIPSE_940 && pdev->use_ngg_culling) {
       pdev->xclipse_cull_min_vertices = radv_xclipse_cull_min_vertices();
       pdev->xclipse_cull_small_no_flush =

@@ -1007,6 +1007,9 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    struct radv_cmd_stream *dest_cs[3] = {0};
    const uint32_t ring_bo_flags = RADEON_FLAG_NO_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING;
    const uint32_t ring_bo_flags_tmz = ring_bo_flags | (secure ? RADEON_FLAG_ENCRYPTED : 0);
+   /* GL2_BYPASS on a no-CPU-access BO maps it MTYPE_UC (winsys). */
+   const uint32_t ring_uc = pdev->xclipse_ring_uc;
+#define RING_UC(bit) ((ring_uc & (bit)) ? RADEON_FLAG_GL2_BYPASS : 0)
    VkResult result = VK_SUCCESS;
 
    const bool add_sample_positions = !queue->ring_info.sample_positions && needs->sample_positions;
@@ -1014,7 +1017,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    const uint32_t queue_scratch_size = queue->ring_info.scratch_size_per_wave * queue->ring_info.scratch_waves;
 
    if (scratch_size > queue_scratch_size) {
-      result = radv_bo_create(device, NULL, scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags,
+      result = radv_bo_create(device, NULL, scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(8),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &scratch_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1025,7 +1028,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    const uint32_t compute_queue_scratch_size =
       queue->ring_info.compute_scratch_size_per_wave * queue->ring_info.compute_scratch_waves;
    if (compute_scratch_size > compute_queue_scratch_size) {
-      result = radv_bo_create(device, NULL, compute_scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz,
+      result = radv_bo_create(device, NULL, compute_scratch_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz | RING_UC(8),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &compute_scratch_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1033,7 +1036,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    if (needs->esgs_ring_size > queue->ring_info.esgs_ring_size) {
-      result = radv_bo_create(device, NULL, needs->esgs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags,
+      result = radv_bo_create(device, NULL, needs->esgs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(4),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &esgs_ring_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1041,7 +1044,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    if (needs->gsvs_ring_size > queue->ring_info.gsvs_ring_size) {
-      result = radv_bo_create(device, NULL, needs->gsvs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags,
+      result = radv_bo_create(device, NULL, needs->gsvs_ring_size, 4096, RADEON_DOMAIN_VRAM, ring_bo_flags | RING_UC(4),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &gsvs_ring_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1049,7 +1052,7 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
    }
 
    if (!queue->ring_info.tess_rings && needs->tess_rings) {
-      result = radv_bo_create(device, NULL, pdev->info.total_tess_ring_size, 256, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz,
+      result = radv_bo_create(device, NULL, pdev->info.total_tess_ring_size, 256, RADEON_DOMAIN_VRAM, ring_bo_flags_tmz | RING_UC(1),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &tess_rings_bo);
       if (result != VK_SUCCESS)
          goto fail;
@@ -1095,12 +1098,13 @@ radv_update_preamble_cs(struct radv_queue_state *queue, struct radv_device *devi
       result = radv_bo_create(device, NULL, pdev->info.total_attribute_pos_prim_ring_size, 2 * 1024 * 1024 /* 2MiB */,
                               /* Not cs_domain(): has_dedicated_vram is forced true here. */
                               pdev->info.vram_size_kb ? RADEON_DOMAIN_VRAM : RADEON_DOMAIN_GTT,
-                              RADEON_FLAG_32BIT | RADEON_FLAG_DISCARDABLE | ring_bo_flags_tmz,
+                              RADEON_FLAG_32BIT | RADEON_FLAG_DISCARDABLE | ring_bo_flags_tmz | RING_UC(2),
                               RADV_BO_PRIORITY_SCRATCH, 0, true, &ge_rings_bo);
       if (result != VK_SUCCESS)
          goto fail;
       radv_rmv_log_command_buffer_bo_create(device, ge_rings_bo, 0, 0, pdev->info.total_attribute_pos_prim_ring_size);
    }
+#undef RING_UC
 
    if (!queue->ring_info.gds && needs->gds) {
       assert(pdev->info.gfx_level == GFX10 || pdev->info.gfx_level == GFX10_3);

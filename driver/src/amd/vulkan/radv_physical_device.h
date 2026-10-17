@@ -176,6 +176,9 @@ struct radv_physical_device {
    /* Xclipse: write back and invalidate L2 in every buffer barrier, as on chips whose L2 isn't
     * coherent between clients (debug.radv_xclipse_bufl2 1). Blue-streak investigation. */
    bool xclipse_buffer_l2;
+   /* Xclipse: map these internal rings uncached (debug.radv_xclipse_ringuc mask): 1 = tess,
+    * 2 = GE attribute/pos/prim, 4 = ES-GS/GS-VS, 8 = scratch. Blue-streak investigation. */
+   uint32_t xclipse_ring_uc;
 
    /* Whether to emulate ASTC image support on HW without support. */
    bool emulate_astc;

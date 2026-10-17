@@ -258,7 +258,11 @@ radv_amdgpu_bo_va_op(struct radv_amdgpu_winsys *ws, uint32_t bo_handle, uint64_t
        *   RADV_XCLIPSE_MTYPE / debug.radv_xclipse_mtype
        *   0=none (default on 0x73a0)  1=NC  2=WC  3=CC (upstream)  4=UC  5=RW;  -1/unset elsewhere
        */
-      const int mt = (radv_xclipse_ucmask() & radv_xclipse_bo_class(bo_flags)) ? 4 : radv_xclipse_mtype(ws);
+      /* GL2_BYPASS without CPU access: device-coherent memory or a ring the driver asked to be
+       * uncached (radv_queue.c), UC as upstream. */
+      const bool uc = (radv_xclipse_ucmask() & radv_xclipse_bo_class(bo_flags)) ||
+                      ((bo_flags & RADEON_FLAG_GL2_BYPASS) && !(bo_flags & RADEON_FLAG_CPU_ACCESS));
+      const int mt = uc ? 4 : radv_xclipse_mtype(ws);
       if (mt >= 0) {
          static const uint64_t mtv[] = {0, AMDGPU_VM_MTYPE_NC, AMDGPU_VM_MTYPE_WC,
                                         AMDGPU_VM_MTYPE_CC, AMDGPU_VM_MTYPE_UC, AMDGPU_VM_MTYPE_RW};
