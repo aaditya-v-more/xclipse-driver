@@ -139,6 +139,12 @@ def select_phone(refresh: bool = False) -> None:
     wireless = [s for s in serials if re.fullmatch(r"[\d.]+:\d+", s)]
     if wireless:  # remembered for reconnect_wireless()
         _SELECTED["address"] = wireless[0]
+    if len(serials) == 1 and len([line for line in listing.splitlines()[1:] if line.strip()]) > 1:
+        # One ready device beside an offline or unauthorized one (an emulator that's starting,
+        # say): plain adb refuses "more than one device", so name the ready one.
+        os.environ["ANDROID_SERIAL"] = serials[0]
+        _SELECTED["auto"] = True
+        return
     if len(serials) < 2:
         return
     for serial in serials:
