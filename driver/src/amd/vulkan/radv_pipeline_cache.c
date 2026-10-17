@@ -24,6 +24,8 @@
 #include "vk_pipeline.h"
 
 #include "aco_interface.h"
+#include "ac_xclipse_log.h"
+#include "util/bitscan.h"
 
 void
 radv_hash_graphics_spirv_to_nir(blake3_hash hash, const struct radv_shader_stage *stage,
@@ -346,6 +348,19 @@ radv_report_pso_cache_stats(struct radv_device *device, const struct radv_pipeli
 {
    const struct radv_physical_device *pdev = radv_device_physical(device);
    const struct radv_instance *instance = radv_physical_device_instance(pdev);
+
+#ifdef __ANDROID__
+   /* Xclipse: application pipeline hits and misses in logcat at debug.radv_xclipse_log >= 1, so a
+    * second launch shows whether the disk cache survived (stderr goes nowhere on Android). */
+   if (!pipeline->is_internal && ac_xclipse_log_level() >= 1) {
+      static uint32_t hits, misses;
+      uint32_t h = cache_hit ? p_atomic_inc_return(&hits) : p_atomic_read(&hits);
+      uint32_t m = cache_hit ? p_atomic_read(&misses) : p_atomic_inc_return(&misses);
+      uint32_t n = h + m;
+      if (util_is_power_of_two_nonzero(n) || n % 256 == 0)
+         AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV", "[PSOCACHE] hits=%u misses=%u", h, m);
+   }
+#endif
 
    if (!(instance->debug_flags & RADV_DEBUG_PSO_CACHE_STATS))
       return;
