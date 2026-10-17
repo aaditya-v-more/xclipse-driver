@@ -885,3 +885,24 @@ along a roof edge at 85 s. The streaks are rarer here than in the fixed-mode air
 screening at normal clocks needs several runs per flag or a longer shot series. Next: run
 `pipeline/artifact_screen.sh wave32 syncshaders nggreuse0 mtype4`, or repeat the screen under
 `game_compare` fixed mode, where the baseline shows streaks in 7 of 12 shots.
+
+#### Fixed-mode flag screen results (2026-10-17)
+
+`pipeline/artifact_screen.sh` in fixed performance mode (400/1632 MHz), Heaven RADV, driver
+`xd-fc066b9`, nine shots 32-64 s after rendering starts (airship scene; r44 is a scene fade):
+
+| Flag | Folder | FPS | Blue streaks |
+|---|---|---:|---|
+| baseline | `results/2026-10-17_174720-game` | 39.5 | about 7 of 9 shots |
+| wave32 | `results/2026-10-17_175006-game` | 37.3 | yes |
+| syncshaders | `results/2026-10-17_175238-game` | 27.9 | yes |
+| nggreuse0 | `results/2026-10-17_175459-game` | 39.6 | yes |
+| mtype4 (UC) | `results/2026-10-17_175720-game` | 25.5 | **none** |
+| mtype3 (CC) | `results/2026-10-17_180031-game` | 39.7 | yes |
+| mtype1 (NC) | `results/2026-10-17_180313-game` | 39.9 | yes |
+
+Only uncached GPU mappings remove the streaks, so the cause is memory coherence, not wave size, a
+missing VGT flush or the reuse cache. syncshaders shows lower FPS alone doesn't hide them. UC on
+every BO costs 35% FPS, so `f15ee9e` adds `debug.radv_xclipse_ucmask` (UC for one BO class:
+1 = host-cached, 2 = host write-combined, 4 = no CPU access, 8 = imported) and screen labels
+uc1/uc2/uc4/uc8 to find the class that needs it.
