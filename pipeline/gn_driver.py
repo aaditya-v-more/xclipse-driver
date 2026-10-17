@@ -302,7 +302,7 @@ def set_args(game: str, text: str) -> None:
     if clear():
         sys.exit(f"{game}: couldn't empty the Exec Arguments field")
     typed = type_text(text)
-    if typed != text:
+    if typed.rstrip() != text:
         sys.exit(f"{game}: the field reads {typed!r}, not {text!r}; not saved")
     _, _, nodes = wait_for(f"{game} Config*")
     tap_node(title_buttons(nodes)[1], nodes)  # save
@@ -310,7 +310,7 @@ def set_args(game: str, text: str) -> None:
     nodes = open_container(game, from_library=False)
     after = args_field(nodes)["text"]
     close_container(nodes)
-    if after != text:
+    if after.rstrip() != text:
         sys.exit(f"{game}: saved, but it reads {after!r} when reopened")
     print(f"{game}: Exec Arguments set and read back:\n  was {before}\n  now {after}")
 

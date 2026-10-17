@@ -1137,3 +1137,16 @@ with it. No GPU fault. With Max Device Memory set to `2048 MB` (it was `0 MB`) a
 before launch, it loaded into the opening scene at about 32 FPS, RAM 5.8 GB per GameNative's overlay,
 swap about 3.5 GB, rendering correctly. One launch so far, so the cap's effect is not separated
 from the cleared background apps.
+
+The kill repeats at every scene change, about 1.5 min after launch. The game's GPU memory
+(`dumpsys gpu --gpumem`) holds at 1.48 GB on the title screen and in the first scene, then jumps
+to 2.6 GB while the next scene loads, the same in every run: with Max Device Memory 1024 MB,
+`-ExecCmds="sg.TextureQuality 0,sg.ShadowQuality 0,r.Streaming.PoolSize 400"`, in-game Low
+settings, or `dxvk.maxMemoryBudget=1536`. (`dxvk.maxChunkSize` does not exist in DXVK 2.7.1.) The DXVK
+memory HUD (`dxvk.hud=memory,allocations` in `DXVK_CONFIG`) at the peak showed 2145 MB allocated
+and 1723 MB used, nearly all in memory type 0 (21 chunks, 1996 MB, 1836 MB used). That allocated total
+matches the kernel's per-process count, so neither DXVK chunk slack nor driver-internal memory
+explains it: the scene needs about 1.8 GB of GPU memory, all of it unswappable GEM pages. MemAvailable
+was 2.6–2.9 GB at launch after `am kill-all`, so lmkd kills the foreground GameNative process
+during the load. Samsung's driver fails earlier with `CreateTexture2D` E_INVALIDARG on BC5
+textures when BCn emulation is off.
