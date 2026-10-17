@@ -66,7 +66,7 @@ SHADERS = {
     "tri.geom": "tri_geom", "xfb.vert": "xfb_vert", "xfb_many.vert": "xfb_many_vert",
     "grid.vert": "grid_vert", "xfb_many.geom": "xfb_many_geom", "inputs.frag": "inputs_frag",
     "tess.tesc": "tess_tesc", "tess.tese": "tess_tese", "scratch.vert": "scratch_vert",
-    "fill_scratch.comp": "fill_scratch_comp", "sample.comp": "sample_comp",
+    "fill_scratch.comp": "fill_scratch_comp", "sample.comp": "sample_comp", "pcf.comp": "pcf_comp",
     "mrt.frag": "mrt_frag", "mrt_add.frag": "mrt_add_frag", "mrt_read.comp": "mrt_read_comp",
     "vertex.vert": "vertex_vert", "depth.vert": "depth_vert", "depth_read.comp": "depth_read_comp",
     "mips_read.comp": "mips_read_comp", "storage_write.comp": "storage_write_comp",

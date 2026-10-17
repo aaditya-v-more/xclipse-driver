@@ -37,6 +37,7 @@
 #include "flat_frag.h"
 #include "grid_vert.h"
 #include "sample_comp.h"
+#include "pcf_comp.h"
 #include "scratch_vert.h"
 #include "screen_vert.h"
 #include "tess_tesc.h"
@@ -2173,6 +2174,55 @@ static void fill_r32f(uint8_t *d, float want[64][4])
    }
 }
 
+static void fill_r8(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      d[i] = (uint8_t)(i * 37 + 11);
+      want[i][0] = d[i] / 255.0f;
+      want[i][1] = want[i][2] = 0.0f;
+      want[i][3] = 1.0f;
+   }
+}
+
+static void fill_r16(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const uint16_t v = (uint16_t)(i * 1000 + 17);
+      memcpy(d + i * 2, &v, 2);
+      want[i][0] = v / 65535.0f;
+      want[i][1] = want[i][2] = 0.0f;
+      want[i][3] = 1.0f;
+   }
+}
+
+static void fill_r16f(uint8_t *d, float want[64][4])
+{
+   for (int i = 0; i < 64; i++) {
+      const int k = (i * 3 + i / 8) % HALFS;
+      d[i * 2] = halfs[k].bits & 0xff;
+      d[i * 2 + 1] = halfs[k].bits >> 8;
+      want[i][0] = halfs[k].value;
+      want[i][1] = want[i][2] = 0.0f;
+      want[i][3] = 1.0f;
+   }
+}
+
+/* RG32F and RGBA32F: each channel its own ramp, so a swapped or dropped channel shows. */
+static void fill_f32_channels(uint8_t *d, float want[64][4], int channels)
+{
+   for (int i = 0; i < 64; i++) {
+      for (int c = 0; c < 4; c++) {
+         const float v = (i % 8) * (1.5f + c) - (i / 8) * (0.25f + c * 0.5f) + 0.125f * c;
+         if (c < channels)
+            memcpy(d + (i * channels + c) * 4, &v, 4);
+         want[i][c] = c < channels ? v : c == 3 ? 1.0f : 0.0f;
+      }
+   }
+}
+
+static void fill_rg32f(uint8_t *d, float want[64][4]) { fill_f32_channels(d, want, 2); }
+static void fill_rgba32f(uint8_t *d, float want[64][4]) { fill_f32_channels(d, want, 4); }
+
 /* Depth reads back in red only; the other channels aren't defined. */
 static void fill_d16(uint8_t *d, float want[64][4])
 {
@@ -2407,6 +2457,11 @@ static const struct texture_format {
    {"RGB10A2", VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.002f,
     fill_rgb10a2},
    {"R32F", VK_FORMAT_R32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 1e-5f, fill_r32f},
+   {"RG32F", VK_FORMAT_R32G32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 1e-5f, fill_rg32f},
+   {"RGBA32F", VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 1e-5f, fill_rgba32f},
+   {"R8", VK_FORMAT_R8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.006f, fill_r8},
+   {"R16", VK_FORMAT_R16_UNORM, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.0002f, fill_r16},
+   {"R16F", VK_FORMAT_R16_SFLOAT, VK_IMAGE_ASPECT_COLOR_BIT, 4, 0.002f, fill_r16f},
    {"D16", VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 0.0002f, fill_d16},
    {"D24S8", VK_FORMAT_D24_UNORM_S8_UINT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d24},
    {"D32F", VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT, 1, 1e-5f, fill_d32f},
@@ -2468,8 +2523,12 @@ static void run_textures(void)
       .addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
       .addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
    };
-   VkSampler linear, nearest;
+   VkSampler linear, nearest, shadow_linear;
    VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &linear));
+   sci.compareEnable = VK_TRUE;
+   sci.compareOp = VK_COMPARE_OP_LESS;
+   VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &shadow_linear));
+   sci.compareEnable = VK_FALSE;
    sci.magFilter = sci.minFilter = VK_FILTER_NEAREST;
    VKCHECK("vkCreateSampler", vkCreateSampler(dev, &sci, NULL, &nearest));
 
@@ -2503,9 +2562,13 @@ static void run_textures(void)
          },
       .layout = layout,
    };
-   VkPipeline pipeline;
+   VkPipeline pipeline, pcf_pipeline;
    VKCHECK("vkCreateComputePipelines",
            vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &pipeline));
+   VkShaderModule pcf_module = make_shader(pcf_comp, sizeof(pcf_comp));
+   cpci.stage.module = pcf_module;
+   VKCHECK("vkCreateComputePipelines",
+           vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &cpci, NULL, &pcf_pipeline));
    const VkDescriptorPoolSize pool_sizes[2] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1},
                                                {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1}};
    VkDescriptorPoolCreateInfo dpci = {
@@ -2678,6 +2741,53 @@ static void run_textures(void)
          add_problem(wrong, sizeof(wrong), "%s %d fetched/%d filtered", tf->name, fetch_bad,
                      filter_bad);
       }
+      if (tf->aspect == VK_IMAGE_ASPECT_DEPTH_BIT) {
+         /* PCF against the average of the four texels each corner sample filters: a filtered
+          * comparison reads the fraction of them above the reference, a point-sampled one 0 or 1.
+          * Corners where a texel equals the reference are skipped. */
+         float(*io)[4] = out.map;
+         float pcf_want[N];
+         bool decided[N];
+         for (int i = 0; i < N; i++) {
+            const int x = i % 8, y = i / 8, x1 = x < 7 ? x + 1 : 7, y1 = y < 7 ? y + 1 : 7;
+            const float t[4] = {want[i][0], want[y * 8 + x1][0], want[y1 * 8 + x][0],
+                                want[y1 * 8 + x1][0]};
+            const float ref = (t[0] + t[1] + t[2] + t[3]) / 4;
+            int above = 0;
+            decided[i] = true;
+            for (int k = 0; k < 4; k++) {
+               above += ref < t[k];
+               decided[i] &= fabsf(t[k] - ref) > 1e-4f;
+            }
+            pcf_want[i] = above / 4.0f;
+            io[N + i][0] = ref;
+         }
+         image_info.sampler = shadow_linear;
+         vkUpdateDescriptorSets(dev, 1, writes, 0, NULL);
+         cb = begin_cmd();
+         vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, pcf_pipeline);
+         vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &set, 0, NULL);
+         vkCmdDispatch(cb, 1, 1, 1);
+         vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                              0, 1, &to_host, 0, NULL, 0, NULL);
+         VKCHECK("vkEndCommandBuffer", vkEndCommandBuffer(cb));
+         snprintf(what, sizeof(what), "PCF on %s", tf->name);
+         submit_and_wait(cb, what);
+         int pcf_bad = 0;
+         char pcf_first[120] = "";
+         for (int i = 0; i < N; i++) {
+            if (!decided[i] || fabsf(io[i][0] - pcf_want[i]) <= 0.01f)
+               continue;
+            if (!pcf_bad++)
+               snprintf(pcf_first, sizeof(pcf_first), "at (%d,%d): got %g, want %g", i % 8, i / 8,
+                        io[i][0], pcf_want[i]);
+         }
+         jint("pcf_wrong", pcf_bad);
+         if (pcf_bad) {
+            jstr("first_wrong_pcf", pcf_first);
+            add_problem(wrong, sizeof(wrong), "%s PCF %d", tf->name, pcf_bad);
+         }
+      }
       jclose();
       vkDestroyImageView(dev, view, NULL);
       vkDestroyImage(dev, image, NULL);
@@ -2690,10 +2800,13 @@ static void run_textures(void)
    vkDestroyDescriptorPool(dev, dpool, NULL);
    vkDestroyPipeline(dev, pipeline, NULL);
    vkDestroyShaderModule(dev, module, NULL);
+   vkDestroyPipeline(dev, pcf_pipeline, NULL);
+   vkDestroyShaderModule(dev, pcf_module, NULL);
    vkDestroyPipelineLayout(dev, layout, NULL);
    vkDestroyDescriptorSetLayout(dev, dsl, NULL);
    vkDestroySampler(dev, nearest, NULL);
    vkDestroySampler(dev, linear, NULL);
+   vkDestroySampler(dev, shadow_linear, NULL);
    free_buffer(&out);
    free_buffer(&upload);
 }

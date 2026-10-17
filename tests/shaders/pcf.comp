@@ -1,0 +1,13 @@
+#version 450
+// Depth comparison with a linear filter (PCF) at the corner each texel shares with its right and
+// lower neighbors, against a reference the host put in ref[i].x: the average of those four
+// texels, so a filtered comparison reads the fraction of them above it.
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(binding = 0) uniform sampler2DShadow tex;
+layout(std430, binding = 1) buffer Out { vec4 result[64]; vec4 ref[64]; };
+void main()
+{
+   ivec2 p = ivec2(gl_LocalInvocationID.xy);
+   int i = p.y * 8 + p.x;
+   result[i] = vec4(textureLod(tex, vec3((vec2(p) + 1.0) / 8.0, ref[i].x), 0.0));
+}

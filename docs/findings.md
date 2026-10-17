@@ -108,6 +108,15 @@ The 940 runs GFX10.3 command streams, but its shader launch works like GFX11's i
   - Both are world-readable.
 - **`/sys/kernel/gpu/mem_info` misses imported memory.** Its per-process numbers count the process's GEM buffers, but skip imported and exported dma-bufs (`amdgpu_gem_bo_size`). GameNative's wrapper imports dma-bufs for host-visible memory in 32-bit games, so those don't show up.
 
+### Caches and texture filtering (probed with Heaven and `xdtest`, 2026-10-17)
+
+- **GL1 behaves like GFX10.3's, not GFX11's.** The 940 runs a GFX11 shader core, but a load with GLC alone doesn't bypass GL1. Device-scope (coherent) loads need GLC|DLC, as on GFX10.3. With GLC alone, TES reads of the tess offchip ring returned stale HS output: blue streaks in Heaven (fixed in `288a2c6`, see PROGRESS).
+- **The texture unit can't linear-filter 32-bit float or 16-bit UNORM formats.**
+  - The affected formats include R32F, RG32F, RGBA32F, R16_UNORM, D16 and D32F/D32FS8 sampled without compare. A linear sampler returns the nearest texel, the one at (x+1, y+1) for a corner sample (`results/2026-10-17_190027`).
+  - RGBA8, sRGB, RGBA16F, R16F, R11G11B10F, RGB10A2, R8 and the BC formats filter correctly.
+  - Samsung's driver withholds `SAMPLED_IMAGE_FILTER_LINEAR` for exactly the affected formats. RADV advertises it.
+  - Depth comparison with a linear filter (PCF) is correct on D16, D32F and D32FS8, so shadow maps are fine.
+
 ## Build PC
 
 - i5-13600 (14 cores / 20 threads), 15.7 GB RAM, about 214 GB free on C:. Hypervisor present.

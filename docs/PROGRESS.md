@@ -953,3 +953,11 @@ FPS, where UC on the offchip ring cost 16%. It also covers every other coherent 
 (ring descriptors, NGG/GS rings, app `Coherent` buffers), not just tessellation. Still to check:
 `run.py` on-device correctness tests on `xd-288a2c6`, a normal-clock Heaven A/B and other games.
 The ucmask, ringuc and bufl2 knobs stay as debug props for now; they are off by default.
+
+On-device tests on `xd-288a2c6` (`results/2026-10-17_185452`) pass, except `textures`. That test
+has failed on RADV since 2026-10-11 (`154524`), so it is not a regression. Widening the test
+(`190027`) showed the texture unit point-samples R32F, RG32F, RGBA32F, R16_UNORM and depth
+under a linear sampler. Samsung's driver withholds linear filtering for exactly those formats,
+and RADV advertises it. Linear PCF on depth is correct, and the test now checks it with
+fractional results. Dropping the feature bits would only make apps refuse formats they use today,
+as stock Heaven does with its D24 depth texture, so the fix has to emulate the filter in the shader.
