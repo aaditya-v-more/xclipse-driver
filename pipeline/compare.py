@@ -149,7 +149,7 @@ def main():
     known = set(run.list_crash_records())
     try:
         run.shell("am force-stop app.gamenative")
-        run.shell("svc power stayon usb")
+        run.shell(run.STAY_ON_CMD)
         if args.fixed_clocks:
             p = run.adb("shell", "cmd power set-fixed-performance-mode-enabled true")
             if p.returncode or (p.stdout + p.stderr).strip():

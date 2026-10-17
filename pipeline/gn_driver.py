@@ -59,7 +59,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from game import EXEC_ARGS  # noqa: E402
 from phone_ui import clear, dump, tap, type_text  # noqa: E402
-from run import adb, shell  # noqa: E402
+from run import STAY_ON_CMD, adb, shell  # noqa: E402
 
 APP = "app.gamenative"
 PHONE_DIR = "/sdcard/Download/xclipse"  # where the file picker opens
@@ -639,7 +639,7 @@ def main() -> None:
                 sys.exit(f"{game}: not a <bench>-<driver> name for one of {sorted(EXEC_ARGS)}")
             texts[game] = EXEC_ARGS[bench].format(driver=driver)
     stay_on = shell("settings get global stay_on_while_plugged_in").strip()
-    shell("svc power stayon usb")
+    shell(STAY_ON_CMD)
     try:
         wait_awake_unlocked()
         if args.command == "install":

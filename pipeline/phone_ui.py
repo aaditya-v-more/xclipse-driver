@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run import ADB, adb, shell  # noqa: E402
+from run import ADB, adb, select_phone, shell  # noqa: E402
 
 BOUNDS = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
 
@@ -122,6 +122,7 @@ def type_text(text: str) -> str | None:
 
 
 def screenshot(path: str) -> None:
+    select_phone()
     with open(path, "wb") as f:
         subprocess.run([ADB, "exec-out", "screencap", "-p"], stdout=f, check=True)
 

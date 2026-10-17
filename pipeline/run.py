@@ -42,6 +42,10 @@ TEST_BUILD = TEST_SRC / "build"
 DRIVER_SO = ROOT / "driver" / "build-android" / "vulkan.radeon.so"
 RESULTS = ROOT / "results"
 ADB = shutil.which("adb") or str(Path.home() / "platform-tools" / f"adb{EXE}")
+PHONE_SERIAL = "RZCY90ZYQXZ"  # the Galaxy S24 FE's ro.serialno, also its USB serial
+# Holds the screen on while on AC or USB power (1 | 2), so a wall charger works with wireless adb.
+STAY_ON_CMD = "settings put global stay_on_while_plugged_in 3"
+_SELECTED: dict = {}  # select_phone() state: "done", and "auto" once it set ANDROID_SERIAL
 PHONE_DIR = "/data/local/tmp/xd"
 CORRECTNESS_TESTS = ["info", "device", "submit", "compute", "render", "tess", "scratch", "scratchcs",
                      "queries", "xfb", "xfbmany", "xfbmanygs", "textures", "mips", "mrt", "vertex", "depth",
@@ -110,7 +114,40 @@ def run(cmd: list[str], timeout: float | None = None) -> subprocess.CompletedPro
                           timeout=timeout)
 
 
+def select_phone(refresh: bool = False) -> None:
+    """Points adb at the test phone through ANDROID_SERIAL when several devices are attached.
+
+    Wireless debugging lists the phone under an IP:port and an mDNS name, and another phone may be
+    on USB, so plain adb commands fail. Picks the transport whose ro.serialno is PHONE_SERIAL. A
+    caller-set ANDROID_SERIAL wins. `refresh` re-resolves after a reboot changes the port."""
+    if refresh and _SELECTED.pop("auto", None):
+        os.environ.pop("ANDROID_SERIAL", None)
+    if os.environ.get("ANDROID_SERIAL") or (_SELECTED.get("done") and not refresh):
+        return
+    _SELECTED["done"] = True
+    try:
+        listing = run([ADB, "devices"], timeout=30).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return
+    serials = [line.split("\t")[0] for line in listing.splitlines()[1:]
+               if line.endswith("\tdevice")]
+    if len(serials) < 2:
+        return
+    for serial in serials:
+        try:
+            got = run([ADB, "-s", serial, "shell", "getprop ro.serialno"], timeout=15).stdout.strip()
+        except subprocess.TimeoutExpired:
+            continue
+        if got == PHONE_SERIAL:
+            os.environ["ANDROID_SERIAL"] = serial
+            _SELECTED["auto"] = True
+            return
+    print(f"warning: {len(serials)} adb devices attached and none is {PHONE_SERIAL}",
+          file=sys.stderr)
+
+
 def adb(*args: str, timeout: float = 120) -> subprocess.CompletedProcess:
+    select_phone()
     return run([ADB, *args], timeout=timeout)
 
 
@@ -120,7 +157,11 @@ def shell(command: str, timeout: float = 60) -> str:
 
 def phone_state() -> str:
     try:
-        return adb("get-state", timeout=15).stdout.strip()
+        state = adb("get-state", timeout=15).stdout.strip()
+        if state != "device" and _SELECTED.get("auto"):
+            select_phone(refresh=True)
+            state = adb("get-state", timeout=15).stdout.strip()
+        return state
     except subprocess.TimeoutExpired:
         return ""
 

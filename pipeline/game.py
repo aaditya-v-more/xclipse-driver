@@ -40,7 +40,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run import ADB, RESULTS, adb, phone_state, shell  # noqa: E402
+from run import ADB, RESULTS, STAY_ON_CMD, adb, phone_state, select_phone, shell  # noqa: E402
 
 APP = "app.gamenative"
 OUT_DIR = "/sdcard/Download/xclipse/out"  # D:\xclipse\out inside the containers
@@ -211,6 +211,7 @@ def logcat_start(path: Path) -> None:
     logcat_stop()
     LOGCAT["path"] = path
     LOGCAT["file"] = open(path, "wb")
+    select_phone()
     LOGCAT["proc"] = subprocess.Popen([ADB, "logcat", "-v", "threadtime", "-b", "main,system",
                                        "-T", "1"], stdout=LOGCAT["file"], stderr=subprocess.DEVNULL)
 
@@ -705,7 +706,7 @@ def main() -> None:
     # The screen must stay on between runs (the timeout is 30 s), and a game can't start on a
     # locked phone. The setting is restored at the end.
     stay_on = shell("settings get global stay_on_while_plugged_in").strip()
-    shell("svc power stayon usb")
+    shell(STAY_ON_CMD)
     # The panel idles at 60 Hz and SurfaceFlinger paces GameNative to it; min/peak_refresh_rate
     # pin it (verified: the compositor period goes from 16.67 to 8.33 ms). Both are restored.
     refresh = {name: shell(f"settings get system {name}").strip()

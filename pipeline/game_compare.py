@@ -191,7 +191,7 @@ def main():
                for k in ("min_refresh_rate", "peak_refresh_rate")}
     zen = run.shell("settings get global zen_mode").strip()
     try:
-        run.shell("svc power stayon usb")
+        run.shell(run.STAY_ON_CMD)
         run.shell("input keyevent KEYCODE_WAKEUP")
         if not game.wait_unlocked(300):
             raise RuntimeError("phone stayed locked")
