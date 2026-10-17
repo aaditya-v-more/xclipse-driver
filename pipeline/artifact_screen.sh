@@ -38,6 +38,7 @@ flags() {
     ring1|ring2|ring4|ring8|ring16|ring32) echo --prop debug.radv_xclipse_ringuc=${1#ring} ;;  # UC for one ring class
     uc1|uc2|uc4|uc8) echo --prop debug.radv_xclipse_ucmask=${1#uc} ;;  # UC for one BO class
     gl1scope0) echo --prop debug.radv_xclipse_gl1scope=0 ;;  # GFX11 cache bits (GLC only) for device-scope loads
+    filteremu0) echo --prop debug.radv_xclipse_filteremu=0 ;;  # hardware point-sampling for unfilterable formats
     *) echo "unknown label $1" >&2; exit 2 ;;
   esac
 }
