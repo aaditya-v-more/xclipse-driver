@@ -1294,3 +1294,44 @@ home screen was refused, as intended.
   with earlier driver builds, the game got through this scene to the song scene (above). So whether RB skips the opening cutscene, and when
   play starts, is unverified; `play` reports a kill from logcat. The DXVK HUD (memory and
   allocations) is still showing in this container.
+
+### 2026-10-18: Life is Strange reaches play; where its memory goes
+
+The game got through the Continue load into play for the first time on this driver (xd-69715ca)
+and held there for 5 minutes with no lmkd kill, at about 26 FPS. Three changes went in together,
+so which one decided it is untested:
+
+- GameNative Max Device Memory 1024 to 512 MB. UE4 sizes its texture pool from the DXGI dedicated
+  memory GameNative reports: images at the title fell from 921 to 718 MB. On its own it still died
+  at the load.
+- In-game Advanced Video: Resolution Scaling Yes, Scaling Percent 80%. Every other option was
+  already at its lowest (Graphics Quality, Texture, Shadow, Effects, Post Process, View Distance
+  Low). Anti-Aliasing only offers High, Very High and Cinematic; it stays High.
+- `game_input.py play` runs `am kill-all` every 3 s for 45 s of the scene load, since background
+  apps restart during it.
+
+Also removed: `dxvk.maxMemoryBudget` (with usage above the budget, DXVK frees empty chunks at once,
+so they churn) and `-ExecCmds` (this Shipping build ignores it: r.ScreenPercentage 25 changed
+nothing). Exec args are `-nostartupmovies -dx11`; `DXVK_CONFIG` keeps
+`dxvk.enableDescriptorBuffer=False` plus `dxvk.hud=memory,allocations` for diagnosis.
+
+Memory at the kills before this (7.4 GB RAM, about 1.3 GB available at the title, 12 GB zram):
+
+- CPU: during the load the game's anonymous memory grows from about 1.0 to 1.55 GB. The kernel then
+  swaps most of it out (RssAnon 76-440 MB, VmSwap 1.5-1.7 GB). MemFree sits at 30-150 MB for about
+  25 s, and lmkd kills about 25 processes in 2 s and then GameNative.
+- GPU: 2.3-2.9 GB, all pinned GTT. The driver's BO tally now matches gpumem; the earlier 700 MB gap
+  was logging lag. The driver's own BOs are about 70 MB. DXVK's HUD just before one kill: 2073 MB
+  used of 2316 MB allocated in 23 chunks.
+- Images (`[IMG_MEM]`) peak at 1.0-1.24 GB: render targets about 216 MB, BC 467-647 MB, other
+  textures 275-314 MB, storage 45 MB, depth 20 MB. BC blocks are 98.7% BC5, 1.1% BC6H, 0.2% BC7.
+- Buffers (`[BUF_MEM]`, new in 69715ca): all "multi" (usage 0x219ff), mostly 64 MB. They track
+  DXVK's allocated heap (2017 MB both, in play), so DXVK puts a buffer over each whole memory
+  chunk and images are suballocated from the same chunks. The buffer tally therefore measures
+  DXVK's chunks, not separate buffer memory.
+
+In play after the change: DXVK 1659 MB used of 2017 MB allocated (33 chunks), images 630-960 MB,
+MemAvailable 860-1000 MB, the game 345 MB resident with 1.45 GB swapped.
+
+Menu input: with 120 ms holds the D-pad stepped one to three values per press in the option rows;
+40 ms taps step once. `game_input.py` now holds the D-pad 40 ms and the other buttons 120 ms.

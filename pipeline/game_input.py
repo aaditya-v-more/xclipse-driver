@@ -23,8 +23,8 @@ short). For LifeIsStrange3 that is: wait for the game's window; press RB every 2
 Square Enix and Deck Nine logos, the health warning and the autosave notice (they show "Skip" on RB)
 until the bright title screen; press A for "Press any button" and A again for Continue, until the
 screen goes dark for loading; wait for the first scene to draw; then press RB three times, 2 s
-apart, for the opening cutscene. It runs `am kill-all` (background processes only) before launching
-and again before Continue, to give the game memory. It refuses to restart a game that is already
+apart, for the opening cutscene. It runs `am kill-all` (background processes only) before launching,
+again before Continue, and every 3 s for 45 s of the scene load, to give the game memory. It refuses to restart a game that is already
 running unless --restart is given. If GameNative dies on the way (Android's low-memory killer), it
 says so from logcat.
 
@@ -61,6 +61,9 @@ BUTTONS = {
     "LEFT": (0.0701, 0.3907), "RIGHT": (0.1432, 0.3907),
 }
 HOLD_MS = 120
+# The D-pad repeats while held: in Life is Strange's option rows a 120 ms hold moved one to three
+# steps, while 40 ms taps moved exactly one each (2026-10-18).
+DPAD_HOLD_MS = 40
 # The box whose brightness `play` watches: left of centre, inside the game's 16:9 picture.
 BOX = (0.20, 0.30, 0.50, 0.65)
 GAME_PROCESS = "wineserver"
@@ -96,7 +99,8 @@ def press(button: str) -> None:
     w, h = check_in_game()
     fx, fy = BUTTONS[button]
     x, y = round(fx * w), round(fy * h)
-    sh(f"input swipe {x} {y} {x} {y} {HOLD_MS}")
+    hold = DPAD_HOLD_MS if button in ("UP", "DOWN", "LEFT", "RIGHT") else HOLD_MS
+    sh(f"input swipe {x} {y} {x} {y} {hold}")
 
 
 def brightness() -> float:
@@ -175,6 +179,9 @@ def life_is_strange_3(run: Run, until: str | None = None) -> None:
         time.sleep(2.5)
     else:
         sys.exit("the menu did not start loading after four presses of A")
+    # Background apps restart while the scene loads and the load is where lmkd kills GameNative, so
+    # keep clearing them on the phone for the next 45 s without holding up the brightness polling.
+    sh("nohup sh -c 'for i in $(seq 15); do am kill-all; sleep 3; done' >/dev/null 2>&1 &")
     run.wait(lambda v: v > 12, "the first scene", limit_s=180)
     for _ in range(3):  # the opening cutscene
         time.sleep(2.0)
