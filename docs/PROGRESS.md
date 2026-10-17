@@ -843,3 +843,45 @@ depth-of-field cliff scene. `nonggc` adds no defect and doesn't cause the streak
 Result: in this measured condition, `nonggc` is a repeatable +28% average FPS and +22% 1%-low
 FPS gain on Heaven with no rendering regression. It is the first package candidate. A normal-clock
 check is still needed.
+
+### Blue streak ("lightning") investigation, in progress (2026-10-17)
+
+The user asked for the streaks to be fixed. They are straight, uniform-blue lines, one thick band
+or several thin solid or dotted lines, across Heaven's sky. Their positions change between runs at
+the same benchmark time. With scene-matched screenshots they are most frequent in the airship
+scene 35 s after rendering starts. `nonggc` doesn't change them. The pattern points to stray
+vertices (long sliver triangles), not render-target corruption.
+
+A read-only source survey ranked driver-side causes. Each has a runtime test that needs no
+rebuild:
+
+1. **Wave64 VGPR corruption on the 940** (`radv_shader.c` 16-VGPR floor, `8acb984`). A wave64 shader with few VGPRs
+   overwrites v0/v1 in lanes 0-31 of other waves. In NGG and tessellation-evaluation waves those
+   registers carry vertex indices, packed primitives and u/v coordinates. The floor was validated
+   only on synthetic shaders. Test: `debug.radv_perftest=pswave32,gewave32,cswave32` (wave size is
+   part of the shader cache key, so no cache flush is needed). Fix: default those stages to wave32
+   on the 940.
+2. **A missing `VGT_FLUSH` between NGG draws.** The port inserts it only before NGG-culling draws
+   (`radv_cmd_buffer.c` ~14174). Test: `debug.radv_debug=syncshaders`.
+3. **The vertex-reuse cache** (depth 30, `radv_queue.c` ~872). Test:
+   `debug.radv_xclipse_nggreuse=0`.
+4. **Host-visible memory coherence.** Memory types claim HOST_CACHED|COHERENT, and MTYPE defaults
+   to 0 on the 940. Test: `debug.radv_xclipse_mtype=4` (uncached, slow).
+5. Others: `has_ngg_passthru_no_msg` is set for the 940 without verification (test `nongg`);
+   tessellation rings (test by disabling Heaven's tessellation); and wave64 cross-half lane ops
+   (`[W64XLANE]` in the RADV log).
+
+`pipeline/artifact_screen.sh [labels]` runs one Heaven RADV run per flag. It takes screenshots
+every 10 s from 35 to 95 s after rendering starts. Labels: baseline, wave32, syncshaders,
+nggreuse0, mtype4, nongg. A flag that removes the streaks across all seven shots, when the
+baseline shows them, identifies the cause. Confirm it with a second run before changing the
+driver's defaults.
+
+The screen was paused at the user's request after its baseline run,
+`results/2026-10-17_173655-game` (normal clocks, 57.2 FPS, no GPU faults). Normal clocks move the
+camera further along the benchmark path at the same time, so these shots show later scenes than
+the fixed-mode study. Only faint thin blue lines appear, in the airship rigging at 55 s and possibly
+along a roof edge at 85 s. The streaks are rarer here than in the fixed-mode airship shots, so
+screening at normal clocks needs several runs per flag or a longer shot series. Next: run
+`pipeline/artifact_screen.sh wave32 syncshaders nggreuse0 mtype4 nongg`, or repeat the screen under
+`game_compare` fixed mode, where the baseline shows streaks in 7 of 12 shots.
