@@ -439,9 +439,9 @@ def import_zip(zip_name: str, entry: str) -> None:
     go("Settings", "Customize your experience")
     go("Driver Manager", "Import ZIP from device")
     height = screen_height()
-    # The dialog shows 3 rows of installed drivers; swiping on their names (away from the trash
+    # The dialog shows 3 rows of a growing list of installed drivers; swiping on their names (away from the trash
     # icons at the right) scrolls it.
-    if scroll_to(entry, 400, 1720, 1400, height, tries=4):
+    if scroll_to(entry, 400, 1720, 1400, height, tries=15):
         print(f"{entry} is installed already")
     else:
         _, n, nodes = wait_for("Import ZIP from device")
@@ -453,7 +453,7 @@ def import_zip(zip_name: str, entry: str) -> None:
         tap_node(*found)
         wait_for("Import ZIP from device", limit_s=30)
         time.sleep(4)  # the entry shows up a few seconds after the pick
-        if not scroll_to(entry, 400, 1720, 1400, height, tries=4):
+        if not scroll_to(entry, 400, 1720, 1400, height, tries=15):
             sys.exit(f"picked {zip_name}, but {entry!r} isn't in the installed drivers")
         print(f"imported {zip_name} as {entry}")
     go("Close", "Customize your experience")
