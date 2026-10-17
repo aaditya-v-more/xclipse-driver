@@ -21,6 +21,64 @@
 #include "vk_debug_utils.h"
 #include "vk_log.h"
 
+#include "ac_xclipse_log.h"
+
+/* Live buffer bytes per kind, with debug.radv_xclipse_log >= 1, beside the [IMG_MEM] image tally.
+ * A buffer with several of vertex/index/uniform/storage usage is "multi" (DXVK's chunk-wide global
+ * buffers look like this). A line goes out when the total moves 64 MB, and each buffer of 16 MB or
+ * more gets its own. */
+static void
+radv_xclipse_buffer_tally(struct radv_buffer *buffer, bool created)
+{
+#ifdef __ANDROID__
+   enum { K_MULTI, K_INDEX, K_VERTEX, K_UNIFORM, K_STORAGE, K_XFER, K_OTHER, K_COUNT };
+   static const char *const kname[K_COUNT] = {"multi", "index", "vertex", "uniform", "storage", "xfer", "other"};
+   static uint64_t kind_bytes[K_COUNT], total, last_total;
+   static uint32_t count;
+
+   unsigned kind;
+   if (created) {
+      if (ac_xclipse_log_level() < 1)
+         return;
+      const VkBufferUsageFlags2 u = buffer->vk.usage;
+      const unsigned roles = !!(u & VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT) + !!(u & VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT) +
+                             !!(u & VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT) + !!(u & VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT);
+      kind = roles > 1                                    ? K_MULTI
+             : (u & VK_BUFFER_USAGE_2_INDEX_BUFFER_BIT)   ? K_INDEX
+             : (u & VK_BUFFER_USAGE_2_VERTEX_BUFFER_BIT)  ? K_VERTEX
+             : (u & VK_BUFFER_USAGE_2_UNIFORM_BUFFER_BIT) ? K_UNIFORM
+             : (u & VK_BUFFER_USAGE_2_STORAGE_BUFFER_BIT) ? K_STORAGE
+             : (u & (VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_2_TRANSFER_DST_BIT)) ? K_XFER
+                                                          : K_OTHER;
+      buffer->xclipse_mem_kind = kind + 1;
+      p_atomic_add(&kind_bytes[kind], buffer->vk.size);
+      p_atomic_add(&total, buffer->vk.size);
+      p_atomic_inc(&count);
+      if (buffer->vk.size >= (16ull << 20))
+         AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[BUF_BIG] +%" PRIu64 " MB %s usage=0x%" PRIx64,
+                         buffer->vk.size >> 20, kname[kind], (uint64_t)u);
+   } else {
+      if (!buffer->xclipse_mem_kind)
+         return;
+      kind = buffer->xclipse_mem_kind - 1;
+      p_atomic_add(&kind_bytes[kind], -(int64_t)buffer->vk.size);
+      p_atomic_add(&total, -(int64_t)buffer->vk.size);
+      p_atomic_dec(&count);
+   }
+
+   const uint64_t t = p_atomic_read(&total), l = p_atomic_read(&last_total);
+   if ((t > l ? t - l : l - t) < (64ull << 20))
+      return;
+   p_atomic_set(&last_total, t);
+   AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN",
+                   "[BUF_MEM] MB total=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64
+                   " %s=%" PRIu64 " %s=%" PRIu64 " %s=%" PRIu64 " buffers=%u",
+                   t >> 20, kname[0], kind_bytes[0] >> 20, kname[1], kind_bytes[1] >> 20, kname[2],
+                   kind_bytes[2] >> 20, kname[3], kind_bytes[3] >> 20, kname[4], kind_bytes[4] >> 20, kname[5],
+                   kind_bytes[5] >> 20, kname[6], kind_bytes[6] >> 20, count);
+#endif
+}
+
 static void
 radv_destroy_buffer(struct radv_device *device, const VkAllocationCallbacks *pAllocator, struct radv_buffer *buffer)
 {
@@ -34,6 +92,7 @@ radv_destroy_buffer(struct radv_device *device, const VkAllocationCallbacks *pAl
       vk_address_binding_report(&instance->vk, &buffer->vk.base, buffer->vk.device_address, buffer->range,
                                 VK_DEVICE_ADDRESS_BINDING_TYPE_UNBIND_EXT);
 
+   radv_xclipse_buffer_tally(buffer, false);
    radv_rmv_log_resource_destroy(device, (uint64_t)radv_buffer_to_handle(buffer));
    vk_buffer_finish(&buffer->vk);
    vk_free2(&device->vk.alloc, pAllocator, buffer);
@@ -63,6 +122,9 @@ radv_create_buffer(struct radv_device *device, const VkBufferCreateInfo *pCreate
    vk_buffer_init(&device->vk, &buffer->vk, pCreateInfo);
    buffer->bo = NULL;
    buffer->range = 0;
+   buffer->xclipse_mem_kind = 0;
+   if (!is_internal)
+      radv_xclipse_buffer_tally(buffer, true);
 
    if (buffer->vk.create_flags & VK_BUFFER_CREATE_SPARSE_BINDING_BIT) {
       enum radeon_bo_flag flags = RADEON_FLAG_VIRTUAL;

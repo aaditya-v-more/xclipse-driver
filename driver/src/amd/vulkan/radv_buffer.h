@@ -24,6 +24,7 @@ struct radv_buffer {
    /* Set when bound */
    struct radeon_winsys_bo *bo;
    uint64_t range;
+   uint8_t xclipse_mem_kind; /* 1 + kind in the [BUF_MEM] tally, 0 when not counted */
 };
 
 VK_DEFINE_NONDISP_HANDLE_CASTS(radv_buffer, vk.base, VkBuffer, VK_OBJECT_TYPE_BUFFER)
