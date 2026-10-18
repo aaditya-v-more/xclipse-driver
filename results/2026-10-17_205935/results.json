@@ -1,0 +1,248 @@
+{
+  "meta": {
+    "started": "2026-10-17T20:59:35",
+    "driver": {
+      "commit": "0e7eac3+changes",
+      "so_sha256": "22914ad2cecbbbb16ce98963ac47a823c998a95279ecf1b7a18b13cf07c2391c"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "31.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 297"
+    },
+    "tests": [
+      "textures"
+    ],
+    "drivers": [
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "31.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 297"
+    }
+  },
+  "results": [
+    {
+      "test": "textures",
+      "driver": "radv",
+      "gpu_temp_c_before": "31.0",
+      "ms_load": 25.42,
+      "ms_instance": 2.022,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.712,
+      "has_bc": true,
+      "formats": [
+        {
+          "format": "RGBA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BGRA8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "features": "0x1dd81",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGB10A2",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R32F",
+          "features": "0x1dd87",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA32F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R8",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16F",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16_SNORM",
+          "features": "0x1dd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "D16",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D24S8",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "D32F",
+          "features": "0x1de01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D32FS8",
+          "features": "0x1d601",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "BC1",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC2",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC3",
+          "features": "0x1d401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC4",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC5",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC7",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] sampling BC2",
+        "[xdtest] sampling BC3",
+        "[xdtest] sampling BC4",
+        "[xdtest] sampling BC5",
+        "[xdtest] sampling BC7",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,651 @@
+{
+  "meta": {
+    "started": "2026-10-17T19:10:25",
+    "driver": {
+      "commit": "288a2c6+changes",
+      "so_sha256": "8fc85be305980d0cff92e3ca9f8cf98fc325cf25947430935e5bd97172a17635"
+    },
+    "phone": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "34.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 327"
+    },
+    "tests": [
+      "textures",
+      "mips",
+      "depth"
+    ],
+    "drivers": [
+      "stock",
+      "radv"
+    ],
+    "env": [],
+    "phone_after": {
+      "model": "SM-S721B",
+      "build": "S721BXXSEDZI1",
+      "android": "16",
+      "gpu_temp_c": "35.0",
+      "gpu_clock_khz": "0",
+      "gpu_max_clock_khz": "800000",
+      "battery": "level: 100 temperature: 327"
+    }
+  },
+  "results": [
+    {
+      "test": "textures",
+      "driver": "stock",
+      "gpu_temp_c_before": "35.0",
+      "ms_load": 18.411,
+      "ms_instance": 72.943,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.821,
+      "has_bc": false,
+      "formats": [
+        {
+          "format": "RGBA8",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BGRA8",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA8_SRGB",
+          "features": "0xdd81",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGBA16F",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R11G11B10F",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RGB10A2",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R32F",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RG32F",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RGBA32F",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "R8",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "R16",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "R16F",
+          "features": "0xdd83",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "RG16",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RGBA16",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "R16_SNORM",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "RGBA16_SNORM",
+          "features": "0xcd83",
+          "supported": true,
+          "fetch_wrong": 0
+        },
+        {
+          "format": "D16",
+          "features": "0xce01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D24S8",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "D32F",
+          "features": "0xce01",
+          "supported": true,
+          "fetch_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "D32FS8",
+          "features": "0xc601",
+          "supported": true,
+          "fetch_wrong": 0,
+          "pcf_wrong": 0
+        },
+        {
+          "format": "BC1",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC2",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC3",
+          "features": "0xd401",
+          "supported": true,
+          "fetch_wrong": 0,
+          "filter_wrong": 0
+        },
+        {
+          "format": "BC4",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "BC5",
+          "features": "0x0",
+          "supported": false
+        },
+        {
+          "format": "BC7",
+          "features": "0x0",
+          "supported": false
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] sampling D32FS8",
+        "[xdtest] PCF on D32FS8",
+        "[xdtest] sampling BC1",
+        "[xdtest] sampling BC2",
+        "[xdtest] sampling BC3",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "textures",
+      "driver": "radv",
+      "gpu_temp_c_before": "35.0",
+      "status": "crash",
+      "error": "no result (exit code 134)",
+      "progress": [
+        "[xdtest] creating instance",
+        "/usr/local/share/libdrm/amdgpu.ids: No such file or directory",
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "/usr/local/share/libdrm/amdgpu.ids: No such file or directory",
+        "FORTIFY: %w0 is unsupported"
+      ],
+      "driver_log": [
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.wsi.disable.unordered.submits\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.x11.ignore.suboptimal\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.disable.ngg.gs\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.enable.unified.heap.on.apu\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.report.llvm9.version.string\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.prefer.2d.swizzle.for.3d.storage\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.gfx12.hiz.wa\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.adaptive.sync\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.x11.override.min.image.count\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.x11.strict.image.count\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.x11.ensure.min.image.count\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.google.display.timing\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.device.coherent.memory\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.cooperative.matrix2.nv\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.emulate.rt\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.enable.float16.gfx8\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.require.etc2\"",
+        "10-17 19:10:27.739 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.require.astc\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.clear.lds\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.override.vram.size\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.override.graphics.shader.version\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.override.compute.shader.version\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.override.ray.tracing.shader.version\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.driconf.executable.override\"",
+        "10-17 19:10:27.740 W/libc    ( 6715): Access denied finding property \"vendor.mesa.process.name\"",
+        "10-17 19:10:27.744 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.force.family\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.userq\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.image.opcodes\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.cu.mask\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.parse.ib\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:27.745 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.disk.cache.single.file\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.disk.cache.database\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.disk.cache.multi.file\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.shader.cache.max.size\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.glsl.cache.max.size\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.wsi.debug\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.wsi.present.mode\"",
+        "10-17 19:10:27.766 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.wsi.headless.swapchain\"",
+        "10-17 19:10:27.767 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.enable.submit.thread\"",
+        "10-17 19:10:27.767 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.bvh.stats.file\"",
+        "10-17 19:10:27.767 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.enable.pipeline.cache\"",
+        "10-17 19:10:27.767 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.force.vrs.config.file\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.force.vrs\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.tex.aniso\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.tex.aniso\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.trap.handler\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.bvh.stats.file\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.radv.printf.buffer.size\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.vk.enable.pipeline.cache\"",
+        "10-17 19:10:27.768 W/libc    ( 6715): Access denied finding property \"vendor.mesa.aco.debug\"",
+        "10-17 19:10:27.769 W/libc    ( 6715): Access denied finding property \"vendor.mesa.spirv.debug\"",
+        "10-17 19:10:27.769 W/libc    ( 6715): Access denied finding property \"vendor.mesa.spirv.dump.path\"",
+        "10-17 19:10:27.769 W/libc    ( 6715): Access denied finding property \"vendor.mesa.spirv.read.path\"",
+        "10-17 19:10:27.769 W/libc    ( 6715): Access denied finding property \"vendor.mesa.spirv.force.unstructured\"",
+        "10-17 19:10:27.772 F/libc    ( 6715): FORTIFY: %w0 is unsupported",
+        "10-17 19:10:27.772 F/libc    ( 6715): Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 6715 (xdtest), pid 6715 (xdtest)",
+        "10-17 19:10:27.861 F/DEBUG   ( 6718): Cmdline: ./xdtest --driver /data/local/tmp/xd/vulkan.radeon.so --test textures --out /data/local/tmp/xd/out --tag radv",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):   NOTE:   /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #00 pc 0000000000077c60  /apex/com.android.runtime/lib64/bionic/libc.so (__fortify_fatal(char const*, ...)+228) (BuildId: a101e008162b1718f4c0f7e04274d228)",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #01 pc 00000000000cd8fc  /apex/com.android.runtime/lib64/bionic/libc.so (__vfprintf+10400) (BuildId: a101e008162b1718f4c0f7e04274d228)",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #02 pc 0000000000096554  /apex/com.android.runtime/lib64/bionic/libc.so (vsnprintf+192) (BuildId: a101e008162b1718f4c0f7e04274d228)",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #03 pc 0000000000edc890  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #04 pc 0000000000ed4424  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #05 pc 0000000000ed43c8  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #06 pc 00000000011278ec  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #07 pc 000000000101e948  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #08 pc 00000000010107b8  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #09 pc 000000000100e8c0  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #10 pc 000000000100e4fc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #11 pc 000000000100c118  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #12 pc 0000000000d204bc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #13 pc 0000000000d058cc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #14 pc 0000000000d05d44  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #15 pc 0000000000d05fcc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:27.862 F/DEBUG   ( 6718):       #18 pc 00000000000683fc  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+120) (BuildId: a101e008162b1718f4c0f7e04274d228)"
+      ]
+    },
+    {
+      "test": "mips",
+      "driver": "radv",
+      "gpu_temp_c_before": "35.0",
+      "status": "crash",
+      "error": "no result (exit code 134)",
+      "progress": [
+        "/usr/local/share/libdrm/amdgpu.ids: No such file or directory",
+        "amdgpu: DRM version is 3.42.0 (< 3.54); continuing.",
+        "[xdtest] creating device",
+        "/usr/local/share/libdrm/amdgpu.ids: No such file or directory",
+        "[xdtest] creating pipeline",
+        "FORTIFY: %w0 is unsupported"
+      ],
+      "driver_log": [
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.wsi.disable.unordered.submits\"",
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.x11.ignore.suboptimal\"",
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.disable.ngg.gs\"",
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.enable.unified.heap.on.apu\"",
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.report.llvm9.version.string\"",
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.prefer.2d.swizzle.for.3d.storage\"",
+        "10-17 19:10:28.655 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.gfx12.hiz.wa\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.adaptive.sync\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.x11.override.min.image.count\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.x11.strict.image.count\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.x11.ensure.min.image.count\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.google.display.timing\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.device.coherent.memory\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.cooperative.matrix2.nv\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.emulate.rt\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.enable.float16.gfx8\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.require.etc2\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.require.astc\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.clear.lds\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.override.vram.size\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.override.graphics.shader.version\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.override.compute.shader.version\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.override.ray.tracing.shader.version\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.driconf.executable.override\"",
+        "10-17 19:10:28.656 W/libc    ( 6751): Access denied finding property \"vendor.mesa.process.name\"",
+        "10-17 19:10:28.660 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.force.family\"",
+        "10-17 19:10:28.660 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.userq\"",
+        "10-17 19:10:28.660 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.image.opcodes\"",
+        "10-17 19:10:28.661 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.cu.mask\"",
+        "10-17 19:10:28.661 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.parse.ib\"",
+        "10-17 19:10:28.661 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:28.661 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:28.661 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:28.661 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:28.673 W/libc    ( 6751): Access denied finding property \"vendor.mesa.disk.cache.single.file\"",
+        "10-17 19:10:28.673 W/libc    ( 6751): Access denied finding property \"vendor.mesa.disk.cache.database\"",
+        "10-17 19:10:28.673 W/libc    ( 6751): Access denied finding property \"vendor.mesa.disk.cache.multi.file\"",
+        "10-17 19:10:28.673 W/libc    ( 6751): Access denied finding property \"vendor.mesa.shader.cache.max.size\"",
+        "10-17 19:10:28.673 W/libc    ( 6751): Access denied finding property \"vendor.mesa.glsl.cache.max.size\"",
+        "10-17 19:10:28.674 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.wsi.debug\"",
+        "10-17 19:10:28.674 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.wsi.present.mode\"",
+        "10-17 19:10:28.674 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.wsi.headless.swapchain\"",
+        "10-17 19:10:28.674 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.enable.submit.thread\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.bvh.stats.file\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.enable.pipeline.cache\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.force.vrs.config.file\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.force.vrs\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.tex.aniso\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.tex.aniso\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.amd.priority\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.trap.handler\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.bvh.stats.file\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.radv.printf.buffer.size\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.vk.enable.pipeline.cache\"",
+        "10-17 19:10:28.675 W/libc    ( 6751): Access denied finding property \"vendor.mesa.aco.debug\"",
+        "10-17 19:10:28.676 W/libc    ( 6751): Access denied finding property \"vendor.mesa.spirv.debug\"",
+        "10-17 19:10:28.676 W/libc    ( 6751): Access denied finding property \"vendor.mesa.spirv.dump.path\"",
+        "10-17 19:10:28.676 W/libc    ( 6751): Access denied finding property \"vendor.mesa.spirv.read.path\"",
+        "10-17 19:10:28.676 W/libc    ( 6751): Access denied finding property \"vendor.mesa.spirv.force.unstructured\"",
+        "10-17 19:10:28.681 F/libc    ( 6751): FORTIFY: %w0 is unsupported",
+        "10-17 19:10:28.681 F/libc    ( 6751): Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 6751 (xdtest), pid 6751 (xdtest)",
+        "10-17 19:10:28.745 F/DEBUG   ( 6754): Cmdline: ./xdtest --driver /data/local/tmp/xd/vulkan.radeon.so --test mips --out /data/local/tmp/xd/out --tag radv",
+        "10-17 19:10:28.745 F/DEBUG   ( 6754):   NOTE:   /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #00 pc 0000000000077c60  /apex/com.android.runtime/lib64/bionic/libc.so (__fortify_fatal(char const*, ...)+228) (BuildId: a101e008162b1718f4c0f7e04274d228)",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #01 pc 00000000000cd8fc  /apex/com.android.runtime/lib64/bionic/libc.so (__vfprintf+10400) (BuildId: a101e008162b1718f4c0f7e04274d228)",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #02 pc 0000000000096554  /apex/com.android.runtime/lib64/bionic/libc.so (vsnprintf+192) (BuildId: a101e008162b1718f4c0f7e04274d228)",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #03 pc 0000000000edc890  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #04 pc 0000000000ed4424  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #05 pc 0000000000ed43c8  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #06 pc 00000000011278ec  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #07 pc 000000000101e948  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #08 pc 00000000010107b8  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #09 pc 000000000100e8c0  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #10 pc 000000000100e4fc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #11 pc 000000000100c118  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #12 pc 0000000000d204bc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #13 pc 0000000000d058cc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #14 pc 0000000000d05d44  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #15 pc 0000000000d05fcc  /data/local/tmp/xd/vulkan.radeon.so",
+        "10-17 19:10:28.746 F/DEBUG   ( 6754):       #18 pc 00000000000683fc  /apex/com.android.runtime/lib64/bionic/libc.so (__libc_init+120) (BuildId: a101e008162b1718f4c0f7e04274d228)"
+      ]
+    },
+    {
+      "test": "mips",
+      "driver": "stock",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 23.998,
+      "ms_instance": 40.562,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 1.496,
+      "texture_compression_bc": false,
+      "cases": [
+        {
+          "case": "RGBA8 64x64",
+          "supported": true,
+          "levels": 7,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 2048x2048",
+          "supported": true,
+          "levels": 12,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 640x360",
+          "supported": true,
+          "levels": 10,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "RGBA8 cube 128",
+          "supported": true,
+          "levels": 8,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC1 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC3 1024x1024",
+          "supported": true,
+          "levels": 11,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        },
+        {
+          "case": "BC4 512x512",
+          "supported": false
+        },
+        {
+          "case": "BC5 1024x1024",
+          "supported": false
+        },
+        {
+          "case": "BC7 512x512",
+          "supported": false
+        },
+        {
+          "case": "BC1 cube 256",
+          "supported": true,
+          "levels": 9,
+          "wrong_fetch": 0,
+          "wrong_sample": 0,
+          "wrong_grad": 0,
+          "wrong_cube": 0,
+          "wrong_levels": []
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] RGBA8 640x360",
+        "[xdtest] RGBA8 cube 128",
+        "[xdtest] BC1 1024x1024",
+        "[xdtest] BC3 1024x1024",
+        "[xdtest] BC1 cube 256",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "depth",
+      "driver": "stock",
+      "gpu_temp_c_before": "35.0",
+      "ms_load": 12.782,
+      "ms_instance": 27.026,
+      "device_name": "Samsung Xclipse 940",
+      "api_version": "1.3.279",
+      "driver_version": "0x6000216",
+      "vendor_id": "0x144d",
+      "device_id": "0x2600200",
+      "driver_id": 21,
+      "driver_name": "Samsung Proprietary driver",
+      "driver_info": "Driver version: 24.0.534, git hash: 1900168dcb ",
+      "subgroup_size": 64,
+      "ms_device": 0.948,
+      "formats": [
+        {
+          "format": "D16",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D32F",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D24S8",
+          "supported": false
+        },
+        {
+          "format": "D32FS8",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating pipelines",
+        "[xdtest] dummy image layout",
+        "[xdtest] D16",
+        "[xdtest] D32F",
+        "[xdtest] D32FS8",
+        "[xdtest] tearing down"
+      ]
+    },
+    {
+      "test": "depth",
+      "driver": "radv",
+      "gpu_temp_c_before": "36.0",
+      "ms_load": 11.814,
+      "ms_instance": 1.824,
+      "device_name": "AMD Radeon Graphics (RADV TITAN)",
+      "api_version": "1.4.358",
+      "driver_version": "0x6802063",
+      "vendor_id": "0x144d",
+      "device_id": "0x73a0",
+      "driver_id": 3,
+      "driver_name": "radv",
+      "driver_info": "Mesa 26.3.0-devel",
+      "subgroup_size": 64,
+      "ms_device": 1.692,
+      "formats": [
+        {
+          "format": "D16",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D32F",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        },
+        {
+          "format": "D24S8",
+          "supported": false
+        },
+        {
+          "format": "D32FS8",
+          "supported": true,
+          "wrong_depth": 0,
+          "wrong_stencil": 0,
+          "wrong_compare": 0,
+          "wrong_pcf": 0
+        }
+      ],
+      "status": "pass",
+      "progress": [
+        "[xdtest] creating pipelines",
+        "[xdtest] dummy image layout",
+        "[xdtest] D16",
+        "[xdtest] D32F",
+        "[xdtest] D32FS8",
+        "[xdtest] tearing down"
+      ]
+    }
+  ]
+}

@@ -29,3 +29,4 @@ __pycache__/
 /results/*/*
 !/results/*/summary.md
 !/results/*/results.json
+.DS_Store
