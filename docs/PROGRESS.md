@@ -1362,3 +1362,26 @@ DXVK holds nearly all of it (the earlier 2.3-2.9 GB readings were load peaks wit
 other textures 231, storage 32, depth 17). That leaves about 1 GB of buffers suballocated in
 DXVK's chunks (mesh vertex/index data, constant and staging buffers), which the driver can't
 split further because DXVK binds one buffer over each whole chunk.
+
+### 2026-10-18: allocation backpressure (debug.radv_xclipse_memwait) shows no clear gain
+
+xd-ac77309 adds an opt-in wait before creating a BO of 4 MB or more. While MemFree is below N MB
+(`debug.radv_xclipse_memwait=N` or `RADV_XCLIPSE_MEMWAIT`), it waits in 10 ms steps for up to
+300 ms and logs `[MEMWAIT]`. The idea: lmkd's kills are watermark kills, and at the Continue load
+GPU memory grows about 1.8 GB while the game's CPU heap grows 0.55 GB, so slowing the pinned GPU
+allocations might let kswapd keep up. The kernel watermarks are about 10 MB min, 61 MB low and
+113 MB high, summed over the DMA32 and Normal zones, so "min2x" fires near 20 MB free.
+
+Results, Life is Strange `play --no-kill`, same setup as above:
+
+| memwait | reached play and alive 90 s later |
+|---|---|
+| 0 (off) | 4 of 6 (1 killed loading, 1 died in play) |
+| 150 MB | 6 of 7 (1 killed loading) |
+
+The alternating A/B half of that was 3 of 4 each way. In play MemFree normally sits at 90-200 MB,
+so at 150 most waits hit the 300 ms cap (18-48 waits per run), and MemFree still dipped to
+27-45 MB while other threads allocated. Two of the seven runs reached the first scene about 80 s
+later than usual (197-201 s against 110-130 s). The difference is within noise at this sample size,
+so the switch stays off by default and isn't part of the package. With `am kill-all` through the
+load, survival was 4 of 5.
