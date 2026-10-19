@@ -202,7 +202,8 @@ def memory_sample(user: str, processes: dict[str, str] | None = None) -> dict:
                 f"ps -A -u {user} -o PID=,NAME=; "
                 f"for p in $(ps -A -u {user} -o PID=); do grep -h -E '^Vm(RSS|Swap):' /proc/$p/status; "
                 "done", 30)
-    kb = {"MemAvailable:": 0, "SwapFree:": 0, "GpuTotal:": 0, "VmRSS:": 0, "VmSwap:": 0}
+    kb = {"MemAvailable:": 0, "MemFree:": 0, "SwapFree:": 0, "GpuTotal:": 0, "GpuSwap:": 0,
+          "VmRSS:": 0, "VmSwap:": 0}
     psi_full = None
     gpu_bytes, pids = {}, set()
     for line in out.splitlines():
@@ -222,7 +223,8 @@ def memory_sample(user: str, processes: dict[str, str] | None = None) -> dict:
                 processes[parts[0]] = parts[1].strip()
     return {"available_mb": kb["MemAvailable:"] // 1024, "swap_free_mb": kb["SwapFree:"] // 1024,
             "app_rss_mb": kb["VmRSS:"] // 1024, "app_swap_mb": kb["VmSwap:"] // 1024,
-            "gpu_total_mb": kb["GpuTotal:"] // 1024,
+            "free_mb": kb["MemFree:"] // 1024,
+            "gpu_total_mb": kb["GpuTotal:"] // 1024, "gpu_swap_mb": kb["GpuSwap:"] // 1024,
             "app_gpu_mb": sum(gpu_bytes.get(pid, 0) for pid in pids) // (1 << 20),
             "pressure_full_avg10": psi_full}
 

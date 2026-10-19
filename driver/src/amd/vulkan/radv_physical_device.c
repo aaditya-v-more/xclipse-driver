@@ -474,6 +474,10 @@ radv_xclipse_knob_is_diagnostic(const char *entry)
       "RADV_XCLIPSE_LOG",     "debug.radv_xclipse_log",
       "RADV_XCLIPSE_PERF",    "debug.radv_xclipse_perf",
       "RADV_XCLIPSE_PERF_MS", "debug.radv_xclipse_perf_ms",
+      /* Memory policy: these change when and what the winsys allocates, never a shader. */
+      "RADV_XCLIPSE_MEMWAIT",    "debug.radv_xclipse_memwait",
+      "RADV_XCLIPSE_GPUSWAP",    "debug.radv_xclipse_gpuswap",
+      "RADV_XCLIPSE_GPUSWAP_MB", "debug.radv_xclipse_gpuswap_mb",
    };
    const size_t len = strcspn(entry, "=");
    for (unsigned i = 0; i < ARRAY_SIZE(diag); i++) {

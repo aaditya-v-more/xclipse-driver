@@ -22,6 +22,8 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <xf86drm.h>
 #include "drm-uapi/amdgpu_drm.h"
 #include <sys/mman.h>
@@ -103,6 +105,116 @@ radv_xclipse_memwait(uint64_t size)
    if (waited)
       AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_CHURN", "[MEMWAIT] %u ms before +%" PRIu64 " MB: MemFree %" PRIu64 " -> %" PRIu64 " MB",
                       waited, size >> 20, free0, free);
+}
+
+/* GPU memory swap. Samsung's sgpu (CONFIG_DRM_SGPU_GRAPHIC_MEMORY_RECLAIM, drivers/gpu/drm/samsung/
+ * gpu/sgpu/sgpu_swap.c) gives every process that opens the GPU a sysfs node it owns,
+ * /sys/kernel/gpu/proc/<tgid>/swap. Writing N swaps out up to N bytes of the process's buffers,
+ * oldest first (it stops at the first buffer that no longer fits the budget), skipping busy ones:
+ * each is moved to system placement, copied into shmem and reclaimed to zram. A swapped buffer comes
+ * back when a submission next validates it, so the game keeps running; the system itself uses this for
+ * games in the background (GpuSwap in /proc/meminfo). With RADV_XCLIPSE_GPUSWAP /
+ * debug.radv_xclipse_gpuswap set to N (MB), creating a BO of 1 MB or more while MemFree is below N MB
+ * first asks the kernel to swap out RADV_XCLIPSE_GPUSWAP_MB MB (debug.radv_xclipse_gpuswap_mb, default
+ * 256) plus the new size, at most once per 50 ms. The write returns when the copies are done, which is
+ * the backpressure. 0 or unset turns it off. Logs [GPUSWAP] with debug.radv_xclipse_log 1. */
+static unsigned
+radv_xclipse_gpuswap_mb(unsigned *budget_mb)
+{
+   static int mb = -1;
+   static int budget = 256;
+   if (mb < 0) {
+      const char *e = getenv("RADV_XCLIPSE_GPUSWAP");
+      const char *b = getenv("RADV_XCLIPSE_GPUSWAP_MB");
+      if (e && !*e)
+         e = NULL;
+      if (b && !*b)
+         b = NULL;
+#ifdef __ANDROID__
+      char v[PROP_VALUE_MAX] = {0};
+      mb = e ? atoi(e) : (__system_property_get("debug.radv_xclipse_gpuswap", v) > 0 ? atoi(v) : 0);
+      char w[PROP_VALUE_MAX] = {0};
+      if (!b && __system_property_get("debug.radv_xclipse_gpuswap_mb", w) > 0 && w[0])
+         b = w;
+#else
+      mb = e ? atoi(e) : 0;
+#endif
+      if (b && atoi(b) > 0)
+         budget = atoi(b);
+      if (mb < 0)
+         mb = 0;
+      AC_XCLIPSE_LOGP(ANDROID_LOG_INFO, "RADV_ARM", "[ARM] gpuswap=%d MB, budget %d MB (%s)", mb, budget,
+                      e ? "env" : "prop/default");
+   }
+   *budget_mb = budget;
+   return mb;
+}
+
+/* GpuSwap in MB from /proc/meminfo (the kernel's swapped GPU pages), or 0 if absent. */
+static uint64_t
+radv_xclipse_gpuswap_meminfo_mb(void)
+{
+   char buf[256];
+   FILE *f = fopen("/proc/meminfo", "r");
+   if (!f)
+      return 0;
+   uint64_t kb = 0;
+   while (fgets(buf, sizeof(buf), f)) {
+      if (sscanf(buf, "GpuSwap: %" SCNu64, &kb) == 1)
+         break;
+   }
+   fclose(f);
+   return kb >> 10;
+}
+
+static void
+radv_xclipse_gpuswap(uint64_t size)
+{
+   unsigned budget_mb;
+   unsigned limit = radv_xclipse_gpuswap_mb(&budget_mb);
+   if (!limit || size < (1ull << 20))
+      return;
+   uint64_t free0 = radv_xclipse_memfree_mb();
+   if (free0 >= limit)
+      return;
+
+   static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+   static int64_t last_ns;
+   static int fd = -2;   /* -2 unopened, -1 unavailable */
+   pthread_mutex_lock(&lock);
+   int64_t now = os_time_get_nano();
+   if (last_ns && now - last_ns < 50 * 1000000ll) {
+      pthread_mutex_unlock(&lock);
+      return;
+   }
+   if (fd == -2) {
+      char path[64];
+      snprintf(path, sizeof(path), "/sys/kernel/gpu/proc/%d/swap", (int)getpid());
+      fd = open(path, O_WRONLY | O_CLOEXEC);
+      if (fd < 0) {
+         AC_XCLIPSE_LOGP(ANDROID_LOG_ERROR, "RADV_CHURN", "[GPUSWAP] %s: %s; off", path, strerror(errno));
+         fd = -1;
+      }
+   }
+   if (fd < 0) {
+      pthread_mutex_unlock(&lock);
+      return;
+   }
+   char num[32];
+   uint64_t bytes = ((uint64_t)budget_mb << 20) + size;
+   int len = snprintf(num, sizeof(num), "%" PRIu64, bytes);
+   uint64_t swapped0 = radv_xclipse_gpuswap_meminfo_mb();
+   ssize_t w = write(fd, num, len);
+   int err = w < 0 ? errno : 0;
+   last_ns = os_time_get_nano();
+   pthread_mutex_unlock(&lock);
+   if (ac_xclipse_log_level() >= 1 || err) {
+      AC_XCLIPSE_LOGP(err ? ANDROID_LOG_ERROR : ANDROID_LOG_INFO, "RADV_CHURN",
+                      "[GPUSWAP] asked %" PRIu64 " MB before +%" PRIu64 " MB in %d ms: MemFree %" PRIu64 " -> %" PRIu64
+                      " MB, GpuSwap %" PRIu64 " -> %" PRIu64 " MB%s%s",
+                      bytes >> 20, size >> 20, (int)((last_ns - now) / 1000000), free0, radv_xclipse_memfree_mb(),
+                      swapped0, radv_xclipse_gpuswap_meminfo_mb(), err ? ": " : "", err ? strerror(err) : "");
+   }
 }
 
 /* Size histogram of created BOs, powers of 4 from 16KB. */
@@ -1154,6 +1266,7 @@ radv_amdgpu_winsys_bo_create(struct radeon_winsys *_ws, uint64_t size, unsigned 
       request.flags |= AMDGPU_GEM_CREATE_ENCRYPTED;
    }
 
+   radv_xclipse_gpuswap(size);
    radv_xclipse_memwait(size);
    r = ac_drm_bo_alloc(ws->dev, &request, &buf_handle);
    if (r) {
