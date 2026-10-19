@@ -548,7 +548,10 @@ struct radv_compiler_info {
       uint32_t xclipse_gfx11_cache_scope : 1;
       /* Filter unfilterable formats in the shader (radv_nir_lower_xclipse_filter). */
       uint32_t xclipse_filter_emu : 2;
-      uint32_t padding : 7;
+      /* RDNA3 dual-issue VALU and s_delay_alu on a gfx11_isa chip (940 opt-in). */
+      uint32_t xclipse_vopd : 1;
+      uint32_t xclipse_delay_alu : 1;
+      uint32_t padding : 5;
    } hw;
 
    /* Misc values included as part of the cache key */

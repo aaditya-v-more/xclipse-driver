@@ -193,6 +193,10 @@ struct radv_physical_device {
     * (RADV_XCLIPSE_GL1SCOPE=0 / debug.radv_xclipse_gl1scope 0; A/B only, brings back the blue
     * streaks). */
    bool xclipse_gfx11_cache_scope;
+   /* RDNA3 ISA features the 920's core lacks, untested on the 940 until probed (opt-in):
+    * dual-issue VALU (VOPD, wave32 only) and s_delay_alu scheduling hints. */
+   bool xclipse_vopd;
+   bool xclipse_delay_alu;
    /* Linear filtering of 32-bit float and 16-bit UNORM/SNORM formats in the shader. */
    uint8_t xclipse_filter_emu; /* 0 off, 1 full, 2 bilinear only, 3 branch only */
 

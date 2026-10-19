@@ -3161,6 +3161,15 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
 
    pdev->xclipse_buffer_l2 = radv_xclipse_flag("RADV_XCLIPSE_BUFL2", "radv_xclipse_bufl2");
    pdev->xclipse_gfx11_cache_scope = radv_xclipse_flag_off("RADV_XCLIPSE_GL1SCOPE", "radv_xclipse_gl1scope");
+   /* The 920 decodes GFX11 encodings on an RDNA2 core, so ACO keeps RDNA3's dual-issue VALU and
+    * s_delay_alu off for every gfx11_isa chip. The 940 is sold as RDNA3; RADV_XCLIPSE_VOPD=1 /
+    * debug.radv_xclipse_vopd 1 and RADV_XCLIPSE_DELAYALU=1 / debug.radv_xclipse_delayalu 1 turn
+    * them on there, to probe and A/B (VOPD pairs form in wave32 shaders only: RADV_PERFTEST=
+    * pswave32,cswave32). Both change binaries; the knobs are part of the cache key. */
+   pdev->xclipse_vopd = pdev->info.xclipse_model == AC_XCLIPSE_940 &&
+                        radv_xclipse_flag("RADV_XCLIPSE_VOPD", "radv_xclipse_vopd");
+   pdev->xclipse_delay_alu = pdev->info.xclipse_model == AC_XCLIPSE_940 &&
+                             radv_xclipse_flag("RADV_XCLIPSE_DELAYALU", "radv_xclipse_delayalu");
    pdev->xclipse_filter_emu = 0;
    if (pdev->info.xclipse_model == AC_XCLIPSE_940) {
       /* "0" turns the filter emulation off; "2" skips the second level of a linear mip filter; "3"

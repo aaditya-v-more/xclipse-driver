@@ -3602,8 +3602,9 @@ radv_aco_fill_compiler_options(struct aco_compiler_options *aco_info, const stru
     * features (dual-issue VALU) stay off. */
    if (compiler_info->hw.gfx11_isa)
       aco_info->gfx_level = GFX11;
-   aco_info->has_vopd = aco_info->gfx_level >= GFX11 && !compiler_info->hw.gfx11_isa;
-   aco_info->no_delay_alu = compiler_info->hw.gfx11_isa;
+   aco_info->has_vopd = aco_info->gfx_level >= GFX11 &&
+                        (!compiler_info->hw.gfx11_isa || compiler_info->hw.xclipse_vopd);
+   aco_info->no_delay_alu = compiler_info->hw.gfx11_isa && !compiler_info->hw.xclipse_delay_alu;
    aco_info->gfx10_global_offsets = compiler_info->hw.gfx11_isa;
    /* RADV_XCLIPSE_SCRATCHINIT=0 turns it off, for A/B only (an env var, so it is part of the
     * shader cache key): scratch then does not work on this chip at all. */
