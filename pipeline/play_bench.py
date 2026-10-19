@@ -247,7 +247,8 @@ def run_once(game: str, name: str, items: dict[str, str], known: set[str], run_d
                 result["cpu_x4_mhz"] = result["cpu_clock_mhz"][-1]
         if memory:
             for key, pick in (("app_gpu_mb", max), ("app_rss_mb", max), ("app_swap_mb", max),
-                              ("available_mb", min), ("skin_c", max)):
+                              ("available_mb", min), ("free_mb", min), ("gpu_swap_mb", max),
+                              ("skin_c", max)):
                 values = [m[key] for m in memory if m.get(key) is not None]
                 if values:
                     result[f"{key}_{pick.__name__}"] = pick(values)
