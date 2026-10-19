@@ -313,7 +313,8 @@ def summarize(meta: dict, results: list[dict], sim: dict) -> str:
              f"Scene capture {meta['seconds']} s per run ({WARMUP_S} s warm-up, {MEASURE_S} s "
              f"measured), {meta['rounds']} rounds, variants in turn. "
              f"`am kill-all` through the load: {'no' if meta['no_kill'] else 'yes'}. "
-             f"Cool-down to GPU {meta.get('max_temp')} C, skin {meta.get('max_skin')} C. "
+             f"Cool-down to GPU {meta.get('max_temp')} C, skin {meta.get('max_skin')} C; fixed "
+             f"performance mode: {'yes' if meta.get('fixed_clocks') else 'no'}. "
              f"Phone: {meta['phone'].get('model')} {meta['phone'].get('build')}, "
              f"Android {meta['phone'].get('android')}, GPU max clock "
              f"{meta['phone'].get('gpu_max_clock_khz')} kHz.", ""]
@@ -392,6 +393,8 @@ def main() -> None:
     ap.add_argument("--max-temp", type=float, default=42, help="GPU C to cool to before a run; 0 skips")
     ap.add_argument("--max-skin", type=float, default=38)
     ap.add_argument("--cool-limit", type=float, default=900, help="longest cool-down in seconds")
+    ap.add_argument("--fixed", action="store_true",
+                    help="Android's fixed performance mode for the whole session (steadier clocks)")
     args = ap.parse_args()
     if args.seconds < WARMUP_S + MEASURE_S + 5:
         sys.exit(f"--seconds must be at least {WARMUP_S + MEASURE_S + 5}")
@@ -408,13 +411,18 @@ def main() -> None:
             items.setdefault(key, variants[baseline][key])
     select_phone()
     shell(STAY_ON_CMD)
+    if args.fixed:
+        out = shell("cmd power set-fixed-performance-mode-enabled true")
+        if "true" not in out.lower() and "success" not in out.lower():
+            sys.exit(f"fixed performance mode not confirmed: {out!r}")
     user = app_user()
     run_dir = RESULTS / (dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-play")
     run_dir.mkdir(parents=True)
     meta = {"game": args.game, "started": dt.datetime.now().isoformat(timespec="seconds"),
             "variants": variants, "rounds": args.rounds, "seconds": args.seconds,
             "measure_s": MEASURE_S, "no_kill": args.no_kill, "max_temp": args.max_temp or None,
-            "max_skin": args.max_skin if args.max_temp else None, "phone": phone_context()}
+            "max_skin": args.max_skin if args.max_temp else None, "fixed_clocks": args.fixed,
+            "phone": phone_context()}
     results: list[dict] = []
     print(f"writing {run_dir}", flush=True)
     try:
@@ -445,6 +453,8 @@ def main() -> None:
     finally:
         set_props({}, known)
         shell(f"am force-stop {APP}")
+        if args.fixed:
+            shell("cmd power set-fixed-performance-mode-enabled false")
         if container_keys:  # leave the container as the baseline variant has it
             apply_container(args.game, container_of(variants[baseline]))
         write(run_dir, meta, results, final=True)
