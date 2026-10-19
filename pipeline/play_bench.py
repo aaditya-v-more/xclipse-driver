@@ -412,8 +412,8 @@ def main() -> None:
     select_phone()
     shell(STAY_ON_CMD)
     if args.fixed:
-        out = shell("cmd power set-fixed-performance-mode-enabled true")
-        if "true" not in out.lower() and "success" not in out.lower():
+        out = shell("cmd power set-fixed-performance-mode-enabled true; echo rc=$?")
+        if out.strip() != "rc=0":  # silent on success
             sys.exit(f"fixed performance mode not confirmed: {out!r}")
     user = app_user()
     run_dir = RESULTS / (dt.datetime.now().strftime("%Y%m%d-%H%M%S") + "-play")
