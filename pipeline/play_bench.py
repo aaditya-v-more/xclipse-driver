@@ -49,7 +49,8 @@ import ssim as ssim_mod  # noqa: E402
 from game import (APP, CPU_POLICIES, LAUNCH_SETTINGS, LOW_MEMORY_KILL, MEMORY_EVERY_S,  # noqa: E402
                   MIN_STEADY_S, WARMUP_S, app_user, battery_sample, cool_down, drivers_seen,
                   frame_stats, game_layers, gpu_faults, gpu_sample, gpu_temp, logcat_since,
-                  memory_sample, present_times, screenshot, thermal_sample)
+                  logcat_start, logcat_stop, memory_sample, present_times, screenshot,
+                  thermal_sample)
 from run import RESULTS, STAY_ON_CMD, phone_context, phone_state, select_phone, shell  # noqa: E402
 
 DEFAULT_VARIANTS = ["default", "nggc=debug.radv_perftest=nggc",
@@ -158,6 +159,10 @@ def run_once(game: str, name: str, items: dict[str, str], known: set[str], run_d
     result["memory_before"] = memory_sample(user)
     faults_before = gpu_faults()
     since = shell("date '+%m-%d %H:%M:%S.000'")
+    # The phone's log from launch to the end of the run (driver diagnostics under
+    # debug.radv_xclipse_log, lmkd, crashes); it stays local, never committed.
+    logcat_start(run_dir / f"{tag}-logcat.txt")
+    result["logcat_file"] = f"{tag}-logcat.txt"
     t0 = time.monotonic()
     code, lines = play(game, args.no_kill)
     result["seconds_to_play"] = round(time.monotonic() - t0, 1)
@@ -247,6 +252,7 @@ def run_once(game: str, name: str, items: dict[str, str], known: set[str], run_d
                 if values:
                     result[f"{key}_{pick.__name__}"] = pick(values)
     shell(f"am force-stop {APP}")
+    logcat_stop()
     killed = logcat_since(since, LOW_MEMORY_KILL)
     if killed:
         result["status"] = "killed-low-memory"
@@ -267,6 +273,8 @@ def run_once(game: str, name: str, items: dict[str, str], known: set[str], run_d
     result.setdefault("status", "ran" if stats.get("steady_seconds", 0) >= MIN_STEADY_S
                       and stats.get("seconds", 0) >= 0.9 * MEASURE_S else "too-short")
     result["gpu_temp_c_after"] = gpu_temp()
+    from game import LOGCAT  # the capture file served logcat_since; the next run opens its own
+    LOGCAT.pop("path", None)
     return result
 
 
