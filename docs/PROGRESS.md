@@ -1395,3 +1395,53 @@ title's 3D scene (brightness 49.6-49.8 in `game_input.py look`, the same as with
 39-55 FPS in GameNative's overlay. The black scene of 2026-10-18 came with an ini that also set the
 streaming cvars, so it isn't a driver bug at the smaller render size; it isn't being pursued.
 Exec Arguments are back to `-nostartupmovies -dx11`; the properties are unset.
+
+### 2026-10-19: Android 17 kills every Life is Strange load; the kernel can swap GPU memory
+
+The phone updated itself to Android 17 (SDK 37, build S721BXXUEEZIF) since the handoff. Today
+`game_input.py play` (with `am kill-all` through the load) reached gameplay once in six launches;
+the other five were lmkd's "min2x watermark is breached even after kill" at the Continue load,
+against 4 of 5 on 2026-10-18. The kill is a one-second cascade: lmkd reclaims every cached app it
+has left, then the foreground app at oom_score_adj 0. GameNative's own process is small at that
+point (68 MB RSS, 108 MB dmabuf); the game's memory is in its Wine processes and in pinned GPU
+pages. The watermarks are unchanged (min 10 MB, low 61 MB, high 113 MB over the two zones); the
+burst outruns reclaim.
+
+`pipeline/play_bench.py` (new) is the in-game A/B: `--variant NAME[=debug.prop=value,driver:...,
+env:...,set:...]`, `--rounds`, `--fixed` (Android's fixed performance mode for the session,
+`cmd power set-fixed-performance-mode-enabled`, which pins the GPU at 400 MHz), retries on kills,
+logcat per run beside the results, SSIM against the baseline, MemFree and the kernel's GpuSwap in
+the memory samples. Runs: `results/20261019-183301-play` (normal clocks; the one surviving run:
+**26.3 FPS, 1% low 6.4, p99 100 ms, 212 stutters/min, GPU 95% busy at a 307 MHz average, skin
+43 C, 2219 MB GPU memory**) and `results/20261019-184916-play` (fixed mode; three kills, aborted).
+At normal clocks the GPU governor is `conservative`, the table runs 252-1095 MHz with a normal
+maximum of 800 MHz, and under this game the phone sits thermally capped near 307 MHz: energy per
+frame, not peak throughput, decides the frame rate here. Heaven at normal clocks runs near the
+60 Hz cap, so Life is Strange's first scene is the better discriminator.
+
+Two probes for the shader core (xd-f04c2df), both opt-in and unmeasured: `debug.radv_xclipse_vopd`
+turns on ACO's RDNA3 dual-issue VALU (VOPD; pairs only form in wave32, so with
+`debug.radv_perftest=pswave32,cswave32`) and `debug.radv_xclipse_delayalu` its `s_delay_alu`
+hints. ACO had both off for every gfx11_isa chip because the 920's core is RDNA2; the 940 is sold
+as RDNA3. They change binaries and are in the shader-cache key. The test is xdtest correctness
+first, then the LiS scene.
+
+**The kernel can swap GPU memory** (`CONFIG_DRM_SGPU_GRAPHIC_MEMORY_RECLAIM`, `sgpu_swap.c` in
+the pinned r12s kernel). Every process that opens the GPU gets `/sys/kernel/gpu/proc/<tgid>/`,
+owned by its own uid: `summary` (buffers, bytes, bytes populated) and `swap` (mode 0664). Writing
+N to `swap` swaps out up to N bytes of that process's buffers, oldest first, stopping at the first
+that no longer fits and skipping busy ones: each is moved to system placement, copied to shmem and
+reclaimed to zram; writing 0 swaps everything back. A swapped buffer returns when a submission
+next validates it (`sgpu_tt_swapin` in `amdgpu_ttm.c`), and the CS ioctl holds the process's swap
+lock, so it's safe to use while the game runs. The system uses it for backgrounded games
+(`GpuSwap` in `/proc/meminfo` was 31 MB with nothing of ours running); `sgpu_swap_ctrl` at the
+root is the system's own entry (root:system). The app's node is writable from inside the game
+process, which is where the driver runs. xd-299e141 adds `debug.radv_xclipse_gpuswap=N`: before
+creating a BO of 1 MB or more while MemFree is below N MB, the driver writes 256 MB plus the new
+size (`debug.radv_xclipse_gpuswap_mb` changes the 256) to its own node, at most every 50 ms; the
+write returns when the copies are done, which is the backpressure. `[GPUSWAP]` lines under
+`debug.radv_xclipse_log=1` give MemFree and GpuSwap before and after. The memory knobs
+(`memwait`, `gpuswap`, `gpuswap_mb`) are excluded from the shader-cache key. Untested on the
+phone: it went unplugged and locked before the first launch. The risk to measure is thrash: the
+oldest buffers may be the ones the next frame needs, and a swap-out of a buffer transiently
+allocates its size again in shmem.

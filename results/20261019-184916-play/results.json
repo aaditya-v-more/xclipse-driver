@@ -1,0 +1,481 @@
+{
+ "meta": {
+  "game": "LifeIsStrange3",
+  "started": "2026-10-19T18:49:16",
+  "variants": {
+   "default": {},
+   "nggc": {
+    "debug.radv_perftest": "nggc"
+   },
+   "filteremu0": {
+    "debug.radv_xclipse_filteremu": "0"
+   }
+  },
+  "rounds": 3,
+  "seconds": 75,
+  "measure_s": 60,
+  "no_kill": false,
+  "max_temp": 42,
+  "max_skin": 38,
+  "fixed_clocks": true,
+  "phone": {
+   "model": "SM-S721B",
+   "build": "S721BXXUEEZIF",
+   "android": "17",
+   "gpu_temp_c": "42.0",
+   "gpu_clock_khz": "0",
+   "gpu_max_clock_khz": "400000",
+   "battery": "level: 76 temperature: 395"
+  },
+  "launch_settings": [
+   "Screen Size: 1280x720",
+   "Graphics Driver: Wrapper-gamenative",
+   "DX Wrapper: dxvk (Config: 'version=2.7.1,framerate=0,maxDeviceMemory=0,async=0,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+   "WoW64 Mode: true",
+   "Box64 Version: 0.4.2",
+   "Box64 Preset: COMPATIBILITY",
+   "FEXCore Preset: INTERMEDIATE",
+   "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 DXVK_CONFIG=dxvk.enableDescriptorBuffer=False",
+   "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=dxvk.enableDescriptorBuffer=False VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= WRAPPER_VMEM_MAX_SIZE=512 MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 WRAPPER_EMULATE_BCN=0 WRAPPER_USE_BCN_CACHE=0 WRAPPER_BCN_GPU=0 WRAPPER_ASTC_BLOCK=8x8 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=-all WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+  ],
+  "driver": "RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)"
+ },
+ "ssim": {},
+ "results": [
+  {
+   "tag": "r0-default",
+   "variant": "default",
+   "props": {},
+   "container": {},
+   "props_read": {
+    "debug.radv_perftest": "",
+    "debug.radv_xclipse_filteremu": ""
+   },
+   "gpu_temp_c_before": 41.0,
+   "thermal_status_before": 1,
+   "skin_c_before": 38.0,
+   "memory_before": {
+    "available_mb": 2903,
+    "swap_free_mb": 10854,
+    "app_rss_mb": 0,
+    "app_swap_mb": 0,
+    "gpu_total_mb": 87,
+    "app_gpu_mb": 0,
+    "pressure_full_avg10": 0.0
+   },
+   "seconds_to_play": 153.8,
+   "play_log": [
+    "LifeIsStrange3: launched; Game Information gave way after 3.2 s (now showing in_game: ['FPS 0.0', 'CPU 63%', 'GPU 14%', 'RAM 4.0GB', 'BAT 77%', 'PWR 0.4W', 'GameNative', 'Launching game...'])",
+    "[  15.4 s] launched",
+    "[  19.3 s] the game's window (black): brightness 0.0",
+    "[  46.2 s] the game's first picture: brightness 16.0",
+    "[  70.6 s] the title screen: brightness 50.4 after 7 x RB",
+    "[  72.1 s] pressed A",
+    "[  74.9 s] pressed A",
+    "[  77.5 s] loading after Continue: brightness 6.0",
+    "GameNative is not in front (mCurrentFocus=null): the low-memory killer stopped GameNative:",
+    "10-19 18:52:33.418   614   614 I lmkd    : Reclaim 'app.gamenative' (15195), uid 10402, oom_score_adj 0, state 2(8) to free 70848kB rss, 36560kB anon rss, 108688kB swap, 40405kB dmabuf_pss, 108048kB dmabuf_rss; reason: min2x watermark is breached even after kill; level: 1"
+   ],
+   "status": "killed-low-memory",
+   "screenshot": "r0-default-failed.png",
+   "low_memory_kill": "10-19 18:52:33.418   614   614 I lmkd    : Reclaim 'app.gamenative' (15195), uid 10402, oom_score_adj 0, state 2(8) to free 70848kB rss, 36560kB anon rss, 108688kB swap, 40405kB dmabuf_pss, 108048kB dmabuf_rss; reason: min2x watermark is breached even after kill; level: 1",
+   "vulkan_drivers_seen": [],
+   "launch_settings": [
+    "Screen Size: 1280x720",
+    "Graphics Driver: Wrapper-gamenative",
+    "DX Wrapper: dxvk (Config: 'version=2.7.1,framerate=0,maxDeviceMemory=0,async=0,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+    "WoW64 Mode: true",
+    "Box64 Version: 0.4.2",
+    "Box64 Preset: COMPATIBILITY",
+    "FEXCore Preset: INTERMEDIATE",
+    "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 DXVK_CONFIG=dxvk.enableDescriptorBuffer=False",
+    "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=dxvk.enableDescriptorBuffer=False VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= WRAPPER_VMEM_MAX_SIZE=512 MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 WRAPPER_EMULATE_BCN=0 WRAPPER_USE_BCN_CACHE=0 WRAPPER_BCN_GPU=0 WRAPPER_ASTC_BLOCK=8x8 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=-all WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+   ],
+   "driver": "RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)",
+   "gpu_resets": 0,
+   "gpu_page_faults": 0,
+   "gpu_temp_c_after": 51.0
+  },
+  {
+   "tag": "r0-default-retry",
+   "variant": "default",
+   "props": {},
+   "container": {},
+   "props_read": {
+    "debug.radv_perftest": "",
+    "debug.radv_xclipse_filteremu": ""
+   },
+   "gpu_temp_c_before": 41.0,
+   "thermal_status_before": 1,
+   "skin_c_before": 38.0,
+   "memory_before": {
+    "available_mb": 3001,
+    "swap_free_mb": 10832,
+    "app_rss_mb": 0,
+    "app_swap_mb": 0,
+    "gpu_total_mb": 89,
+    "app_gpu_mb": 0,
+    "pressure_full_avg10": 0.0
+   },
+   "seconds_to_play": 160.0,
+   "play_log": [
+    "LifeIsStrange3: launched; Game Information gave way after 3.2 s (now showing in_game: ['FPS 0.0', 'CPU 63%', 'GPU 9%', 'RAM 4.1GB', 'BAT 77%', 'PWR 0.5W', 'GameNative', 'Launching game...'])",
+    "[  14.9 s] launched",
+    "[  18.8 s] the game's window (black): brightness 0.0",
+    "[  47.4 s] the game's first picture: brightness 16.0",
+    "[  71.6 s] the title screen: brightness 50.3 after 7 x RB",
+    "[  73.0 s] pressed A",
+    "[  75.9 s] pressed A",
+    "[  78.5 s] loading after Continue: brightness 6.0",
+    "GameNative is not in front (mCurrentFocus=Window{3a60d4e u0 com.sec.android.app.launcher/com.sec.android.app.launcher.activities.LauncherActivity}): the low-memory killer stopped GameNative:",
+    "10-19 18:57:16.324   614   614 I lmkd    : Reclaim 'app.gamenative' (30460), uid 10402, oom_score_adj 0, state 2(8) to free 68092kB rss, 36228kB anon rss, 125080kB swap, 40405kB dmabuf_pss, 108048kB dmabuf_rss; reason: min2x watermark is breached even after kill; level: 1"
+   ],
+   "status": "killed-low-memory",
+   "screenshot": "r0-default-retry-failed.png",
+   "low_memory_kill": "10-19 18:57:16.324   614   614 I lmkd    : Reclaim 'app.gamenative' (30460), uid 10402, oom_score_adj 0, state 2(8) to free 68092kB rss, 36228kB anon rss, 125080kB swap, 40405kB dmabuf_pss, 108048kB dmabuf_rss; reason: min2x watermark is breached even after kill; level: 1",
+   "vulkan_drivers_seen": [],
+   "launch_settings": [
+    "Screen Size: 1280x720",
+    "Graphics Driver: Wrapper-gamenative",
+    "DX Wrapper: dxvk (Config: 'version=2.7.1,framerate=0,maxDeviceMemory=0,async=0,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+    "WoW64 Mode: true",
+    "Box64 Version: 0.4.2",
+    "Box64 Preset: COMPATIBILITY",
+    "FEXCore Preset: INTERMEDIATE",
+    "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 DXVK_CONFIG=dxvk.enableDescriptorBuffer=False",
+    "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=dxvk.enableDescriptorBuffer=False VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= WRAPPER_VMEM_MAX_SIZE=512 MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 WRAPPER_EMULATE_BCN=0 WRAPPER_USE_BCN_CACHE=0 WRAPPER_BCN_GPU=0 WRAPPER_ASTC_BLOCK=8x8 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=-all WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+   ],
+   "driver": "RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)",
+   "gpu_resets": 0,
+   "gpu_page_faults": 0,
+   "gpu_temp_c_after": 49.0
+  },
+  {
+   "tag": "r0-nggc",
+   "variant": "nggc",
+   "props": {
+    "debug.radv_perftest": "nggc"
+   },
+   "container": {},
+   "props_read": {
+    "debug.radv_perftest": "nggc",
+    "debug.radv_xclipse_filteremu": ""
+   },
+   "gpu_temp_c_before": 41.0,
+   "thermal_status_before": 1,
+   "skin_c_before": 38.0,
+   "memory_before": {
+    "available_mb": 2826,
+    "swap_free_mb": 11004,
+    "app_rss_mb": 0,
+    "app_swap_mb": 0,
+    "gpu_total_mb": 86,
+    "app_gpu_mb": 0,
+    "pressure_full_avg10": 0.29
+   },
+   "seconds_to_play": 84.5,
+   "play_log": [
+    "[  15.7 s] launched",
+    "[  19.7 s] the game's window (black): brightness 0.0",
+    "[  46.7 s] the game's first picture: brightness 16.0",
+    "[  66.7 s] the title screen: brightness 51.0 after 6 x RB",
+    "[  68.2 s] pressed A",
+    "[  71.0 s] pressed A",
+    "[  72.0 s] loading after Continue: brightness 6.0",
+    "[  76.9 s] the first scene: brightness 23.4",
+    "[  79.2 s] pressed RB",
+    "[  81.6 s] pressed RB",
+    "[  84.0 s] pressed RB",
+    "[  84.0 s] LifeIsStrange3 is in play"
+   ],
+   "status": "killed-low-memory",
+   "app_exited_s": 16,
+   "screenshot": "r0-nggc.png",
+   "surfaceflinger": {
+    "frames": 23
+   },
+   "refresh_period_ns": 8333333,
+   "layer": "cea6ee2 SurfaceView[app.gamenative/app.gamenative.MainActivity]@0(BLAST)#15046",
+   "memory": [
+    {
+     "t": 1,
+     "available_mb": 1710,
+     "swap_free_mb": 9774,
+     "app_rss_mb": 878,
+     "app_swap_mb": 632,
+     "gpu_total_mb": 1204,
+     "app_gpu_mb": 1116,
+     "pressure_full_avg10": 4.38,
+     "battery_charge_uah": 1862000,
+     "battery_level": 78,
+     "battery_voltage_mv": 4111,
+     "battery_temperature_dc": 393,
+     "thermal_status": 0,
+     "skin_c": 38.6
+    },
+    {
+     "t": 6,
+     "available_mb": 1117,
+     "swap_free_mb": 9818,
+     "app_rss_mb": 748,
+     "app_swap_mb": 741,
+     "gpu_total_mb": 1444,
+     "app_gpu_mb": 1240,
+     "pressure_full_avg10": 6.73,
+     "battery_charge_uah": 1862000,
+     "battery_level": 78,
+     "battery_voltage_mv": 4111,
+     "battery_temperature_dc": 393,
+     "thermal_status": 0,
+     "skin_c": 39.1
+    },
+    {
+     "t": 11,
+     "available_mb": 975,
+     "swap_free_mb": 9793,
+     "app_rss_mb": 664,
+     "app_swap_mb": 814,
+     "gpu_total_mb": 1444,
+     "app_gpu_mb": 1240,
+     "pressure_full_avg10": 5.86,
+     "battery_charge_uah": 1862000,
+     "battery_level": 78,
+     "battery_voltage_mv": 4143,
+     "battery_temperature_dc": 395,
+     "thermal_status": 0,
+     "skin_c": 39.1
+    },
+    {
+     "t": 16,
+     "available_mb": 1694,
+     "swap_free_mb": 9845,
+     "app_rss_mb": 0,
+     "app_swap_mb": 0,
+     "gpu_total_mb": 1428,
+     "app_gpu_mb": 1224,
+     "pressure_full_avg10": 9.51,
+     "battery_charge_uah": 1862000,
+     "battery_level": 78,
+     "battery_voltage_mv": 4143,
+     "battery_temperature_dc": 395,
+     "thermal_status": 0,
+     "skin_c": 39.3
+    }
+   ],
+   "gpu": [
+    [
+     0.5,
+     4,
+     400000,
+     57.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     2.1,
+     0,
+     400000,
+     59.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     2.9,
+     0,
+     0,
+     59.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     4.3,
+     0,
+     400000,
+     60.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     5.0,
+     0,
+     0,
+     58.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     5.7,
+     0,
+     0,
+     58.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     7.0,
+     0,
+     0,
+     57.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     7.6,
+     0,
+     0,
+     56.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     8.3,
+     0,
+     0,
+     55.0,
+     1152000,
+     1536000,
+     1152000,
+     1632000
+    ],
+    [
+     9.0,
+     0,
+     400000,
+     54.0,
+     1152000,
+     1152000,
+     1536000,
+     1632000
+    ],
+    [
+     9.7,
+     0,
+     0,
+     53.0,
+     1056000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     10.4,
+     0,
+     0,
+     52.0,
+     1152000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     11.1,
+     0,
+     0,
+     52.0,
+     1536000,
+     1536000,
+     1152000,
+     1632000
+    ],
+    [
+     12.5,
+     0,
+     400000,
+     53.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     13.2,
+     0,
+     0,
+     53.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     13.9,
+     0,
+     0,
+     53.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     14.6,
+     0,
+     0,
+     54.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     15.2,
+     7,
+     400000,
+     55.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ],
+    [
+     16.2,
+     0,
+     0,
+     55.0,
+     1536000,
+     1536000,
+     1536000,
+     1632000
+    ]
+   ],
+   "app_gpu_mb_max": 1240,
+   "app_rss_mb_max": 878,
+   "app_swap_mb_max": 814,
+   "available_mb_min": 975,
+   "skin_c_max": 39.3,
+   "low_memory_kill": "10-19 19:01:14.258   614   614 I lmkd    : Reclaim 'app.gamenative' (17832), uid 10402, oom_score_adj 700, state 10(3) to free 90396kB rss, 31252kB anon rss, 123912kB swap, 10200kB dmabuf_pss, 17432kB dmabuf_rss; reason: min2x watermark is breached and swap is low (9199156kB < 5158992kB); level: 2",
+   "vulkan_drivers_seen": [],
+   "launch_settings": [
+    "Screen Size: 1280x720",
+    "Graphics Driver: Wrapper-gamenative",
+    "DX Wrapper: dxvk (Config: 'version=2.7.1,framerate=0,maxDeviceMemory=0,async=0,asyncCache=0,vkd3dVersion=2.14.1,vkd3dLevel=12_1,ddrawrapper=none,csmt=3,gpuName=NVIDIA GeForce GTX 480,videoMemorySize=2048,strict_shader_math=1,OffscreenRenderingMode=fbo,renderer=gl')",
+    "WoW64 Mode: true",
+    "Box64 Version: 0.4.2",
+    "Box64 Preset: COMPATIBILITY",
+    "FEXCore Preset: INTERMEDIATE",
+    "Env Vars (Container Base): WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 MESA_VK_WSI_PRESENT_MODE=mailbox TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 DXVK_CONFIG=dxvk.enableDescriptorBuffer=False",
+    "Env Vars (Final Guest): DXVK_STATE_CACHE_PATH=/data/data/app.gamenative/files/imagefs/home/xuser/.cache DXVK_LOG_LEVEL=none DXVK_CONFIG_FILE=/data/user/0/app.gamenative/files/imagefs/home/xuser/.config/dxvk.conf DXVK_CONFIG=dxvk.enableDescriptorBuffer=False VK_ICD_FILENAMES=/data/user/0/app.gamenative/files/imagefs/usr/share/vulkan/icd.d/wrapper_icd.aarch64.json GALLIUM_DRIVER=zink LIBGL_KOPPER_DISABLE=true ADRENOTOOLS_DRIVER_PATH=/data/user/0/app.gamenative/files/contents/adrenotools/RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)/ ADRENOTOOLS_HOOKS_PATH=/data/user/0/app.gamenative/files/imagefs/usr/lib ADRENOTOOLS_DRIVER_NAME=vulkan.radeon.so WRAPPER_VK_VERSION=1.3.0 WRAPPER_EXTENSION_BLACKLIST= WRAPPER_VMEM_MAX_SIZE=512 MESA_VK_WSI_PRESENT_MODE=mailbox WRAPPER_RESOURCE_TYPE=auto WRAPPER_DISABLE_PRESENT_WAIT=0 WRAPPER_EMULATE_BCN=0 WRAPPER_USE_BCN_CACHE=0 WRAPPER_BCN_GPU=0 WRAPPER_ASTC_BLOCK=8x8 LC_ALL=en_US.utf8 MESA_DEBUG=silent MESA_NO_ERROR=1 WINEPREFIX=/data/user/0/app.gamenative/files/imagefs/home/xuser/.wine SDL_XINPUT_ENABLED=1 SDL_DIRECTINPUT_ENABLED=1 SDL_JOYSTICK_HIDAPI=1 SDL_JOYSTICK_WGI=0 SDL_JOYSTICK_RAWINPUT=0 SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1 SDL_HINT_FORCE_RAISEWINDOW=0 SDL_ALLOW_TOPMOST=0 SDL_MOUSE_FOCUS_CLICKTHROUGH=1 WINEDEBUG=-all WINEPATH=A:\\ WRAPPER_MAX_IMAGE_COUNT=0 ZINK_DESCRIPTORS=lazy ZINK_DEBUG=compact MESA_SHADER_CACHE_DISABLE=false MESA_SHADER_CACHE_MAX_SIZE=512MB mesa_glthread=true WINEESYNC=1 TU_DEBUG=noconform VKD3D_SHADER_MODEL=6_0 PULSE_LATENCY_MSEC=144 PULSE_SERVER=/data/user/0/app.gamenative/files/imagefs/tmp/.sound/PS0"
+   ],
+   "driver": "RADV Xclipse (Mesa 26.3.0-devel-xd-ac77309)",
+   "gpu_resets": 0,
+   "gpu_page_faults": 0,
+   "gpu_temp_c_after": 56.0
+  }
+ ]
+}

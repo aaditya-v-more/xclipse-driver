@@ -41,6 +41,9 @@ environment variables are read the same way but have not been checked inside a c
 | Linear filtering emulated for the formats the 940 point-samples (R32F, R16, R16G16 and others) | on | `RADV_XCLIPSE_FILTEREMU=0` turns it off | `debug.radv_xclipse_filteremu` |
 | NGG primitive culling | off (it was slower on the 940) | `RADV_PERFTEST=nggc` turns it on | `debug.radv_perftest` |
 | Per-shader register and code-size log in logcat (`[SHADER]`) | off | `RADV_XCLIPSE_LOG=1` | `debug.radv_xclipse_log` |
+| RDNA3 dual-issue VALU (VOPD) in wave32 shaders, 940 only; needs `RADV_PERFTEST=pswave32,cswave32` to form pairs. Unmeasured, probe only (xd-f04c2df) | off | `RADV_XCLIPSE_VOPD=1` | `debug.radv_xclipse_vopd` |
+| RDNA3 `s_delay_alu` scheduling hints, 940 only. Unmeasured, probe only (xd-f04c2df) | off | `RADV_XCLIPSE_DELAYALU=1` | `debug.radv_xclipse_delayalu` |
+| GPU memory swap: when MemFree is below N MB at an allocation of 1 MB or more, the kernel swaps the process's oldest idle GPU buffers (256 MB plus the new size, `..._GPUSWAP_MB` changes it) to zram; they come back when a submission needs them. Aimed at lmkd's load-time kills; unmeasured (xd-299e141) | off | `RADV_XCLIPSE_GPUSWAP=N` | `debug.radv_xclipse_gpuswap` |
 
 Never set `RADV_DEBUG=nongg`: it hangs the 940.
 
