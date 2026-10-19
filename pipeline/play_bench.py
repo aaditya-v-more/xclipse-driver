@@ -391,7 +391,7 @@ def main() -> None:
     ap.add_argument("--no-kill", action="store_true", help="launch without am kill-all, as a player would")
     ap.add_argument("--max-temp", type=float, default=42, help="GPU C to cool to before a run; 0 skips")
     ap.add_argument("--max-skin", type=float, default=38)
-    ap.add_argument("--cool-limit", type=float, default=300, help="longest cool-down in seconds")
+    ap.add_argument("--cool-limit", type=float, default=900, help="longest cool-down in seconds")
     args = ap.parse_args()
     if args.seconds < WARMUP_S + MEASURE_S + 5:
         sys.exit(f"--seconds must be at least {WARMUP_S + MEASURE_S + 5}")
@@ -428,8 +428,6 @@ def main() -> None:
                     print(f"{tag}: starting", flush=True)
                     r = run_once(args.game, name, variants[name], known, run_dir, tag, user, args)
                     results.append(r)
-                    if r["status"] == "ran" or "surfaceflinger" in r:
-                        break
                     if r.get("launch_settings") and "launch_settings" not in meta:
                         meta["launch_settings"] = r["launch_settings"]
                     if r.get("driver"):
@@ -437,9 +435,13 @@ def main() -> None:
                     s = r.get("surfaceflinger", {})
                     print(f"{tag}: {r['status']}, to play {r.get('seconds_to_play')} s, "
                           f"fps {s.get('fps_avg', 0):.1f}, 1% low {s.get('fps_1pct_low') or 0:.1f}, "
-                          f"p99 {s.get('frametime_p99_ms') or 0:.1f} ms, GPU {r.get('app_gpu_mb_max')} MB",
+                          f"p99 {s.get('frametime_p99_ms') or 0:.1f} ms, GPU {r.get('app_gpu_mb_max')} MB, "
+                          f"GPU {r.get('gpu_clock_mhz') or 0:.0f} MHz, skin {r.get('skin_c_before')}-"
+                          f"{r.get('skin_c_max')} C, available {r['memory_before']['available_mb']} MB before",
                           flush=True)
                     write(run_dir, meta, results)
+                    if r["status"] not in ("play-failed", "killed-low-memory", "app-exited"):
+                        break
     finally:
         set_props({}, known)
         shell(f"am force-stop {APP}")
