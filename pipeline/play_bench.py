@@ -10,16 +10,20 @@ GPU's busy share, clocks and temperature (`game.py`'s helpers), and memory, batt
 state every 5 s; a screenshot ends the run, for SSIM against the baseline variant's screenshots.
 
 A variant is a set of Android properties, the way RADV reads its options under GameNative
-(`debug.radv_perftest`, `debug.radv_debug`, `debug.radv_xclipse_*`). Every property any variant
-names is cleared before each run, so runs can't inherit a setting. Variants take turns, in reverse
-order every other round, and the GPU cools to --max-temp before each run, so heat and memory state
-affect them alike. A run the low-memory killer ends, one in which the game never reaches the scene,
-and one with a GPU fault are reported as such, not as results.
+(`debug.radv_perftest`, `debug.radv_debug`, `debug.radv_xclipse_*`), and optionally container
+settings applied with `gn_driver.py apply`: `driver:ENTRY` (the Graphics Driver Version, such as
+`System` for Samsung's driver), `env:NAME=VALUE` (an environment variable, such as `DXVK_CONFIG`)
+and `set:LABEL=VALUE` (a dropdown, such as `BCn Emulation`). Every property any variant names is
+cleared before each run, so runs can't inherit a setting; a container setting can't be cleared, so
+when any variant names one, the first variant must give its value too. Variants take turns, in
+reverse order every other round, and the GPU cools to --max-temp before each run, so heat and memory
+state affect them alike. A run the low-memory killer ends, one in which the game never reaches the
+scene, and one with a GPU fault are reported as such, not as results.
 
 usage: python pipeline/play_bench.py [--game LifeIsStrange3] [--rounds 3] [--seconds 75]
-           [--variant NAME[=prop=value[,prop=value...]]]... [--no-kill]
-           [--max-temp 42] [--max-skin 38]
+           [--variant NAME[=ITEM[,ITEM...]]]... [--no-kill] [--max-temp 42] [--max-skin 38]
 
+ITEM is debug.<prop>=<value>, driver:<entry>, env:<NAME>=<VALUE> or set:<LABEL>=<VALUE>.
 Without --variant it compares `default` against `nggc=debug.radv_perftest=nggc` and
 `filteremu0=debug.radv_xclipse_filteremu=0`. The first variant is the baseline for SSIM. Writes
 results/<time>-play/results.json and summary.md (tracked); screenshots and the per-run present
@@ -64,14 +68,51 @@ VARIANT_METRICS = (("fps_avg", "FPS avg", 1), ("fps_1pct_low", "1% low", 1),
 
 
 def parse_variant(text: str) -> tuple[str, dict[str, str]]:
+    """Items keep their prefix as part of the key: `debug.radv_perftest`, `driver:`, `env:NAME`,
+    `set:LABEL`; `props_of` and `container_of` split them."""
     name, _, rest = text.partition("=")
-    props = {}
+    items = {}
     for item in filter(None, rest.split(",")):
+        if item.startswith("driver:"):
+            items["driver:"] = item[len("driver:"):]
+            continue
         key, sep, value = item.partition("=")
-        if not sep or not key.startswith("debug."):
-            sys.exit(f"variant {name}: expected debug.<name>=<value>, got {item!r}")
-        props[key] = value
-    return name, props
+        if not sep or not (key.startswith("debug.") or key.startswith(("env:", "set:"))):
+            sys.exit(f"variant {name}: expected debug.<prop>=<value>, driver:<entry>, "
+                     f"env:<NAME>=<VALUE> or set:<LABEL>=<VALUE>, got {item!r}")
+        items[key] = value
+    return name, items
+
+
+def props_of(items: dict[str, str]) -> dict[str, str]:
+    return {k: v for k, v in items.items() if k.startswith("debug.")}
+
+
+def container_of(items: dict[str, str]) -> dict[str, str]:
+    return {k: v for k, v in items.items() if not k.startswith("debug.")}
+
+
+APPLIED: dict = {}  # the container settings last applied, to skip a no-op editor session
+
+
+def apply_container(game: str, settings: dict[str, str]) -> None:
+    """Sets the variant's container settings through GameNative's editor (gn_driver.py apply reads
+    every change back and fails loudly), unless they are already in place."""
+    if not settings or settings == APPLIED:
+        return
+    cmd = [sys.executable, str(HERE / "gn_driver.py"), "apply", game]
+    for key, value in settings.items():
+        if key == "driver:":
+            cmd += ["--driver", value]
+        elif key.startswith("env:"):
+            cmd += ["--env", f"{key[4:]}={value}"]
+        else:
+            cmd += ["--set", f"{key[4:]}={value}"]
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if proc.returncode:
+        sys.exit(f"gn_driver.py apply failed:\n{proc.stdout}{proc.stderr}")
+    APPLIED.clear()
+    APPLIED.update(settings)
 
 
 def set_props(props: dict[str, str], known: set[str]) -> dict[str, str]:
@@ -103,11 +144,13 @@ def play(game: str, no_kill: bool) -> tuple[int, list[str]]:
     return proc.returncode, (proc.stdout + proc.stderr).splitlines()
 
 
-def run_once(game: str, name: str, props: dict[str, str], known: set[str], run_dir: Path,
+def run_once(game: str, name: str, items: dict[str, str], known: set[str], run_dir: Path,
              tag: str, user: str, args) -> dict:
-    result = {"tag": tag, "variant": name, "props": props}
+    props = props_of(items)
+    result = {"tag": tag, "variant": name, "props": props, "container": container_of(items)}
     result["props_read"] = set_props(props, known)
     shell(f"am force-stop {APP}")  # every run starts the game cold
+    apply_container(game, container_of(items))
     time.sleep(2)
     result["gpu_temp_c_before"] = (cool_down(args.max_temp, args.cool_limit, args.max_skin)
                                    if args.max_temp else gpu_temp())
@@ -299,7 +342,8 @@ def summarize(meta: dict, results: list[dict], sim: dict) -> str:
             cells.append(text)
         s = sim.get(variant)
         ssim_text = "-" if not s else f"{s['mean']:.3f} (min {s['min']:.3f}, {s['pairs']} pairs)"
-        props = ", ".join(f"{k}={v}" for k, v in meta["variants"][variant].items()) or "none"
+        props = ", ".join(f"{k}{'' if k.endswith(':') else '='}{v}"
+                          for k, v in meta["variants"][variant].items()) or "none"
         lines.append(f"| {variant} | {props} | {len(ran)}/{total} | " + " | ".join(cells)
                      + f" | {ssim_text} |")
     if sim.get(baseline):
@@ -352,7 +396,16 @@ def main() -> None:
     if args.seconds < WARMUP_S + MEASURE_S + 5:
         sys.exit(f"--seconds must be at least {WARMUP_S + MEASURE_S + 5}")
     variants = dict(parse_variant(v) for v in (args.variant or DEFAULT_VARIANTS))
-    known = {key for props in variants.values() for key in props}
+    known = {key for items in variants.values() for key in props_of(items)}
+    baseline = next(iter(variants))
+    container_keys = {key for items in variants.values() for key in container_of(items)}
+    missing = container_keys - container_of(variants[baseline]).keys()
+    if missing:
+        sys.exit(f"the first variant ({baseline}) must also give {sorted(missing)}, since a "
+                 f"container setting can't be cleared between runs")
+    for items in variants.values():  # every variant states every container setting in play
+        for key in container_keys:
+            items.setdefault(key, variants[baseline][key])
     select_phone()
     shell(STAY_ON_CMD)
     user = app_user()
@@ -390,6 +443,8 @@ def main() -> None:
     finally:
         set_props({}, known)
         shell(f"am force-stop {APP}")
+        if container_keys:  # leave the container as the baseline variant has it
+            apply_container(args.game, container_of(variants[baseline]))
         write(run_dir, meta, results, final=True)
     print((run_dir / "summary.md").read_text())
 
