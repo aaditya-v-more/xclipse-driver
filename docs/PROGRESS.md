@@ -1385,3 +1385,13 @@ so at 150 most waits hit the 300 ms cap (18-48 waits per run), and MemFree still
 later than usual (197-201 s against 110-130 s). The difference is within noise at this sample size,
 so the switch stays off by default and isn't part of the package. With `am kill-all` through the
 load, survival was 4 of 5.
+
+### 2026-10-19: `r.ScreenPercentage=50` renders the title; the black scene isn't reproducible
+
+Retested on xd-ac77309 with `-ENGINEINI=D:/xclipse/LiS3Engine.ini` holding only
+`[SystemSettings] r.ScreenPercentage=50`, one launch each on the default driver, with
+`debug.radv_xclipse_filteremu=0`, and with `debug.radv_xclipse_gl1scope=0`. All three drew the
+title's 3D scene (brightness 49.6-49.8 in `game_input.py look`, the same as without the ini), at
+39-55 FPS in GameNative's overlay. The black scene of 2026-10-18 came with an ini that also set the
+streaming cvars, so it isn't a driver bug at the smaller render size; it isn't being pursued.
+Exec Arguments are back to `-nostartupmovies -dx11`; the properties are unset.
