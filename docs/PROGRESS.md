@@ -1445,3 +1445,37 @@ write returns when the copies are done, which is the backpressure. `[GPUSWAP]` l
 phone: it went unplugged and locked before the first launch. The risk to measure is thrash: the
 oldest buffers may be the ones the next frame needs, and a swap-out of a buffer transiently
 allocates its size again in shmem.
+
+### 2026-10-27: GPU swap is closed to apps by SELinux; VOPD hangs the 940; wave32 halves ALU throughput
+
+The phone came back after a week (still Android 17, uptime 3 days). xd-299e141 is in the
+LifeIsStrange3 container.
+
+**`debug.radv_xclipse_gpuswap` is inert on stock firmware.** The first launch with it logged
+`[GPUSWAP] /sys/kernel/gpu/proc/<tgid>/swap: Permission denied; off`. The node is owned by the
+app's uid with mode 0664, but it carries the `sysfs_gpu` SELinux label, which `untrusted_app` may
+read and not write (no avc line reaches logcat, so the denial is silent). Only the system can swap a
+process's GPU memory (`sgpu_swap_ctrl`, root:system, and the per-process nodes from a privileged
+domain). The knob stays as a no-op that logs and turns itself off; the memory lever would need the
+app to be a system app, or GameNative to ask the system for it, which it can't.
+
+**Survival today, normal clocks, `am kill-all` through the load** (`results/20261027-154023-play`,
+default against the inert gpuswap variant, two rounds): 4 of 5 launches reached play, against 1 of 6
+on 2026-10-19. Same driver behaviour, same settings; the difference is the phone's state (what else
+is resident after a week of use). The kill rate is not a driver signal at this sample size. The
+surviving runs: 21.2-23.6 FPS, 1% low 6.7-8.3, p99 83-108 ms, 2219-2223 MB GPU memory, GPU 96-98%
+busy at 286-301 MHz with skin 43 C: the thermal cap again.
+
+**VOPD hangs the 940.** xdtest on RADV with `RADV_PERFTEST=pswave32,cswave32 RADV_XCLIPSE_VOPD=1`
+timed out in `render` (GPU hang, no reboot, stock health check passed) in both runs
+(`results/2026-10-27_160622`, `_160742`); without VOPD the same wave32 set passed every test
+(`_160713`), and with `RADV_XCLIPSE_DELAYALU=1` too (`_160734`). VOPD with wave64 (`_160755`)
+passed because pairs never form there. The dual-issue encodings are not executable on this core;
+the knob is removed (`pdev->xclipse_vopd` is false) and ACO keeps VOPD off.
+
+**`s_delay_alu` runs but does nothing measurable in the ALU test**, and **wave32 halves ALU
+throughput**: xdtest's `alu` takes 28.4-28.5 ms in wave64 (every run since 2026-10-10, stock and
+RADV alike) and 56.7-56.8 ms with `cswave32`, with or without delay_alu. The 940 executes a
+wave32 instruction in the same time as a wave64 one, so wave64 is the right default for every
+stage and `RADV_PERFTEST=pswave32,cswave32` is a loss there. The Life is Strange A/B of default,
+delayalu, wave32 and wave32+delayalu (`results/20261027-160852-play`) is below.
