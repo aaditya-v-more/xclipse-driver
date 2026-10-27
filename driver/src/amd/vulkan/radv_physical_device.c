@@ -3166,12 +3166,13 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
    pdev->xclipse_buffer_l2 = radv_xclipse_flag("RADV_XCLIPSE_BUFL2", "radv_xclipse_bufl2");
    pdev->xclipse_gfx11_cache_scope = radv_xclipse_flag_off("RADV_XCLIPSE_GL1SCOPE", "radv_xclipse_gl1scope");
    /* The 920 decodes GFX11 encodings on an RDNA2 core, so ACO keeps RDNA3's dual-issue VALU and
-    * s_delay_alu off for every gfx11_isa chip. The 940 is sold as RDNA3; RADV_XCLIPSE_VOPD=1 /
-    * debug.radv_xclipse_vopd 1 and RADV_XCLIPSE_DELAYALU=1 / debug.radv_xclipse_delayalu 1 turn
-    * them on there, to probe and A/B (VOPD pairs form in wave32 shaders only: RADV_PERFTEST=
-    * pswave32,cswave32). Both change binaries; the knobs are part of the cache key. */
-   pdev->xclipse_vopd = pdev->info.xclipse_model == AC_XCLIPSE_940 &&
-                        radv_xclipse_flag("RADV_XCLIPSE_VOPD", "radv_xclipse_vopd");
+    * s_delay_alu off for every gfx11_isa chip. The 940 is sold as RDNA3, but VOPD hangs it: with
+    * wave32 shaders (RADV_PERFTEST=pswave32,cswave32, the only place pairs form) xdtest's render
+    * test timed out on the GPU every time, and passed with VOPD off (2026-10-27, docs/PROGRESS.md),
+    * so it stays off and the knob is gone. s_delay_alu passes every test there:
+    * RADV_XCLIPSE_DELAYALU=1 / debug.radv_xclipse_delayalu 1 turns it on, to A/B. It changes
+    * binaries; the knob is part of the cache key. */
+   pdev->xclipse_vopd = false;
    pdev->xclipse_delay_alu = pdev->info.xclipse_model == AC_XCLIPSE_940 &&
                              radv_xclipse_flag("RADV_XCLIPSE_DELAYALU", "radv_xclipse_delayalu");
    pdev->xclipse_filter_emu = 0;

@@ -32,6 +32,7 @@ times stay local. Nobody may touch the phone while it runs.
 
 from __future__ import annotations
 
+import re
 import argparse
 import datetime as dt
 import json
@@ -73,7 +74,9 @@ def parse_variant(text: str) -> tuple[str, dict[str, str]]:
     `set:LABEL`; `props_of` and `container_of` split them."""
     name, _, rest = text.partition("=")
     items = {}
-    for item in filter(None, rest.split(",")):
+    # Items split at commas that start the next item, so a value may hold commas
+    # (debug.radv_perftest=pswave32,cswave32).
+    for item in filter(None, re.split(r",(?=debug\.|driver:|env:|set:)", rest)):
         if item.startswith("driver:"):
             items["driver:"] = item[len("driver:"):]
             continue
