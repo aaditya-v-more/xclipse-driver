@@ -1,18 +1,130 @@
-# xclipse-driver
+<div align="center">
 
-Open-source Vulkan driver work for the Samsung Xclipse 940 GPU (Galaxy S24 FE, Exynos 2400e): Mesa RADV running on Samsung's `sgpu` kernel driver. The aim is faster Windows games in Winlator-style Android apps, doing for Xclipse what Turnip does for Adreno.
+<h1>xclipse-driver</h1>
 
-## Status (2026-10-12)
+<p>
+  <b>Turnip for Xclipse.</b> An open-source Vulkan driver for the Samsung Xclipse 940,<br>
+  so Windows games run faster, and render correctly, on the Galaxy S24 FE.
+</p>
 
-- The driver builds on Windows, macOS, and Linux, and runs on the S24 FE. All 22 on-device tests in `pipeline/run.py` pass on both drivers: instance, device, submit, compute, rendering, textures (BC1–7, cube maps, mip chains), MRT, vertex fetch, depth/stencil, storage images, tessellation, scratch memory, queries, transform feedback, and the BCn layer's own decode shader.
-- Fixed on the Xclipse 940 so far: pipeline-statistics and primitives-generated queries without GDS (the chip has none), transform feedback through NGG with GFX11's streamout counters, a wave64 register-clobbering bug (every wave64 shader now gets at least 16 VGPRs), and the GPU page faults from GFX11-style shader setup registers (merged-stage pointers, graphics and compute scratch bases).
-- It exposes Vulkan 1.4 with 224 extensions, against Samsung's driver at 1.3 with 154. That includes BC texture compression, maintenance5/6, and mutable descriptors, which DXVK 2.x and 3.x and vkd3d-proton use.
-- Speed, driver level: FP32 throughput, fill rate and bandwidth equal Samsung's; pipelines compile 2.5–3.6× faster; tiny draws cost 1.6–2× more CPU; graphics scratch is 3× slower.
-- Speed, game level: the latest valid Unigine Heaven 4.0 baseline on GameNative 0.9.2 measured 46.03 and 45.17 FPS on RADV with correct textures and zero GPU faults (`results/2026-10-12_120311-game`). On the updated app, stock still fails D24 texture creation; RADV passes diagnostic runs at about 57 FPS with the older DXVK. There is no usable stock baseline for a speed comparison. The 120 Hz measurements show that the earlier 16.7 ms median was not a 60 Hz display cap.
-- Known issue outside the driver: GameNative's BCn compute layer (`bcn_layer`) emulates BC textures for every driver except Qualcomm's and Turnip, and its emulated textures come out black on our driver. Set the container's BCn Emulation to `none`; our driver samples BC textures natively.
-- The phone now has the official GameNative `v1.3.0-prerelease` APK, verified by SHA256 and pinned to source commit `231d1365cf1a09b7f1763cfaebd3906628ec1381`. This release still displays version `1.2.1` internally. Heaven passed a RADV smoke check with correct textures and zero GPU faults. Nine reference source trees and GameNative's/DXVK's nested dependencies are pinned as submodules.
-- The working Heaven configuration remains DXVK `async-1.10.3`. DXVK 2.7.1 imports correctly but caused GPU page faults on RADV; it was restored to the working version. The benchmark runner now stops as soon as it observes a GPU fault/reset counter increase.
-- `docs/HANDOFF.md` has the exact next step; `docs/PROGRESS.md` has the history and numbers.
+<p>
+  <img alt="Vulkan 1.4" src="https://img.shields.io/badge/Vulkan-1.4-C2410C?style=for-the-badge&logo=vulkan&logoColor=white&labelColor=1C1A17">
+  <img alt="224 extensions" src="https://img.shields.io/badge/extensions-224-C2410C?style=for-the-badge&labelColor=1C1A17">
+  <img alt="Mesa RADV" src="https://img.shields.io/badge/Mesa-RADV%2026.3-C2410C?style=for-the-badge&logo=mesa&logoColor=white&labelColor=1C1A17">
+  <img alt="Xclipse 940" src="https://img.shields.io/badge/GPU-Xclipse%20940-C2410C?style=for-the-badge&logo=samsung&logoColor=white&labelColor=1C1A17">
+  <img alt="Android" src="https://img.shields.io/badge/Android-arm64-C2410C?style=for-the-badge&logo=android&logoColor=white&labelColor=1C1A17">
+  <a href="https://ko-fi.com/aadityavmore"><img alt="Support this on Ko-fi" src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white&labelColor=1C1A17"></a>
+</p>
+
+<p>
+  <a href="#install"><b>Install</b></a>
+  &nbsp;·&nbsp;
+  <a href="#what-it-does-today"><b>Results</b></a>
+  &nbsp;·&nbsp;
+  <a href="#quick-start"><b>Build</b></a>
+  &nbsp;·&nbsp;
+  <a href="docs/PROGRESS.md"><b>Lab notebook</b></a>
+</p>
+
+<br>
+
+<img src="docs/img/streaks-fix.jpg" width="720" alt="Unigine Heaven on the Galaxy S24 FE through GameNative, rendered by xclipse-driver">
+
+<sub>Unigine Heaven 4.0 through DXVK in GameNative, on the phone, rendered by this driver.</sub>
+
+</div>
+
+<br>
+
+Adreno phones have Turnip. Xclipse phones have had Samsung's closed driver, stuck at Vulkan 1.3
+and missing the features DXVK and vkd3d-proton lean on. This project runs Mesa's RADV on
+Samsung's amdgpu-derived `sgpu` kernel driver, building on the radv-xclipse port, and tunes it
+for one chip until it beats the stock driver in real games: faster frames, steadier frame times,
+less memory pressure, and no rendering defects.
+
+Every number below was measured on a real Galaxy S24 FE (Exynos 2400e), with paired runs,
+clock and skin-temperature control, and screenshot review. A run that renders wrongly doesn't
+count.
+
+## What it does today
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**More API than Samsung ships**
+
+Vulkan **1.4** with **224** extensions, against the stock driver's 1.3 and 154. BC texture
+compression, maintenance5/6 and mutable descriptors, which DXVK 2.x/3.x and vkd3d-proton use,
+are all there.
+
+</td>
+<td width="50%" valign="top">
+
+**Faster where it counts**
+
+Turning NGG primitive culling off on the 940 gave Heaven **+28% average FPS** and **+22% 1%-low
+FPS** over five clock-locked pairs, with no visual change; it is now the default. Pipelines compile **2.5–3.6×** faster
+than on the stock driver.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**Renders what stock can't**
+
+Samsung's driver fails Heaven's D24 depth texture on the current GameNative build. This driver
+runs it with correct textures and zero GPU faults, and samples BC textures natively.
+
+</td>
+<td valign="top">
+
+**Hardware bugs, found and fixed**
+
+GL1 cache coherence (the blue "lightning" streaks), point-sampled 16/32-bit formats (filtered in
+the shader instead), queries without GDS, GFX11 streamout through NGG, a wave64 register clobber,
+and GFX11 shader-setup page faults.
+
+</td>
+</tr>
+</table>
+
+All 22 on-device tests in `pipeline/run.py` pass on both drivers: instance, submit, compute,
+rendering, textures (BC1–7, cubes, mips), MRT, vertex fetch, depth/stencil, storage images,
+tessellation, scratch, queries and transform feedback.
+
+| Driver-level comparison | vs Samsung's driver |
+|---|---|
+| FP32 throughput, fill rate, bandwidth | equal |
+| Pipeline compile time | 2.5–3.6× faster |
+| Tiny-draw CPU cost | 1.6–2× higher (being worked on) |
+| Graphics scratch | 3× slower (being worked on) |
+
+### In progress
+
+- **Memory pressure.** Android 17's lmkd kills *Life is Strange: True Colors* while it loads. The
+  driver can now ask the kernel's own sgpu Graphic Memory Reclaim to swap idle GPU buffers to
+  zram under pressure (`debug.radv_xclipse_gpuswap`, opt-in, being measured).
+- **RDNA3 shader features.** Dual-issue VALU (VOPD) and `s_delay_alu` hints for the 940's core,
+  opt-in probes awaiting measurement.
+- **Small-draw CPU overhead and graphics scratch**, the two places the stock driver still wins.
+
+## Install
+
+Grab `radv-xclipse-*.zip` from `driver/dist/` (or [build it](#quick-start)), copy it to the phone,
+then in GameNative: **Settings → Emulation → Driver Manager → Import ZIP from device**. Point the
+game's container at it with these settings:
+
+| Setting | Value |
+|---|---|
+| Graphics Driver | Wrapper → `RADV Xclipse (Mesa 26.3.0-devel-xd-<sha>)` |
+| DX Wrapper | DXVK `2.7.1` with `DXVK_CONFIG=dxvk.enableDescriptorBuffer=False` |
+| BCn Emulation | `none` (the driver samples BC natively) |
+| Container | `bionic`, FEXCore `Intermediate`, Box64 `Compatibility` |
+
+[`docs/package.md`](docs/package.md) has the full steps, why each setting is there, and every
+switch the driver exposes. It is built for the Galaxy S24 FE (Xclipse 940) only.
 
 ## Quick start
 
@@ -100,3 +212,17 @@ On macOS or Linux, use `tools/python/bin/python3` in place of `.\tools\python\py
 - `docs/`: progress, device findings, and research.
 - `tools/`: the portable toolchain, not in git. See `tools/README.md`.
 - `third_party/`: pinned reference submodules and the official GameNative APK lock. See `third_party/MANIFEST.md`.
+
+## Support
+
+This is a one-person project, built and benchmarked on my own phone. If it makes your games run
+better, the [tip jar](https://ko-fi.com/aadityavmore) keeps it going.
+
+<a href="https://ko-fi.com/aadityavmore"><img alt="Support this on Ko-fi" src="https://img.shields.io/badge/Ko--fi-buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white&labelColor=1C1A17"></a>
+
+## Credits
+
+Built on [Mesa](https://mesa3d.org)'s RADV, JimVulkan's radv-xclipse port and yoro1836's Xclipse
+940 bring-up. Hardware knowledge comes from Samsung's GPL kernel source, MIT-licensed ports and
+our own probing, never from decompiled vendor code. The driver keeps Mesa's licences; see
+[`driver/LICENSE`](driver/LICENSE).
