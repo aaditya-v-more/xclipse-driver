@@ -1465,6 +1465,10 @@ on 2026-10-19. Same driver behaviour, same settings; the difference is the phone
 is resident after a week of use). The kill rate is not a driver signal at this sample size. The
 surviving runs: 21.2-23.6 FPS, 1% low 6.7-8.3, p99 83-108 ms, 2219-2223 MB GPU memory, GPU 96-98%
 busy at 286-301 MHz with skin 43 C: the thermal cap again.
+Caveat added later: the user was playing during both `gpuswap100` runs (their screenshots show the
+character moved and turned; the default runs show the fixed opening frame), which is why those two
+runs' SSIM against the baseline fell to 0.43 and their FPS and 1% lows differ. Only the three default
+runs of that folder are clean measurements; the survival count (4 of 5 launches) stands.
 
 **VOPD hangs the 940.** xdtest on RADV with `RADV_PERFTEST=pswave32,cswave32 RADV_XCLIPSE_VOPD=1`
 timed out in `render` (GPU hang, no reboot, stock health check passed) in both runs
