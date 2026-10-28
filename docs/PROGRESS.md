@@ -1510,3 +1510,33 @@ and Wine loads its builtin instead (`+loaddll` showed `VERSION.dll ... builtin`)
 `HKCU\Software\Wine\DllOverrides` `version=native,builtin` (CrossOver ignores `WINEDLLOVERRIDES`
 from the environment) the game's DLL loads and GTA V reaches Display Calibration on the Mac. Next on
 the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environment and launch.
+
+## GTA V on the phone: past the installation check, then an int3 in GTA5.exe (2026-10-28 evening)
+
+- `WINEDLLOVERRIDES=version=n,b` in the GTAV container works. PlayGTAV.exe now loads the
+  game folder's `VERSION.dll` and starts GTA5.exe, which no longer reports an incomplete installation.
+- GTA5.exe then dies about 10 s in with `Unhandled exception 0x80000003` (int3) on its main thread,
+  always at `gta5+0x806ac9`, which is in Arxan-encrypted `.text`. The trap follows Authenticode
+  decoding (`CryptDecodeObjectEx` of 1.3.6.1.4.1.311.2.1.4) and comes before any frame. The screen
+  stays black, and GameNative shows no error.
+- The crash is the same with:
+  - the System driver and our RADV driver (4f88558);
+  - FEXCore presets Intermediate and Denuvo (`FEX_SMCCHECKS=full`, hidden hypervisor bit);
+  - Box64 under `proton-10.0-4-x86_64-1`;
+  - Max Device Memory at 512 or 4096 MB.
+
+  So the cause is neither the GPU driver nor the x86 emulator.
+- System-driver detail: winevulkan reports `Failed to enumerate physical devices, res=-3` from
+  GTA's dxdiag survey thread. Our RADV driver enumerates fine and Zink/wined3d contexts come up.
+  This doesn't change the crash.
+- The Mac (CrossOver, Rosetta) shows the same crypto fixme and continues. The obvious difference is
+  Proton's ntdll `GTA5 HACK` in `NtProtectVirtualMemory` (ValveSoftware/wine proton_10.0,
+  `dlls/ntdll/unix/virtual.c`). Keyed on the image name `gta5.exe`, it marks the first image page
+  `VPROT_COPIED`; CrossOver has no such hack. I couldn't test it. A renamed copy of GTA5.exe hands
+  back to PlayGTAV.exe, which relaunches `GTA5.exe` by name, and PlayGTAV.exe is packed, so the name
+  can't be patched.
+- Next: try a Wine build without the GTA5 hack (a non-Proton wine in GameNative, if one is offered).
+  Alternatively, build GameNative's Proton with the hack removed.
+- The container is back to the user's settings: RADV 4f88558, proton-10.0-arm64ec-2, FEXCore
+  Intermediate, 512 MB, PlayGTAV.exe, no args. It keeps the override. Wine debug logs are off again.
+  The x86_64 Proton (proton-10.0-4-x86_64-1) is still installed in GameNative.
