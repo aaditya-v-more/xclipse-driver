@@ -1540,3 +1540,15 @@ the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environmen
 - The container is back to the user's settings: RADV 4f88558, proton-10.0-arm64ec-2, FEXCore
   Intermediate, 512 MB, PlayGTAV.exe, no args. It keeps the override. Wine debug logs are off again.
   The x86_64 Proton (proton-10.0-4-x86_64-1) is still installed in GameNative.
+- Proton GTA5 hack ruled out (same evening). I took GameNative's `proton-10.0-arm64ec.wcp`
+  (downloads.gamenative.app, the same 10.0-arm64ec v2 the phone runs) and patched one byte in
+  `lib/wine/aarch64-unix/ntdll.so`, at offset 0x19870 (UTF-16 `gta5.exe` → `#ta5.exe`). Its only
+  reference is the hack in `NtProtectVirtualMemory`. I imported the result as
+  `proton-10.0-99-arm64ec` and pointed GTAV at it. The `vprot` line disappears, but GTA5.exe still
+  hits int3 at `gta5+0x806ac9`, so the hack isn't the cause.
+- GameNative only accepts imported Proton names that match
+  `^(wine|proton)-<ver>(-<num>)?-(x86|x86_64|arm64ec)`. An import named
+  `proton-10.0-arm64ec-nogta` installs, but launching fails with "No base prefix ... cannot switch
+  thin container". Both imports stay installed in Wine/Proton Manager, and their `.wcp` files are in
+  `Download/xclipse`.
+- GTAV is back on proton-10.0-arm64ec-2. Wine debug logs are off.
