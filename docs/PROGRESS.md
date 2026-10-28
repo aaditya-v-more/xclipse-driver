@@ -1483,3 +1483,30 @@ RADV alike) and 56.7-56.8 ms with `cswave32`, with or without delay_alu. The 940
 wave32 instruction in the same time as a wave64 one, so wave64 is the right default for every
 stage and `RADV_PERFTEST=pswave32,cswave32` is a loss there. The Life is Strange A/B of default,
 delayalu, wave32 and wave32+delayalu (`results/20261027-160852-play`) is below.
+
+### Phone storage cleared for GTA V; GTA V starts on the Mac (2026-10-28)
+
+The phone had 33 GB free. Call of Duty was deleted, app caches trimmed (`pm trim-caches`), and
+GameNative's data cleared (`pm clear app.gamenative`, run by the user). Before the clear, the five
+container configs (GameNative Export config) and the LiS save plus its in-game settings (Export
+Files) went to `/Volumes/SSD/gamenative-backup-20261028` with a README of restore paths; the LiS
+game files are in `/Volumes/SSD/Life is Strange - True Colors`. Download, Recordings and WhatsApp
+Video, Images and Documents were copied to `/Volumes/SSD/phone-backup-20261028` (every file MD5
+checked) and then deleted on the phone by the user. A USB 3 cable pulls at 175-230 MB/s (the
+earlier one managed about 39 MB/s).
+
+GTA V (129.6 GB, 292 files, MD5-checked on the
+phone) is in `/sdcard/GameNative/CustomGames/GTAV`; the phone has about 17 GB left. GameNative
+migrates a custom game into app-internal storage before launch (`migrateToInternalStorage`), and
+across the FUSE mount `renameTo` fails, so it copies: 2x the space. A directory named
+`GTAV/.gamenative` keeps the id unstored (`GameMetadataManager.read` needs a file), so the game
+stays on `/sdcard` with an id derived from its path. Container GTAV: System driver, default
+settings, Executable Path `PlayGTAV.exe` (it starts `GTA5.exe`;
+`GTA5.exe` alone says ERR_NO_LAUNCHER).
+
+On the phone and on the Mac (CrossOver 26.3, win10_64 bottle `GTAV`) the game stopped at "Failed
+to load due to an incomplete installation". Cause: the game folder ships its own `version.dll`,
+and Wine loads its builtin instead (`+loaddll` showed `VERSION.dll ... builtin`). With
+`HKCU\Software\Wine\DllOverrides` `version=native,builtin` (CrossOver ignores `WINEDLLOVERRIDES`
+from the environment) the game's DLL loads and GTA V reaches Display Calibration on the Mac. Next on
+the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environment and launch.
