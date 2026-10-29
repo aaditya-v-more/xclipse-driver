@@ -21,6 +21,8 @@
   &nbsp;·&nbsp;
   <a href="#what-it-does-today"><b>Results</b></a>
   &nbsp;·&nbsp;
+  <a href="#games"><b>Games</b></a>
+  &nbsp;·&nbsp;
   <a href="#quick-start"><b>Build</b></a>
   &nbsp;·&nbsp;
   <a href="docs/PROGRESS.md"><b>Lab notebook</b></a>
@@ -28,19 +30,24 @@
 
 <br>
 
-<img src="docs/img/streaks-fix.jpg" width="720" alt="Unigine Heaven on the Galaxy S24 FE through GameNative, rendered by xclipse-driver">
+<table>
+<tr>
+<td align="center"><a href="docs/media/gtav-on-phone.mp4"><img src="docs/img/gtav-on-phone.jpg" width="420" alt="GTA V running full-screen on the Galaxy S24 FE"></a><br><sub><b>GTA V</b> (DirectX 11). Tap to play the clip</sub></td>
+<td align="center"><a href="docs/media/lis-on-phone.mp4"><img src="docs/img/lis-on-phone.jpg" width="420" alt="Life is Strange: True Colors running on the Galaxy S24 FE"></a><br><sub><b>Life is Strange: True Colors</b>. Tap to play the clip</sub></td>
+</tr>
+</table>
 
-<sub>Unigine Heaven 4.0 through DXVK in GameNative, on the phone, rendered by this driver.</sub>
+<sub>Both games through DXVK in GameNative, on the phone, rendered by this driver.</sub>
 
 </div>
 
 <br>
 
-Adreno phones have Turnip. Xclipse phones have had Samsung's closed driver, stuck at Vulkan 1.3
-and missing the features DXVK and vkd3d-proton lean on. This project runs Mesa's RADV on
-Samsung's amdgpu-derived `sgpu` kernel driver, building on the radv-xclipse port, and tunes it
-for one chip until it beats the stock driver in real games: faster frames, steadier frame times,
-less memory pressure, and no rendering defects.
+Adreno phones have Turnip. Xclipse phones have had Samsung's closed driver, stuck at Vulkan 1.3 and
+missing the features DXVK and vkd3d-proton lean on. This project runs Mesa's RADV on Samsung's
+amdgpu-derived `sgpu` kernel driver, building on JimVulkan's radv-xclipse port and yoro1836's
+Xclipse 940 bring-up, and tunes it for one chip until it beats the stock driver in real games:
+faster frames, steadier frame times, less memory pressure, and no rendering defects.
 
 Every number below was measured on a real Galaxy S24 FE (Exynos 2400e), with paired runs,
 clock and skin-temperature control, and screenshot review. A run that renders wrongly doesn't
