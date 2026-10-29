@@ -23,8 +23,10 @@ short). For LifeIsStrange3 that is: wait for the game's window; press RB every 2
 Square Enix and Deck Nine logos, the health warning and the autosave notice (they show "Skip" on RB)
 until the bright title screen; press A for "Press any button" and A again for Continue, until the
 screen goes dark for loading; wait for the first scene to draw; then press RB three times, 2 s
-apart, for the opening cutscene. It runs `am kill-all` (background processes only) before launching,
-again before Continue, and every 3 s for 45 s of the scene load, to give the game memory. It refuses to restart a game that is already
+apart, for the opening cutscene. It runs `am kill-all` (background processes only) before
+launching, again before Continue, and every 3 s for 45 s of the scene load, to give the game
+memory. For GTAV it presses nothing: it waits for the loading screen, then for the prologue's
+first playable shot to hold still. It refuses to restart a game that is already
 running unless --restart is given. If GameNative dies on the way (Android's low-memory killer), it
 says so from logcat.
 
@@ -193,7 +195,34 @@ def life_is_strange_3(run: Run, until: str | None = None) -> None:
         run.log("pressed RB")
 
 
-GAMES = {"LifeIsStrange3": life_is_strange_3}
+def steady(low: float, high: float, samples: int, spread: float):
+    """A test for Run.wait that holds once `samples` readings in a row lie between low and high,
+    within `spread` of each other."""
+    seen: list[float] = []
+
+    def test(value: float) -> bool:
+        seen.append(value)
+        last = seen[-samples:]
+        return (len(last) == samples and all(low <= v <= high for v in last)
+                and max(last) - min(last) <= spread)
+    return test
+
+
+def gta_v(run: Run, until: str | None = None) -> None:
+    """Brightness of BOX at 1404x648 on RADV xd-4f88558 with BCn Emulation none (2026-10-29): 0
+    once the game's window opens; the Rockstar logo and legal screens 3-70; the loading screen's
+    artwork 126-187; black; then the prologue's cutscene and its first playable shot in the Bobcat
+    Security lobby, which holds still at about 55 while nobody plays. The first launch reached that
+    shot in 165 s, later ones in 90-117 s. Nothing needs pressing; --until title stops at the
+    loading screen."""
+    run.wait(lambda v: 0 <= v < 1, "the game's window (black)", limit_s=240)
+    run.wait(lambda v: v > 120, "the loading screen", limit_s=400, required=False)
+    if until == "title":
+        return
+    run.wait(steady(40, 130, 12, 8), "the prologue's first shot, holding still", limit_s=420)
+
+
+GAMES = {"LifeIsStrange3": life_is_strange_3, "GTAV": gta_v}
 
 
 def play(game: str, restart: bool, until: str | None = None) -> None:
