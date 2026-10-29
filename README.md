@@ -17,6 +17,8 @@
 </p>
 
 <p>
+  <a href="https://github.com/aaditya-v-more/xclipse-driver/releases/latest"><b>Download</b></a>
+  &nbsp;·&nbsp;
   <a href="#install"><b>Install</b></a>
   &nbsp;·&nbsp;
   <a href="#what-it-does-today"><b>Results</b></a>
@@ -123,8 +125,8 @@ lows**, loads **34% sooner**, uses less GPU, CPU and memory, and renders sharper
 
 ## Install
 
-Grab `radv-xclipse-*.zip` from `driver/dist/` (or [build it](#quick-start)), copy it to the phone,
-then in GameNative: **Settings → Emulation → Driver Manager → Import ZIP from device**. Point the
+Download `radv-xclipse-*.zip` from the [latest release](https://github.com/aaditya-v-more/xclipse-driver/releases/latest)
+(or [build it](#quick-start)), copy it to the phone without unzipping it, then in GameNative: **Settings → Emulation → Driver Manager → Import ZIP from device**. Point the
 game's container at it with these settings:
 
 | Setting | Value |

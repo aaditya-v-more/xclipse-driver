@@ -3,7 +3,8 @@
 The package is one zip, `radv-xclipse-26.3.0-devel-xd-<sha>.zip`, holding `meta.json` and
 `vulkan.radeon.so`. It is for the Galaxy S24 FE (Xclipse 940) only. `<sha>` is the commit it was
 built from; build it with `driver/build.sh` or `driver\build.cmd` (`pipeline/run.py --build-driver`
-sets the tag), or take it from `driver/dist/`.
+sets the tag), or download it from the repository's
+[releases](https://github.com/aaditya-v-more/xclipse-driver/releases).
 
 ## Install in GameNative
 
