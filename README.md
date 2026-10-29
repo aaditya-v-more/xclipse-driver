@@ -189,9 +189,17 @@ This driver (top) and Samsung's (bottom), the same frame of the same scene:
 ### Life is Strange: True Colors (DirectX 11)
 
 Measured with `xd-299e141`; the game was removed from the phone on 2026-10-28 to make room for
-GTA V. **It doesn't run on Samsung's driver with BC textures left to the driver:** the game's
-textures are 98.7% BC5, and creating them fails (`CreateTexture2D` returns E_INVALIDARG), so the
-game stops. Samsung's driver with GameNative's software BC decode wasn't tried for this game.
+GTA V.
+
+| | This driver | Samsung's driver |
+|---|---|---|
+| Runs | **Yes** | **No.** The game stops at a failed texture creation |
+| First scene | 21-26 FPS, 1% lows 6-8 FPS | - |
+
+The game's textures are 98.7% BC5. On Samsung's driver, creating them fails
+(`CreateTexture2D` returns E_INVALIDARG), so the game never gets going. That was with BC
+textures left to the driver; Samsung's driver with GameNative's software BC decode wasn't tried
+for this game.
 
 | Knob | Value | Why |
 |---|---|---|
