@@ -1552,3 +1552,28 @@ the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environmen
   thin container". Both imports stay installed in Wine/Proton Manager, and their `.wcp` files are in
   `Download/xclipse`.
 - GTAV is back on proton-10.0-arm64ec-2. Wine debug logs are off.
+
+## GTA V reaches gameplay on our driver (2026-10-29)
+
+- **The int3 was a missing file.** The phone's copy lacked `INTERACTIVE_MUSIC.rpf`. GTA5.exe
+  traps at `gta5+0x806ac9` when that audio pack fails to mount. Pushing the file again from the
+  Mac's install (md5 verified) gets GTA past it. How the file went missing is unknown.
+- **The next crash was GameNative's BCn emulation.** With BCn Emulation at the default `auto`,
+  GTA died about 15 s after D3D11 device creation with `Unhandled page fault on write access`,
+  twice in a row, in DXVK's and GTA's writes to mapped buffers. GameNative's wrapper decodes BCn
+  on the CPU on Xclipse (`excludeBcnCompute`). In `wrapper_device.c` it maps the source buffer's
+  memory with `vkMapMemory`, decodes, and calls `vkUnmapMemory`. DXVK keeps that memory mapped
+  for its whole life. Our driver's map hands back the existing mapping (RADV's safeguard for
+  double maps), and the unmap then `munmap`s it under DXVK. That mechanism comes from reading the
+  code. The fix is verified: **BCn Emulation `none`**, which leaves BC formats to our driver.
+- Run with BCn `none` (RADV 4f88558, no input): "Entering Story Mode" at 135 s, the prologue
+  cutscene at 150 s, gameplay with HUD at 165 s. GTA5's RSS peaked at 1.44 GB.
+- Ruled out on the way: Proton's GTA5 `vprot` hack (above), DXVK descriptor buffers (it crashed
+  with them off too), MTE (the phone doesn't enable it), and SIGBUS (the faults are real
+  SIGSEGVs; Proton's arm64 Wine reports SIGBUS as a misalignment).
+- scudo logs `Can't populate more pages for size class 33296` in GTA's process in every run,
+  BCn on or off. scudo then takes a larger size class, so it isn't the crash.
+- GTA came up at 800x600 in the top-left corner of the 1280x720 screen; fixed below.
+- `gn_driver.py`: Android 17's file picker heads `Download/xclipse` "Files in downloads", so the
+  folder check now also reads the breadcrumb trail. `export-config` works again.
+- Free space on the phone: about 5.3 GB.

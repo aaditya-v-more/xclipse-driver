@@ -148,6 +148,16 @@ def find_view(s: Screen, text: str) -> dict | None:
     return next((n for n in s if text in (n["text"], n["desc"]) and in_view(n, s)), None)
 
 
+def in_phone_dir(nodes: list[dict]) -> bool:
+    """Whether the file picker shows PHONE_DIR. Older DocumentsUI heads the list "Files in
+    xclipse"; Android 17's says "Files in downloads" there, so its breadcrumb trail decides."""
+    folder = Path(PHONE_DIR).name
+    if find(nodes, f"Files in {folder}"):
+        return True
+    trail = sorted((n for n in nodes if n["id"].endswith("id/breadcrumb_text")), key=lambda n: n["x"])
+    return bool(trail) and trail[-1]["text"] == folder
+
+
 class State(NamedTuple):
     kind: str
     game: str | None = None
@@ -1009,7 +1019,7 @@ def import_zip(zip_name: str, entry: str, nav: Nav = NAV) -> None:
         return
     nav.seek(lambda s: find_view(s, "Import ZIP from device"))
     nav.press(lambda s: find_view(s, "Import ZIP from device"), "Import ZIP from device")
-    nav.wait(lambda st: st.kind == "picker" and find(nav.look(), f"Files in {Path(PHONE_DIR).name}"),
+    nav.wait(lambda st: st.kind == "picker" and in_phone_dir(nav.look()),
              what=f"the file picker in {PHONE_DIR}")
     found = nav.seek(lambda s: find_view(s, zip_name))
     if not found:
@@ -1068,7 +1078,7 @@ def import_content(path: Path, nav: Nav = NAV) -> None:
     if not nav.seek(lambda s: find_view(s, entry)):
         nav.seek(lambda s: find_view(s, "Import .wcp from device"))
         nav.press(lambda s: find_view(s, "Import .wcp from device"), "Import .wcp from device")
-        nav.wait(lambda st: st.kind == "picker" and find(nav.look(), f"Files in {Path(PHONE_DIR).name}"),
+        nav.wait(lambda st: st.kind == "picker" and in_phone_dir(nav.look()),
                  what=f"the file picker in {PHONE_DIR}")
         if not nav.seek(lambda s: find_view(s, path.name)):
             sys.exit(f"{path.name} isn't in the picker at {PHONE_DIR}")
@@ -1099,7 +1109,7 @@ def save_export_config(destination: Path, nav: Nav = NAV) -> None:
     if destination.exists() or sh(f"if [ -e {shlex.quote(remote)} ]; then echo exists; fi"):
         sys.exit(f"export destination already exists; keeping it: {destination.name}")
     nav.wait(lambda st: find(nav.look(), "SAVE") is not None, what="the export picker")
-    if not find(nav.look(), f"Files in {Path(PHONE_DIR).name}"):
+    if not in_phone_dir(nav.look()):
         sys.exit(f"export picker is not in {PHONE_DIR}")
 
     def name_field(s: Screen) -> dict:
