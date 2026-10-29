@@ -209,17 +209,20 @@ def steady(low: float, high: float, samples: int, spread: float):
 
 
 def gta_v(run: Run, until: str | None = None) -> None:
-    """Brightness of BOX at 1404x648 on RADV xd-4f88558 with BCn Emulation none (2026-10-29): 0
-    once the game's window opens; the Rockstar logo and legal screens 3-70; the loading screen's
-    artwork 126-187; black; then the prologue's cutscene and its first playable shot in the Bobcat
-    Security lobby, which holds still at about 55 while nobody plays. The first launch reached that
-    shot in 165 s, later ones in 90-117 s. Nothing needs pressing; --until title stops at the
-    loading screen."""
+    """Brightness of BOX at 1404x648 (2026-10-29): 0 once the game's window opens; the Rockstar
+    logo and legal screens 0-70, with a flash to 150; the loading screen, whose artworks change
+    every 15-30 s and read 98-188 each (a 98-104 one holds as still as gameplay, so stillness
+    alone can't tell them apart); black for about 6 s; then the prologue's cutscene and its first
+    playable shot in the Bobcat Security lobby, which holds still at 54-55 while nobody plays.
+    RADV xd-4f88558 reached that shot in 90-165 s, the Samsung driver in about 180 s. Nothing
+    needs pressing; --until title stops at the loading screen."""
     run.wait(lambda v: 0 <= v < 1, "the game's window (black)", limit_s=240)
-    run.wait(lambda v: v > 120, "the loading screen", limit_s=400, required=False)
+    # The logos flash past 130 for a reading or two, then go black for 10 s: hold for five.
+    run.wait(steady(90, 255, 5, 10), "the loading screen", limit_s=400, required=False)
     if until == "title":
         return
-    run.wait(steady(40, 130, 12, 8), "the prologue's first shot, holding still", limit_s=420)
+    run.wait(lambda v: 0 <= v < 3, "the black after loading", limit_s=420)
+    run.wait(steady(40, 130, 12, 8), "the prologue's first shot, holding still", limit_s=240)
 
 
 GAMES = {"LifeIsStrange3": life_is_strange_3, "GTAV": gta_v}

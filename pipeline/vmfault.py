@@ -156,14 +156,14 @@ def what(f: dict) -> tuple[str, dict | None]:
     return "no BO anywhere", None
 
 
-def describe(d: dict, names: dict[int, str]) -> list[str]:
+def describe(d: dict, symbols: dict[int, str]) -> list[str]:
     va, end = int(d["va"], 16), int(d["end"], 16)
     return [f"BO va 0x{va:012x}-0x{end:012x} (size 0x{int(d['size'], 16):x}, {d['kind']}, "
             f"dom {decode(int(d['dom']), names("RADEON_DOMAIN_"))}, prio {d['prio']})",
             f"flags {decode(int(d['flags'], 16), names("RADEON_FLAG_"))}",
             f"owner {d['owner']}{d['internal'] or ''} 0x{d['handle']}",
-            f"made by {names.get(int(d['by'], 16), '-')}",
-            f"winsys call from {names.get(int(d['ws'], 16), '-')}"]
+            f"made by {symbols.get(int(d['by'], 16), '-')}",
+            f"winsys call from {symbols.get(int(d['ws'], 16), '-')}"]
 
 
 def main() -> None:

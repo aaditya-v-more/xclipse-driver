@@ -18,7 +18,9 @@ cleared before each run, so runs can't inherit a setting; a container setting ca
 when any variant names one, the first variant must give its value too. Variants take turns, in
 reverse order every other round, and the GPU cools to --max-temp before each run, so heat and memory
 state affect them alike. A run the low-memory killer ends, one in which the game never reaches the
-scene, and one with a GPU fault are reported as such, not as results.
+scene, and one with a GPU fault in the scene are reported as such, not as results. GPU faults
+before the scene (GTA V's launcher faults once on RADV) are counted per run and reported beside
+the results.
 
 usage: python pipeline/play_bench.py [--game LifeIsStrange3] [--rounds 3] [--seconds 75]
            [--variant NAME[=ITEM[,ITEM...]]]... [--no-kill] [--max-temp 42] [--max-skin 38]
@@ -177,6 +179,11 @@ def run_once(game: str, name: str, items: dict[str, str], known: set[str], run_d
         if screenshot(shot):
             result["screenshot"] = shot.name
     else:
+        # Faults on the way to the scene are recorded; only those in the scene void the run.
+        faults_at_play = gpu_faults()
+        result["gpu_faults_to_play"] = max((faults_at_play.get(k, 0) - faults_before.get(k, 0)
+                                            for k in faults_before), default=0)
+        faults_before = faults_at_play
         memory, gpu = [], []
         frames: set[int] = set()
         holes: list[tuple[int, int]] = []
@@ -363,17 +370,24 @@ def summarize(meta: dict, results: list[dict], sim: dict) -> str:
         lines += ["", f"SSIM floor (baseline against itself): min {sim[baseline]['min']:.3f}; "
                   f"GameNative's overlay band (top {OVERLAY_SHARE:.0%}) is excluded, the on-screen "
                   f"controls are the same in every shot."]
+    loaded = [r for r in results if r.get("gpu_faults_to_play")]
+    if loaded:
+        lines += ["", "GPU page faults before the scene (the sgpu kernel's counters; each resets "
+                  "the GPU and cancels the faulting process's work): "
+                  + "; ".join(f"{v} {sum(1 for r in loaded if r['variant'] == v)}/"
+                              f"{sum(1 for r in results if r['variant'] == v)} runs"
+                              for v in variants if any(r['variant'] == v for r in loaded)) + "."]
     lines += ["", "## Runs", "",
-              "| run | variant | status | to play s | FPS avg | 1% low | p95 | p99 | stutters/min "
+              "| run | variant | status | to play s | faults to play | FPS avg | 1% low | p95 | p99 | stutters/min "
               "| frames | GPU busy % | GPU MHz | X4 MHz | GPU MB max | RSS MB max | avail MB min "
-              "| GPU C before | skin C max |", "|" + "---|" * 18]
+              "| GPU C before | skin C max |", "|" + "---|" * 19]
     for r in results:
         s = r.get("surfaceflinger", {})
 
         def f(v, d=1):
             return "-" if not isinstance(v, (int, float)) else f"{v:.{d}f}"
         lines.append(f"| {r['tag']} | {r['variant']} | {r['status']} | {f(r.get('seconds_to_play'), 0)} | "
-                     f"{f(s.get('fps_avg'))} | {f(s.get('fps_1pct_low'))} | {f(s.get('frametime_p95_ms'))} | "
+                     f"{r.get('gpu_faults_to_play', '-')} | {f(s.get('fps_avg'))} | {f(s.get('fps_1pct_low'))} | {f(s.get('frametime_p95_ms'))} | "
                      f"{f(s.get('frametime_p99_ms'))} | {f(s.get('stutters_per_min'))} | {s.get('frames', '-')} | "
                      f"{f(r.get('gpu_busy_pct'), 0)} | {f(r.get('gpu_clock_mhz'), 0)} | "
                      f"{f(r.get('cpu_x4_mhz'), 0)} | {f(r.get('app_gpu_mb_max'), 0)} | "
