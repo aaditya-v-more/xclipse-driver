@@ -1577,3 +1577,61 @@ the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environmen
 - `gn_driver.py`: Android 17's file picker heads `Download/xclipse` "Files in downloads", so the
   folder check now also reads the breadcrumb trail. `export-config` works again.
 - Free space on the phone: about 5.3 GB.
+
+## GTA V fills the screen; our driver against Samsung's in GTA V (2026-10-29)
+
+- **Full screen.** The container's Screen Size is now Custom **1404x648**: the phone's
+  2340x1080 shape at about 720p's pixel count, so nothing is stretched. GTA ignores the Wine
+  desktop size, so `commandline.txt` in the game folder sets `-width 1404 -height 648
+  -fullscreen` (`docs/games/GTAV.commandline.txt`). Verified with a screenshot: the picture fills
+  the screen. GameNative's Screen Effects scaling (Fill/Stretch) was not needed.
+- **Saved settings.** `docs/games/` holds `GTAV.container.json` (exported after the benchmark:
+  RADV 4f88558, BCn none, quiet logging), `GTAV.commandline.txt`, and Life is Strange's container
+  and `GameUserSettings.ini` from the 2026-10-28 backup. The README's new Games section lists the
+  settings for both games and what each one fixes.
+- **The first comparison attempt was wrong, and was discarded.** `game_input.py play GTAV`
+  called the game "in play" on a loading-screen artwork. The loading screen rotates artworks
+  every 15-30 s; one reads 98-104 and holds as still as gameplay. Samsung's "31.2 FPS" in
+  `110703-play` was measured on the loading screen, as its end-of-run screenshot shows. A
+  brightness trace (logos 0-70 with a flash to 150, artworks 98-188, about 6 s of black, the
+  cutscene, then gameplay at 54-55) gave the fix: wait for a loading artwork that holds for five
+  readings, then the black, then the still shot. The phone also had a thin cover on for those
+  runs; the user removed it before the runs below.
+- **Load-time GPU fault on RADV.** One sgpu page fault in GTA V's launcher process
+  (`PlayGTAV.exe`, not `GTA5.exe`), about 25 s after launch. It falls in the launcher's second
+  Vulkan device, during its first one or two submits. The first device made 64 submits and was
+  destroyed. `vmfault.py` places the fault at offset 0x1000 inside a **live**
+  command-buffer upload BO (0x20000 bytes, GTT write-combined, 32-bit VA, made by
+  `radv_cmd_buffer_resize_upload_buf`). It is the same allocation site as the "nearby BO" in the
+  2026-10-12 DXVK descriptor-buffer faults. The game is unaffected, and the cause is open. A
+  fault inside a live BO points at the VA mapping not being in place yet, or at stale state from
+  the destroyed first device, not at an out-of-bounds access. `play_bench.py` now counts faults
+  before the scene separately (`gpu_faults_to_play`), and only faults in the scene void a run.
+  `vmfault.py`'s `describe` had a parameter shadowing `names()`; fixed.
+- **The comparison** (`results/20261029-113104-play`, cover off, 3 rounds each, taking turns,
+  cooled to GPU 42 C and skin 38 C before each run; RADV 4f88558 + BCn none against System +
+  BCn full):
+
+  | | RADV | Samsung | |
+  |---|---|---|---|
+  | Launch to gameplay | 133 s | 200 s | -34% |
+  | FPS average | 31.1 | 30.7 | same |
+  | 1% low | 15.0 (13.3-16.9) | 8.9 (7.4-11.7) | +69% |
+  | p95 / p99 frame time | 41.7 / 50.0 ms | 41.7 / 50.0 ms | same |
+  | Stutters/min | 17.7 | 21.0 | |
+  | GPU busy | 55% at 371 MHz | 76% at 404 MHz | |
+  | X4 CPU clock | 1121 MHz | 1654 MHz | |
+  | GPU memory max | 800 MB | 894 MB | -11% |
+  | Skin max | 40.4 C | 42.7 C | |
+  | SSIM against RADV | 0.980 (floor 0.974) | 0.954 | |
+
+  Both sit at the same ceiling of about 31 FPS, with neither GPU fully busy. The ceiling is
+  probably the game's frame pacing or the CPU path through FEX and Wine. Our driver reaches it
+  with less GPU and CPU work and lower peak heat. Energy was not measured: the phone was on USB
+  power. **Samsung's frames have lower texture detail.** Sign text is blurred, and the frosted
+  glass's "LOMBANK" lettering is missing (`docs/img/gtav-radv.jpg` and `gtav-stock.jpg` are
+  crops of r1's screenshots). That explains the SSIM gap. The cause is not established. A
+  plausible one is GameNative's CPU BCn decode under `full`, which also fits Samsung's slower
+  load and higher CPU clock. Samsung with BCn `none` was not run this time; in Heaven it renders
+  BC textures black.
+- The GTAV container is back on RADV 4f88558 with BCn none and quiet logging.

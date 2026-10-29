@@ -101,6 +101,10 @@ tessellation, scratch, queries and transform feedback.
 | Tiny-draw CPU cost | 1.6–2× higher (being worked on) |
 | Graphics scratch | 3× slower (being worked on) |
 
+In a real game, GTA V, this driver matches Samsung's average frame rate with **69% higher 1%
+lows**, loads **34% sooner**, uses less GPU, CPU and memory, and renders sharper textures. See
+[Games](#games).
+
 ### In progress
 
 - **Memory pressure.** Android 17's lmkd kills *Life is Strange: True Colors* while it loads. The
@@ -125,6 +129,84 @@ game's container at it with these settings:
 
 [`docs/package.md`](docs/package.md) has the full steps, why each setting is there, and every
 switch the driver exposes. It is built for the Galaxy S24 FE (Xclipse 940) only.
+
+## Games
+
+Settings that get each game running on this driver, with what each one fixes. The container
+exports in [`docs/games/`](docs/games/) hold every other value. GameNative's import replaces a
+container's settings wholesale, so compare against them rather than importing them over a working
+container.
+
+### Grand Theft Auto V (legacy, DirectX 11)
+
+| Knob | Value | Why |
+|---|---|---|
+| Graphics Driver Version | `RADV Xclipse (Mesa 26.3.0-devel-xd-4f88558)` or newer | |
+| BCn Emulation | **`none`** | With `auto` or `full`, GameNative's wrapper maps and unmaps buffer memory DXVK keeps mapped; the unmap tears down DXVK's mapping and the game crashes on a write fault while loading. |
+| DX Wrapper | DXVK `2.7.1`, `DXVK_CONFIG=dxvk.enableDescriptorBuffer=False` | DXVK 2.7.1 faults at startup with descriptor buffers on |
+| Wine / Container | `proton-10.0-arm64ec-2`, `bionic`, FEXCore `Intermediate`, Box64 `Compatibility` | |
+| Max Device Memory | 512 MB | |
+| Screen Size | Custom **1404x648** | The phone's 19.5:9 shape at about 720p's pixel count, so the picture fills the screen without stretching |
+| Game resolution | `commandline.txt` in the game folder: `-width 1404 -height 648 -fullscreen` ([copy](docs/games/GTAV.commandline.txt)) | Without it the game opens at 800x600 in the screen's top-left corner |
+| Executable | `PlayGTAV.exe`, no arguments | |
+| `WINEDLLOVERRIDES` | `version=n,b` | Loads the game folder's own `version.dll` before Wine's; without it the game stops at an incomplete-installation error |
+| Quiet logging | `WINEDEBUG=-all`, Wine debug logs off | Logging slows loading |
+| Game files | Verify them | A missing `x64/audio/sfx/INTERACTIVE_MUSIC.rpf` crashed the game on a breakpoint instruction with no hint of the cause |
+
+It reaches the prologue in 1.5-3 minutes from launch. `pipeline/game_input.py play GTAV` starts
+it and waits for the first playable shot.
+
+**Against Samsung's driver** (2026-10-29, [`results/20261029-113104-play`](results/20261029-113104-play/summary.md)).
+Three rounds per driver, taking turns, each launched cold and measured for 60 s in the
+prologue's first playable shot, with the phone cooled to the same temperature before each run.
+Samsung's driver ran with BCn Emulation `full`, its working setting.
+
+| | This driver | Samsung's driver | Difference |
+|---|---|---|---|
+| Launch to gameplay | **133 s** | 200 s | 34% sooner |
+| Average FPS | 31.1 | 30.7 | the same (both at the game's ~31 FPS ceiling here) |
+| 1% low FPS | **15.0** | 8.9 | +69% |
+| Stutters per minute | 17.7 | 21.0 | -16% |
+| GPU busy | **55%** | 76% | less work for the same frames |
+| Big-core (X4) CPU clock | **1121 MHz** | 1654 MHz | -32% |
+| GPU memory (peak) | **800 MB** | 894 MB | -11% |
+| Skin temperature (peak) | **40.4 C** | 42.7 C | 2.3 C cooler |
+| Texture detail | sharp | blurred signs, missing lettering on frosted glass | see below |
+
+Both drivers deliver the same average frame rate, a ceiling the GPU doesn't reach (neither is
+fully busy). Our driver reaches it with less GPU and CPU work, fewer frame-time dips, less memory
+and a cooler phone. Battery drain wasn't measured; the phone was on USB power. Samsung's driver
+also renders this scene with visibly lower texture detail. Its likely cause, unconfirmed, is
+GameNative decoding BC textures on the CPU, which also fits its slower load and higher CPU clock.
+In 1 of 3 launches, our driver logged one GPU page fault in GTA V's launcher process, before the
+game itself starts. The game was unaffected, and the cause is still open.
+
+This driver (top) and Samsung's (bottom), the same frame of the same scene:
+
+![GTA V on this driver: sharp sign text and frosted-glass lettering](docs/img/gtav-radv.jpg)
+![GTA V on Samsung's driver: blurred sign text, lettering missing](docs/img/gtav-stock.jpg)
+
+### Life is Strange: True Colors (DirectX 11)
+
+Measured with `xd-299e141`; the game was removed from the phone on 2026-10-28 to make room for
+GTA V.
+
+| Knob | Value | Why |
+|---|---|---|
+| Graphics Driver Version | `RADV Xclipse (Mesa 26.3.0-devel-xd-299e141)` or newer | |
+| BCn Emulation | `none` | The driver samples BC textures natively |
+| DX Wrapper | DXVK `2.7.1`, `DXVK_CONFIG=dxvk.enableDescriptorBuffer=False` | |
+| Wine / Container | `proton-10.0-arm64ec-2`, `bionic`, FEXCore `Intermediate`, Box64 `Compatibility` | |
+| Max Device Memory | 512 MB | |
+| Screen Size | 1280x720 | |
+| Exec Arguments | `-nostartupmovies -dx11` | Skips the intro videos; forces the DirectX 11 renderer |
+| In-game graphics | Lowest preset, 80% resolution, dynamic resolution on ([GameUserSettings.ini](docs/games/LifeIsStrange3.GameUserSettings.ini)) | |
+
+The first scene after Continue runs at **21-26 FPS** with 1% lows of 6-8 FPS: the GPU sits at its
+thermal cap near 300 MHz, so energy per frame decides the frame rate. Android's low-memory killer
+may stop GameNative while that scene loads; closing background apps first helps
+(`game_input.py play LifeIsStrange3` does it). Container export:
+[`LifeIsStrange3.container.json`](docs/games/LifeIsStrange3.container.json).
 
 ## Quick start
 

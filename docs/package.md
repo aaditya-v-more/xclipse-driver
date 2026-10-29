@@ -25,7 +25,7 @@ v1.3.0-prerelease. Other games may need different ones.
 | Graphics Driver Version | `RADV Xclipse (Mesa 26.3.0-devel-xd-<sha>)` | |
 | DX Wrapper | DXVK `2.7.1` | |
 | Environment `DXVK_CONFIG` | `dxvk.enableDescriptorBuffer=False` | DXVK 2.7.1 faults at startup with descriptor buffers on |
-| BCn Emulation | `none` | The driver samples BC textures natively; GameNative's BCn layer renders them black |
+| BCn Emulation | `none` | The driver samples BC textures natively. GameNative's BCn layer renders them black, and in GTA V it maps and unmaps buffer memory DXVK keeps mapped, which crashes the game while it loads |
 | FEXCore Preset | `Intermediate` | |
 | Box64 Preset | `Compatibility` | |
 
