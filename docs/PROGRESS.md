@@ -1651,3 +1651,10 @@ the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environmen
 - Not verified on a phone: the import itself (our rules forbid tapping Import config) and the Steam
   and Rockstar sign-in launch path (we have no Steam copy). The graphics settings are the measured ones.
 - Epic copies don't get GameNative's Rockstar handling (`service/epic` has none); untried.
+- Update, same day: a tester's Epic copy stopped in Rockstar Games Launcher's installer ("Please make
+  sure all instances of the Rockstar Games Launcher have been closed"). GameNative's Rockstar path
+  (`PluviaMain.kt:2465`) needs `gameSource == STEAM` *and* headless Steam (`launchRealSteam` with
+  `steamType` headless, `Container.isLaunchHeadlessSteam`) or Bionic Steam; its settings text
+  recommends headless for Rockstar. The bundle config now sets `launchRealSteam=true`,
+  `steamType=headless`, `launchBionicSteam=false`, and the READMEs and release notes say Epic copies
+  aren't supported. Asset re-uploaded (sha256 758c788b…). Still unverified on a Steam copy.

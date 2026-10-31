@@ -15,9 +15,11 @@ Before you start
     Other versions may name things differently.
   - GTA V Legacy on Steam, and about 120 GB free, so the 256 GB or 512 GB phone (the S24 FE has
     no SD card slot).
-  - Epic copies: GameNative's Rockstar sign-in support is for Steam games. An Epic copy starts
-    Rockstar's own launcher instead, which hasn't been tried here. Use the Steam copy if you
-    have the choice.
+  - Use the Steam copy, not Epic. GameNative's Rockstar sign-in support is for Steam games
+    only. An Epic copy starts Rockstar's own launcher, whose installer failed on an S24 FE with
+    "Please make sure all instances of the Rockstar Games Launcher have been closed". Force-stopping
+    GameNative and launching again may get past it once, but the Epic copy hasn't been seen to
+    reach the game.
   - A Rockstar Games account. GameNative asks you to sign in the first time the game starts.
   - Story Mode only. GTA Online doesn't work under Wine (BattlEye).
 
@@ -29,8 +31,11 @@ Steps
      Import ZIP from device > pick radv-xclipse-26.3.0-devel-xd-4f88558.zip.
   4. Open GTA V's page > Options > Import config > pick GTAV-S24FE.config.json.
      Let GameNative download anything it says is missing (Proton, DXVK, FEXCore).
-  5. Open GTA V's container settings and set Screen Size to Custom, 1404x648. Save.
-     (The config import doesn't carry the screen size.)
+  5. Open GTA V's container settings and set Screen Size to Custom, 1404x648. (The config
+     import doesn't carry the screen size.) On the General tab, check that Launch Steam Client
+     is on and Steam Type is Headless; the config sets both. GameNative only shows its
+     Rockstar sign-in in that mode (or with Experimental Bionic Steam). Without it the game
+     tries to install Rockstar's own launcher and fails. Save.
   6. Options > Import Files > pick commandline.txt, and copy it into the GTA V game folder (the
      one with GTA5.exe and PlayGTAV.exe, under Program Files (x86)/Steam/steamapps/common).
      If you can't find that folder, skip this step and set the game's Settings > Graphics >
@@ -46,8 +51,13 @@ Settings the config sets, and why
   Wine / Container       proton-10.0-arm64ec-2, bionic, FEXCore Intermediate, Box64 Compatibility
   Max Device Memory      512 MB
   Quiet logging          WINEDEBUG=-all (logging slows loading)
+  Launch Steam Client    on, Steam Type Headless (needed for GameNative's Rockstar sign-in)
 
 If it doesn't start
+  - "An error has occurred. Please make sure all instances of the Rockstar Games Launcher have
+    been closed": the game is trying to install Rockstar's own launcher. On a Steam copy, turn
+    on Launch Steam Client with Steam Type Headless (step 5). On an Epic copy, see "Before you
+    start".
   - Check the game files in Steam (verify). A missing audio file once crashed the game while
     loading, with no hint of the cause.
   - Make sure the driver shows as RADV Xclipse in the container's Graphics Driver Version.

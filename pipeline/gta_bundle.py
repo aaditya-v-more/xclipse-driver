@@ -5,9 +5,11 @@ The config is our working GTA V container export (docs/games/GTAV.container.json
 settings that carry over to another phone's copy of the game. GameNative's Import config applies
 only known fields and never the screen size, drives or install path, so the import can't point the
 container at the wrong folder. The fields dropped here are the ones tied to our copy: the
-executable (GameNative launches Steam's Rockstar titles through its own stub) and the Steam and
-DRM launch modes, which GameNative chooses for a Steam game. Its WINEDLLOVERRIDES entry loaded a
-version.dll that only our copy's folder ships, so it's removed too.
+executable (GameNative launches Steam's Rockstar titles through its own stub) and the DRM mode. Our
+copy ran without Steam, so the Steam launch mode is set here instead: GameNative only uses its
+Rockstar sign-in and stub when the container launches the Steam client headless or Bionic Steam
+(PluviaMain.kt), and its own settings recommend headless for Rockstar. Its WINEDLLOVERRIDES entry
+loaded a version.dll that only our copy's folder ships, so it's removed too.
 
 usage: python pipeline/gta_bundle.py [--driver ZIP] [--out ZIP]
 """
@@ -35,13 +37,15 @@ KEEP = [
     "audioDriver", "wincomponents", "startupSelection",
 ]
 DROP_ENV = {"WINEDLLOVERRIDES=version=n,b"}
+# Launch Steam Client on, Steam Type Headless: the mode GameNative's Rockstar support needs.
+STEAM = {"launchRealSteam": True, "steamType": "headless", "launchBionicSteam": False}
 
 
 def config() -> dict:
     full = json.loads((GAMES / "GTAV.container.json").read_text())
     out = {key: full[key] for key in KEEP}
     out["envVars"] = " ".join(v for v in full["envVars"].split() if v not in DROP_ENV)
-    return out
+    return out | STEAM
 
 
 def main() -> None:

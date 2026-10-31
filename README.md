@@ -161,7 +161,9 @@ from the latest release. It holds the driver, a GameNative config with every set
 2. **Settings → Emulation → Driver Manager → Import ZIP from device**: the driver zip from the bundle.
 3. GTA V's page → **Options → Import config**: `GTAV-S24FE.config.json`. Let GameNative download
    what it says is missing.
-4. Container settings → **Screen Size → Custom 1404x648**, which the import doesn't carry.
+4. Container settings → **Screen Size → Custom 1404x648**, which the import doesn't carry. On the
+   General tab, check **Launch Steam Client** is on with **Steam Type → Headless** (the config sets
+   it): GameNative only uses its Rockstar sign-in in that mode.
 5. **Options → Import Files**: `commandline.txt` into the game folder (or set 1404x648 Fullscreen in
    the game's graphics settings).
 6. Launch, and sign in to Rockstar when GameNative asks. Story Mode only; GTA Online doesn't run
@@ -169,8 +171,9 @@ from the latest release. It holds the driver, a GameNative config with every set
 
 It's for the Exynos S24 FE (SM-S721B) only. The graphics settings are the ones measured below. Our
 copy was started directly rather than through Steam, so GameNative's Steam and Rockstar sign-in
-steps weren't part of that test. GameNative's Rockstar support covers Steam copies; an Epic copy
-would start Rockstar's own launcher, which hasn't been tried. `pipeline/gta_bundle.py` builds the
+steps weren't part of that test. Use the Steam copy: GameNative's Rockstar support covers Steam
+copies only. An Epic copy starts Rockstar's own launcher, whose installer failed on another S24 FE
+("Please make sure all instances of the Rockstar Games Launcher have been closed"). `pipeline/gta_bundle.py` builds the
 bundle from the container export.
 
 | Knob | Value | Why |
@@ -183,6 +186,7 @@ bundle from the container export.
 | Screen Size | Custom **1404x648** | The phone's 19.5:9 shape at about 720p's pixel count, so the picture fills the screen without stretching |
 | Game resolution | `commandline.txt` in the game folder: `-width 1404 -height 648 -fullscreen` ([copy](docs/games/GTAV.commandline.txt)) | Without it the game opens at 800x600 in the screen's top-left corner |
 | Executable | `PlayGTAV.exe`, no arguments | For a Steam copy GameNative picks the launcher itself |
+| Launch Steam Client | On, Steam Type **Headless** (Steam copies) | GameNative's Rockstar sign-in and launcher stub only run in this mode or with Bionic Steam; our copy didn't use Steam |
 | `WINEDLLOVERRIDES` | `version=n,b`, for our copy only | Loads the game folder's own `version.dll` before Wine's; without it our copy stops at an incomplete-installation error. A Steam copy has no such file, and the bundle's config leaves this out |
 | Quiet logging | `WINEDEBUG=-all`, Wine debug logs off | Logging slows loading |
 | Game files | Verify them | A missing `x64/audio/sfx/INTERACTIVE_MUSIC.rpf` crashed the game on a breakpoint instruction with no hint of the cause |
