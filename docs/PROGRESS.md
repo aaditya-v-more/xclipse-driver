@@ -1635,3 +1635,19 @@ the phone: add `WINEDLLOVERRIDES=version=n,b` to the GTAV container's environmen
   load and higher CPU clock. Samsung with BCn `none` was not run this time; in Heaven it renders
   BC textures black.
 - The GTAV container is back on RADV 4f88558 with BCn none and quiet logging.
+
+### 2026-10-31: GTA V setup bundle for other S24 FE owners
+
+- `GTAV-S24FE-GameNative.zip` on release v0.1.0: the xd-4f88558 driver zip, `GTAV-S24FE.config.json`
+  (`docs/games/`), `commandline.txt` and `README.txt` (`docs/games/GTAV-S24FE-README.txt`).
+  `pipeline/gta_bundle.py` builds it from `docs/games/GTAV.container.json`.
+- GameNative's Import config (`ContainerConfigTransfer.importConfig` → `BestConfigService`) applies
+  a fixed field list: driver, DXVK, Proton, Box64/FEXCore, env, CPU lists, audio, wincomponents,
+  exe and Steam launch modes. It never applies screen size, drives or install path, so the user sets
+  1404x648 by hand. The bundle drops the exe and Steam/DRM modes: for a Steam game that ships
+  `socialclub.dll`, GameNative launches its own Rockstar stub (`.gamenative-rockstar/Launcher.exe`)
+  after a Rockstar sign-in, whatever the container's exe says. It also drops `WINEDLLOVERRIDES=version=n,b`,
+  which only our copy's folder needs.
+- Not verified on a phone: the import itself (our rules forbid tapping Import config) and the Steam
+  and Rockstar sign-in launch path (we have no Steam copy). The graphics settings are the measured ones.
+- Epic copies don't get GameNative's Rockstar handling (`service/epic` has none); untried.

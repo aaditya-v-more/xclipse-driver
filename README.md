@@ -139,6 +139,9 @@ game's container at it with these settings:
 [`docs/package.md`](docs/package.md) has the full steps, why each setting is there, and every
 switch the driver exposes. It is built for the Galaxy S24 FE (Xclipse 940) only.
 
+For GTA V, the release also has a one-zip setup with the driver and the game's settings; see
+[Grand Theft Auto V](#grand-theft-auto-v-legacy-directx-11).
+
 ## Games
 
 Settings that get each game running on this driver, with what each one fixes. The container
@@ -147,6 +150,28 @@ container's settings wholesale, so compare against them rather than importing th
 container.
 
 ### Grand Theft Auto V (legacy, DirectX 11)
+
+**Set it up on your S24 FE.** Download
+[`GTAV-S24FE-GameNative.zip`](https://github.com/aaditya-v-more/xclipse-driver/releases/latest)
+from the latest release. It holds the driver, a GameNative config with every setting below, and
+`commandline.txt`. Its `README.txt` has the full steps; in short:
+
+1. Install GameNative [v1.3.0-prerelease](https://github.com/utkarshdalal/GameNative/releases/tag/v1.3.0-prerelease),
+   sign in to Steam, and install **Grand Theft Auto V Legacy** (about 120 GB).
+2. **Settings → Emulation → Driver Manager → Import ZIP from device**: the driver zip from the bundle.
+3. GTA V's page → **Options → Import config**: `GTAV-S24FE.config.json`. Let GameNative download
+   what it says is missing.
+4. Container settings → **Screen Size → Custom 1404x648**, which the import doesn't carry.
+5. **Options → Import Files**: `commandline.txt` into the game folder (or set 1404x648 Fullscreen in
+   the game's graphics settings).
+6. Launch, and sign in to Rockstar when GameNative asks. Story Mode only; GTA Online doesn't run
+   under Wine.
+
+It's for the Exynos S24 FE (SM-S721B) only. The graphics settings are the ones measured below. Our
+copy was started directly rather than through Steam, so GameNative's Steam and Rockstar sign-in
+steps weren't part of that test. GameNative's Rockstar support covers Steam copies; an Epic copy
+would start Rockstar's own launcher, which hasn't been tried. `pipeline/gta_bundle.py` builds the
+bundle from the container export.
 
 | Knob | Value | Why |
 |---|---|---|
@@ -157,8 +182,8 @@ container.
 | Max Device Memory | 512 MB | |
 | Screen Size | Custom **1404x648** | The phone's 19.5:9 shape at about 720p's pixel count, so the picture fills the screen without stretching |
 | Game resolution | `commandline.txt` in the game folder: `-width 1404 -height 648 -fullscreen` ([copy](docs/games/GTAV.commandline.txt)) | Without it the game opens at 800x600 in the screen's top-left corner |
-| Executable | `PlayGTAV.exe`, no arguments | |
-| `WINEDLLOVERRIDES` | `version=n,b` | Loads the game folder's own `version.dll` before Wine's; without it the game stops at an incomplete-installation error |
+| Executable | `PlayGTAV.exe`, no arguments | For a Steam copy GameNative picks the launcher itself |
+| `WINEDLLOVERRIDES` | `version=n,b`, for our copy only | Loads the game folder's own `version.dll` before Wine's; without it our copy stops at an incomplete-installation error. A Steam copy has no such file, and the bundle's config leaves this out |
 | Quiet logging | `WINEDEBUG=-all`, Wine debug logs off | Logging slows loading |
 | Game files | Verify them | A missing `x64/audio/sfx/INTERACTIVE_MUSIC.rpf` crashed the game on a breakpoint instruction with no hint of the cause |
 
